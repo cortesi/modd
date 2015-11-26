@@ -2,10 +2,12 @@ package modd
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"os/exec"
 
 	"github.com/cortesi/termlog"
+	"github.com/fatih/color"
 )
 
 func getShell() string {
@@ -18,9 +20,20 @@ func getShell() string {
 	return sh
 }
 
+func logOutput(fp io.ReadCloser, out func(string, ...interface{})) {
+	r := bufio.NewReader(fp)
+	for {
+		line, _, err := r.ReadLine()
+		if err != nil {
+			return
+		}
+		out(string(line))
+	}
+}
+
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd string, log termlog.Logger) error {
-	log.Notice("prep: %s", cmd)
+	log.Say("%s %s", color.BlueString("prep:"), cmd)
 	sh := getShell()
 	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()
@@ -31,32 +44,15 @@ func RunProc(cmd string, log termlog.Logger) error {
 	if err != nil {
 		return err
 	}
-	go func() {
-		r := bufio.NewReader(stde)
-		for {
-			line, _, err := r.ReadLine()
-			if err != nil {
-				return
-			}
-			log.Warn(string(line))
-		}
-	}()
-	go func() {
-		r := bufio.NewReader(stdo)
-		for {
-			line, _, err := r.ReadLine()
-			if err != nil {
-				return
-			}
-			log.Say(string(line))
-		}
-	}()
+	go logOutput(stde, log.Warn)
+	go logOutput(stdo, log.Say)
 	err = c.Start()
 	if err != nil {
 		return err
 	}
 	err = c.Wait()
 	if err != nil {
+		log.Shout("%s", c.ProcessState.String())
 		return err
 	}
 	// FIXME: rusage stats here
