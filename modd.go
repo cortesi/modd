@@ -8,8 +8,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cortesi/termlog"
 	"github.com/rjeczalik/notify"
 )
+
+// Version is the modd release version
+const Version = "0.1"
+
+// Logger receives events as "debug", and is silenced by default
+var Logger = defaultLogger()
+
+func defaultLogger() termlog.Logger {
+	l := termlog.NewLog()
+	l.Quiet()
+	return l
+}
 
 // isUnder takes two absolute paths, and returns true if child is under parent.
 func isUnder(parent string, child string) bool {
@@ -148,6 +161,7 @@ func batch(batchTime time.Duration, exists existenceChecker, ch chan notify.Even
 	for {
 		select {
 		case evt := <-ch:
+			Logger.SayAs("debug", "%s", evt)
 			switch evt.Event() {
 			case notify.Create:
 				added[evt.Path()] = true

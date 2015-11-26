@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/cortesi/modd"
+	"github.com/cortesi/termlog"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -15,24 +15,34 @@ func main() {
 		"path",
 		"Paths to monitor for changes.",
 	).Required().Strings()
+
+	debug := kingpin.Flag("debug", "Debugging for devd development").
+		Default("false").
+		Bool()
+
+	kingpin.Version(modd.Version)
 	kingpin.Parse()
+	log := termlog.NewLog()
+
+	if *debug {
+		log.Enable("debug")
+		modd.Logger = log
+	}
 
 	modchan := make(chan modd.Mod)
-	for _, path := range *paths {
-		err := modd.Watch(path, batchTime, modchan)
-		if err != nil {
-			kingpin.Fatalf("Fatal error: %s", err)
-		}
+	err := modd.Watch(*paths, batchTime, modchan)
+	if err != nil {
+		kingpin.Fatalf("Fatal error: %s", err)
 	}
 	for mod := range modchan {
 		if len(mod.Added) > 0 {
-			fmt.Printf("Added: %v\n", mod.Added)
+			log.Say("Added: %v\n", mod.Added)
 		}
 		if len(mod.Changed) > 0 {
-			fmt.Printf("Changed: %v\n", mod.Changed)
+			log.Say("Changed: %v\n", mod.Changed)
 		}
 		if len(mod.Deleted) > 0 {
-			fmt.Printf("Removed: %v\n", mod.Deleted)
+			log.Say("Deleted: %v\n", mod.Deleted)
 		}
 	}
 }
