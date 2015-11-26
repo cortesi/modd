@@ -184,7 +184,7 @@ func TestMod(t *testing.T) {
 		Deleted: []string{abs("rm")},
 		Changed: []string{abs("change")},
 	}
-	if err := m.normPaths([]string{"/"}); err != nil {
+	if _, err := m.normPaths([]string{"/"}); err != nil {
 		t.Error(err)
 	}
 }

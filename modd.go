@@ -54,15 +54,16 @@ func normPath(bases []string, abspath string) (string, error) {
 	return abspath, nil
 }
 
-func normPaths(bases []string, abspaths []string) error {
+func normPaths(bases []string, abspaths []string) ([]string, error) {
+	ret := make([]string, len(abspaths))
 	for i, p := range abspaths {
 		norm, err := normPath(bases, p)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		abspaths[i] = norm
+		ret[i] = norm
 	}
-	return nil
+	return ret, nil
 }
 
 // An existenceChecker checks the existence of a file
@@ -110,17 +111,37 @@ func (mod Mod) Empty() bool {
 	return true
 }
 
-func (mod *Mod) normPaths(bases []string) error {
-	if err := normPaths(bases, mod.Changed); err != nil {
-		return err
+// Filter applies a filter, modifying the Mod struct in-place
+func (mod *Mod) Filter(excludes []string) (*Mod, error) {
+	changed, err := filterFiles(mod.Changed, excludes)
+	if err != nil {
+		return nil, err
 	}
-	if err := normPaths(bases, mod.Deleted); err != nil {
-		return err
+	deleted, err := filterFiles(mod.Deleted, excludes)
+	if err != nil {
+		return nil, err
 	}
-	if err := normPaths(bases, mod.Added); err != nil {
-		return err
+	added, err := filterFiles(mod.Added, excludes)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return &Mod{Changed: changed, Deleted: deleted, Added: added}, nil
+}
+
+func (mod *Mod) normPaths(bases []string) (*Mod, error) {
+	changed, err := normPaths(bases, mod.Changed)
+	if err != nil {
+		return nil, err
+	}
+	deleted, err := normPaths(bases, mod.Deleted)
+	if err != nil {
+		return nil, err
+	}
+	added, err := normPaths(bases, mod.Added)
+	if err != nil {
+		return nil, err
+	}
+	return &Mod{Changed: changed, Deleted: deleted, Added: added}, nil
 }
 
 func _keys(m map[string]bool) []string {
@@ -220,7 +241,7 @@ func batch(batchTime time.Duration, exists existenceChecker, ch chan notify.Even
 // strings are written to chan, representing all files changed, added or
 // removed. We apply heuristics to cope with things like transient files and
 // unreliable event notifications.
-func Watch(paths []string, batchTime time.Duration, ch chan Mod) error {
+func Watch(paths []string, excludes []string, batchTime time.Duration, ch chan Mod) error {
 	evtch := make(chan notify.EventInfo, 1024)
 	for _, p := range paths {
 		stat, err := os.Stat(p)
@@ -239,7 +260,14 @@ func Watch(paths []string, batchTime time.Duration, ch chan Mod) error {
 		for {
 			ret := batch(batchTime, statExistenceChecker{}, evtch)
 			if ret != nil {
-				ret.normPaths(paths)
+				ret, err := ret.normPaths(paths)
+				if err != nil {
+					Logger.Shout("Error normalising paths: %s", err)
+				}
+				ret, err = ret.Filter(excludes)
+				if err != nil {
+					Logger.Shout("Error filtering paths: %s", err)
+				}
 				if !ret.Empty() {
 					ch <- *ret
 				}

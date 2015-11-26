@@ -16,6 +16,11 @@ func main() {
 		"Paths to monitor for changes.",
 	).Required().Strings()
 
+	excludes := kingpin.Flag("exclude", "Glob pattern for files to exclude from livereload").
+		PlaceHolder("PATTERN").
+		Short('x').
+		Strings()
+
 	debug := kingpin.Flag("debug", "Debugging for devd development").
 		Default("false").
 		Bool()
@@ -30,7 +35,7 @@ func main() {
 	}
 
 	modchan := make(chan modd.Mod)
-	err := modd.Watch(*paths, batchTime, modchan)
+	err := modd.Watch(*paths, *excludes, batchTime, modchan)
 	if err != nil {
 		kingpin.Fatalf("Fatal error: %s", err)
 	}
