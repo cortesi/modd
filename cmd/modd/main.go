@@ -16,9 +16,19 @@ func main() {
 		"Paths to monitor for changes.",
 	).Required().Strings()
 
-	excludes := kingpin.Flag("exclude", "Glob pattern for files to exclude from livereload").
+	cmdstats := kingpin.Flag("cmdstats", "Show stats on command execution").
+		Short('s').
+		Default("false").
+		Bool()
+
+	excludes := kingpin.Flag("exclude", "Glob pattern for files to exclude from monitoring").
 		PlaceHolder("PATTERN").
 		Short('x').
+		Strings()
+
+	prep := kingpin.Flag("prep", "Prep command to run before daemons are restarted").
+		PlaceHolder("CMD").
+		Short('p').
 		Strings()
 
 	debug := kingpin.Flag("debug", "Debugging for devd development").
@@ -34,21 +44,26 @@ func main() {
 		log.Enable("debug")
 		modd.Logger = log
 	}
+	if *cmdstats {
+		log.Enable("cmdstats")
+	}
 
 	modchan := make(chan modd.Mod)
 	err := modd.Watch(*paths, *excludes, batchTime, modchan)
 	if err != nil {
 		kingpin.Fatalf("Fatal error: %s", err)
 	}
+	modd.RunProcs(*prep, log)
 	for mod := range modchan {
 		if len(mod.Added) > 0 {
-			log.Say("Added: %v\n", mod.Added)
+			log.SayAs("debug", "Added: %v\n", mod.Added)
 		}
 		if len(mod.Changed) > 0 {
-			log.Say("Changed: %v\n", mod.Changed)
+			log.SayAs("debug", "Changed: %v\n", mod.Changed)
 		}
 		if len(mod.Deleted) > 0 {
-			log.Say("Deleted: %v\n", mod.Deleted)
+			log.SayAs("debug", "Deleted: %v\n", mod.Deleted)
 		}
+		modd.RunProcs(*prep, log)
 	}
 }
