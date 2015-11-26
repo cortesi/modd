@@ -58,15 +58,7 @@ func main() {
 		log.Shout("%s", err)
 	}
 	for mod := range modchan {
-		if len(mod.Added) > 0 {
-			log.SayAs("debug", "Added: %v\n", mod.Added)
-		}
-		if len(mod.Changed) > 0 {
-			log.SayAs("debug", "Changed: %v\n", mod.Changed)
-		}
-		if len(mod.Deleted) > 0 {
-			log.SayAs("debug", "Deleted: %v\n", mod.Deleted)
-		}
+		log.SayAs("debug", "Delta: \n%s", mod.String())
 		err := modd.RunProcs(*prep, log)
 		if err != nil {
 			log.Shout("%s", err)

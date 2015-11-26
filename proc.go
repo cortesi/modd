@@ -70,3 +70,15 @@ func RunProcs(cmds []string, log termlog.Logger) error {
 	}
 	return nil
 }
+
+type daemon struct{}
+
+// DaemonPen is a group of daemons, managed as a unit.
+type DaemonPen struct {
+	daemons *[]daemon
+}
+
+// Start starts set of daemons, each specified by a command
+func (dp *DaemonPen) Start(commands []string) {
+
+}

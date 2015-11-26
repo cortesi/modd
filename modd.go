@@ -1,6 +1,7 @@
 package modd
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -86,6 +87,13 @@ type Mod struct {
 	Changed []string
 	Deleted []string
 	Added   []string
+}
+
+func (mod Mod) String() string {
+	return fmt.Sprintf(
+		"Added: %v\nDeleted: %v\nChanged: %v",
+		mod.Added, mod.Deleted, mod.Changed,
+	)
 }
 
 // All returns a single list of all changed files
