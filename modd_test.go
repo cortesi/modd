@@ -110,7 +110,7 @@ func TestBatch(t *testing.T) {
 		for _, e := range tst.events {
 			input <- e
 		}
-		ret := batch(".", 0, tst.exists, input)
+		ret := batch(0, tst.exists, input)
 		if !reflect.DeepEqual(*ret, tst.expected) {
 			t.Errorf("Test %d: expected\n%#v\ngot\n%#v", i, tst.expected, *ret)
 		}
@@ -137,8 +137,27 @@ var normPathTests = []struct {
 
 func TestNormPath(t *testing.T) {
 	for i, tst := range normPathTests {
-		ret, err := normPath(tst.base, tst.abspath)
+		ret, err := normPath([]string{tst.base}, tst.abspath)
 		if err != nil || ret != tst.expected {
+			t.Errorf("Test %d: expected %#v, got %#v", i, tst.expected, ret)
+		}
+	}
+}
+
+var isUnderTests = []struct {
+	parent   string
+	child    string
+	expected bool
+}{
+	{"/foo", "/foo/bar", true},
+	{"/foo", "/foo", true},
+	{"/foo", "/foobar/bar", false},
+}
+
+func TestIsUnder(t *testing.T) {
+	for i, tst := range isUnderTests {
+		ret := isUnder(tst.parent, tst.child)
+		if ret != tst.expected {
 			t.Errorf("Test %d: expected %#v, got %#v", i, tst.expected, ret)
 		}
 	}
@@ -165,7 +184,7 @@ func TestMod(t *testing.T) {
 		Deleted: []string{abs("rm")},
 		Changed: []string{abs("change")},
 	}
-	if err := m.normPaths("/"); err != nil {
+	if err := m.normPaths([]string{"/"}); err != nil {
 		t.Error(err)
 	}
 }

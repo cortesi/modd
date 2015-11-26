@@ -1,14 +1,11 @@
 package main
 
-// A simple demo app that just prints all files changed for a path
-
 import (
 	"fmt"
 	"time"
 
+	"github.com/cortesi/modd"
 	"gopkg.in/alecthomas/kingpin.v2"
-
-	"github.com/cortesi/devd/modd"
 )
 
 const batchTime = time.Millisecond * 200

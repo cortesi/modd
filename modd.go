@@ -5,28 +5,45 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/rjeczalik/notify"
 )
 
-// Notify events have absolute paths. We want to normalize these so that they
-// are relative to the base path.
-func normPath(base string, abspath string) (string, error) {
-	absbase, err := filepath.Abs(base)
-	if err != nil {
-		return "", err
+// isUnder takes two absolute paths, and returns true if child is under parent.
+func isUnder(parent string, child string) bool {
+	parent = filepath.ToSlash(parent)
+	child = filepath.ToSlash(child)
+	off := strings.Index(child, parent)
+	if off == 0 && (len(child) == len(parent) || child[len(parent)] == '/') {
+		return true
 	}
-	relpath, err := filepath.Rel(absbase, abspath)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(base, relpath), nil
+	return false
 }
 
-func normPaths(base string, abspaths []string) error {
+// Notify events have absolute paths. We want to normalize these so that they
+// are relative to the base path.
+func normPath(bases []string, abspath string) (string, error) {
+	for _, base := range bases {
+		absbase, err := filepath.Abs(base)
+		if isUnder(absbase, abspath) {
+			if err != nil {
+				return "", err
+			}
+			relpath, err := filepath.Rel(absbase, abspath)
+			if err != nil {
+				return "", err
+			}
+			return filepath.Join(base, relpath), nil
+		}
+	}
+	return abspath, nil
+}
+
+func normPaths(bases []string, abspaths []string) error {
 	for i, p := range abspaths {
-		norm, err := normPath(base, p)
+		norm, err := normPath(bases, p)
 		if err != nil {
 			return err
 		}
@@ -80,14 +97,14 @@ func (mod Mod) Empty() bool {
 	return true
 }
 
-func (mod *Mod) normPaths(base string) error {
-	if err := normPaths(base, mod.Changed); err != nil {
+func (mod *Mod) normPaths(bases []string) error {
+	if err := normPaths(bases, mod.Changed); err != nil {
 		return err
 	}
-	if err := normPaths(base, mod.Deleted); err != nil {
+	if err := normPaths(bases, mod.Deleted); err != nil {
 		return err
 	}
-	if err := normPaths(base, mod.Added); err != nil {
+	if err := normPaths(bases, mod.Added); err != nil {
 		return err
 	}
 	return nil
@@ -123,7 +140,7 @@ func _keys(m map[string]bool) []string {
 //
 // In the face of all this, all we can do is layer on a set of heuristics to
 // try to get intuitive results.
-func batch(base string, batchTime time.Duration, exists existenceChecker, ch chan notify.EventInfo) *Mod {
+func batch(batchTime time.Duration, exists existenceChecker, ch chan notify.EventInfo) *Mod {
 	added := make(map[string]bool)
 	removed := make(map[string]bool)
 	changed := make(map[string]bool)
@@ -189,28 +206,31 @@ func batch(base string, batchTime time.Duration, exists existenceChecker, ch cha
 // strings are written to chan, representing all files changed, added or
 // removed. We apply heuristics to cope with things like transient files and
 // unreliable event notifications.
-func Watch(p string, batchTime time.Duration, ch chan Mod) error {
-	stat, err := os.Stat(p)
-	if err != nil {
-		return err
-	}
-	if stat.IsDir() {
-		p = path.Join(p, "...")
-	}
+func Watch(paths []string, batchTime time.Duration, ch chan Mod) error {
 	evtch := make(chan notify.EventInfo, 1024)
-	err = notify.Watch(p, evtch, notify.All)
-	if err == nil {
-		go func() {
-			for {
-				ret := batch(p, batchTime, statExistenceChecker{}, evtch)
-				if ret != nil {
-					ret.normPaths(p)
-					if !ret.Empty() {
-						ch <- *ret
-					}
+	for _, p := range paths {
+		stat, err := os.Stat(p)
+		if err != nil {
+			return err
+		}
+		if stat.IsDir() {
+			p = path.Join(p, "...")
+		}
+		err = notify.Watch(p, evtch, notify.All)
+		if err != nil {
+			return err
+		}
+	}
+	go func() {
+		for {
+			ret := batch(batchTime, statExistenceChecker{}, evtch)
+			if ret != nil {
+				ret.normPaths(paths)
+				if !ret.Empty() {
+					ch <- *ret
 				}
 			}
-		}()
-	}
-	return err
+		}
+	}()
+	return nil
 }
