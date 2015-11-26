@@ -53,7 +53,10 @@ func main() {
 	if err != nil {
 		kingpin.Fatalf("Fatal error: %s", err)
 	}
-	modd.RunProcs(*prep, log)
+	err = modd.RunProcs(*prep, log)
+	if err != nil {
+		log.Shout("%s", err)
+	}
 	for mod := range modchan {
 		if len(mod.Added) > 0 {
 			log.SayAs("debug", "Added: %v\n", mod.Added)
@@ -64,6 +67,9 @@ func main() {
 		if len(mod.Deleted) > 0 {
 			log.SayAs("debug", "Deleted: %v\n", mod.Deleted)
 		}
-		modd.RunProcs(*prep, log)
+		err := modd.RunProcs(*prep, log)
+		if err != nil {
+			log.Shout("%s", err)
+		}
 	}
 }

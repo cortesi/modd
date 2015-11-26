@@ -19,17 +19,17 @@ func getShell() string {
 }
 
 // RunProc runs a process to completion, sending output to log
-func RunProc(cmd string, log termlog.Logger) (bool, error) {
+func RunProc(cmd string, log termlog.Logger) error {
 	log.Notice("prep: %s", cmd)
 	sh := getShell()
 	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()
 	if err != nil {
-		return false, err
+		return err
 	}
 	stde, err := c.StderrPipe()
 	if err != nil {
-		return false, err
+		return err
 	}
 	go func() {
 		r := bufio.NewReader(stde)
@@ -53,24 +53,24 @@ func RunProc(cmd string, log termlog.Logger) (bool, error) {
 	}()
 	err = c.Start()
 	if err != nil {
-		return false, err
+		return err
 	}
 	err = c.Wait()
 	if err != nil {
-		return false, err
+		return err
 	}
 	// FIXME: rusage stats here
-	log.NoticeAs("cmdstats", "%s, %s", c.ProcessState.UserTime(), c.ProcessState.String())
-	return c.ProcessState.Success(), nil
+	log.NoticeAs("cmdstats", "run time: %s", c.ProcessState.UserTime())
+	return nil
 }
 
 // RunProcs runs all commands in sequence. Stops if any command returns an error.
-func RunProcs(cmds []string, log termlog.Logger) (bool, error) {
+func RunProcs(cmds []string, log termlog.Logger) error {
 	for _, cmd := range cmds {
-		success, err := RunProc(cmd, log)
-		if !success || err != nil {
-			return success, err
+		err := RunProc(cmd, log)
+		if err != nil {
+			return err
 		}
 	}
-	return true, nil
+	return nil
 }
