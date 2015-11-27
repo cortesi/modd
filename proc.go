@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"syscall"
 
 	"github.com/cortesi/termlog"
 	"github.com/fatih/color"
@@ -72,41 +73,46 @@ func RunProcs(cmds []string, log termlog.Logger) error {
 }
 
 type daemon struct {
-	cmd string
-	log termlog.Logger
+	commandString string
+	log           termlog.Logger
+	cmd           *exec.Cmd
 }
 
-func (d *daemon) Start() error {
-	d.log.Say("%s %s", color.BlueString("daemon:"), d.cmd)
-	sh := getShell()
-	c := exec.Command(sh, "-c", d.cmd)
-	stdo, err := c.StdoutPipe()
-	if err != nil {
-		return err
+func (d *daemon) Run() {
+	for {
+		d.log.Say("%s %s", color.BlueString("starting daemon:"), d.commandString)
+		sh := getShell()
+		c := exec.Command(sh, "-c", d.commandString)
+		stdo, err := c.StdoutPipe()
+		if err != nil {
+			d.log.Shout("%s", err)
+			continue
+		}
+		stde, err := c.StderrPipe()
+		if err != nil {
+			d.log.Shout("%s", err)
+			continue
+		}
+		go logOutput(stde, d.log.Warn)
+		go logOutput(stdo, d.log.Say)
+		err = c.Start()
+		if err != nil {
+			d.log.Shout("%s", err)
+			continue
+		}
+		d.cmd = c
+		err = c.Wait()
+		if err != nil {
+			d.log.Shout("%s", c.ProcessState.String())
+			continue
+		}
 	}
-	stde, err := c.StderrPipe()
-	if err != nil {
-		return err
-	}
-	go logOutput(stde, d.log.Warn)
-	go logOutput(stdo, d.log.Say)
-	err = c.Start()
-	if err != nil {
-		return err
-	}
-	err = c.Wait()
-	if err != nil {
-		d.log.Shout("%s", c.ProcessState.String())
-		return err
-	}
-	// FIXME: rusage stats here
-	d.log.NoticeAs("cmdstats", "run time: %s", c.ProcessState.UserTime())
-	return nil
-
 }
 
 func (d *daemon) Restart() {
-
+	if d.cmd != nil {
+		d.cmd.Process.Signal(syscall.SIGHUP)
+	}
 }
 
 // DaemonPen is a group of daemons, managed as a unit.
@@ -119,9 +125,19 @@ func (dp *DaemonPen) Start(commands []string, log termlog.Logger) {
 	d := make([]daemon, len(commands))
 	for i, c := range commands {
 		d[i] = daemon{
-			cmd: c,
-			log: log,
+			commandString: c,
+			log:           log,
 		}
-		d[i].Start()
+		go d[i].Run()
+	}
+	dp.daemons = &d
+}
+
+// Restart all daemons in the pen
+func (dp *DaemonPen) Restart() {
+	if dp.daemons != nil {
+		for _, d := range *dp.daemons {
+			d.Restart()
+		}
 	}
 }

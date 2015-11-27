@@ -21,6 +21,11 @@ func main() {
 		Default("false").
 		Bool()
 
+	daemons := kingpin.Flag("daemon", "Daemon to keep running").
+		PlaceHolder("CMD").
+		Short('d').
+		Strings()
+
 	excludes := kingpin.Flag("exclude", "Glob pattern for files to exclude from monitoring").
 		PlaceHolder("PATTERN").
 		Short('x').
@@ -57,11 +62,14 @@ func main() {
 	if err != nil {
 		log.Shout("%s", err)
 	}
+	d := modd.DaemonPen{}
+	d.Start(*daemons, log)
 	for mod := range modchan {
 		log.SayAs("debug", "Delta: \n%s", mod.String())
 		err := modd.RunProcs(*prep, log)
 		if err != nil {
 			log.Shout("%s", err)
 		}
+		d.Restart()
 	}
 }
