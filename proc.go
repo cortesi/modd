@@ -71,7 +71,43 @@ func RunProcs(cmds []string, log termlog.Logger) error {
 	return nil
 }
 
-type daemon struct{}
+type daemon struct {
+	cmd string
+	log termlog.Logger
+}
+
+func (d *daemon) Start() error {
+	d.log.Say("%s %s", color.BlueString("daemon:"), d.cmd)
+	sh := getShell()
+	c := exec.Command(sh, "-c", d.cmd)
+	stdo, err := c.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stde, err := c.StderrPipe()
+	if err != nil {
+		return err
+	}
+	go logOutput(stde, d.log.Warn)
+	go logOutput(stdo, d.log.Say)
+	err = c.Start()
+	if err != nil {
+		return err
+	}
+	err = c.Wait()
+	if err != nil {
+		d.log.Shout("%s", c.ProcessState.String())
+		return err
+	}
+	// FIXME: rusage stats here
+	d.log.NoticeAs("cmdstats", "run time: %s", c.ProcessState.UserTime())
+	return nil
+
+}
+
+func (d *daemon) Restart() {
+
+}
 
 // DaemonPen is a group of daemons, managed as a unit.
 type DaemonPen struct {
@@ -79,6 +115,13 @@ type DaemonPen struct {
 }
 
 // Start starts set of daemons, each specified by a command
-func (dp *DaemonPen) Start(commands []string) {
-
+func (dp *DaemonPen) Start(commands []string, log termlog.Logger) {
+	d := make([]daemon, len(commands))
+	for i, c := range commands {
+		d[i] = daemon{
+			cmd: c,
+			log: log,
+		}
+		d[i].Start()
+	}
 }
