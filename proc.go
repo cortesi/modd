@@ -34,7 +34,7 @@ func logOutput(fp io.ReadCloser, out func(string, ...interface{})) {
 
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd string, log termlog.Logger) error {
-	log.Say("%s %s", color.BlueString("prep:"), cmd)
+	log.Say("%s %s", color.BlueString("running prep:"), cmd)
 	sh := getShell()
 	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()
