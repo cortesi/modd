@@ -7,10 +7,15 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/cortesi/termlog"
 	"github.com/fatih/color"
 )
+
+// MinRestart is the minimum amount of time between daemon restarts, in
+// nanoseconds.
+const MinRestart = 1 * time.Second
 
 func getShell() string {
 	sh := os.Getenv("SHELL")
@@ -81,7 +86,13 @@ type daemon struct {
 }
 
 func (d *daemon) Run() {
+	var lastStart time.Time
 	for d.stop != true {
+		since := time.Now().Sub(lastStart)
+		if since < MinRestart {
+			time.Sleep(MinRestart - since)
+		}
+		lastStart = time.Now()
 		d.log.Say("%s %s", color.BlueString("starting daemon:"), d.commandString)
 		sh := getShell()
 		c := exec.Command(sh, "-c", d.commandString)
