@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 
 	"github.com/cortesi/termlog"
@@ -76,10 +77,11 @@ type daemon struct {
 	commandString string
 	log           termlog.Logger
 	cmd           *exec.Cmd
+	stop          bool
 }
 
 func (d *daemon) Run() {
-	for {
+	for d.stop != true {
 		d.log.Say("%s %s", color.BlueString("starting daemon:"), d.commandString)
 		sh := getShell()
 		c := exec.Command(sh, "-c", d.commandString)
@@ -115,13 +117,24 @@ func (d *daemon) Restart() {
 	}
 }
 
+func (d *daemon) Shutdown(sig os.Signal) {
+	d.stop = true
+	if d.cmd != nil {
+		d.cmd.Process.Signal(sig)
+		d.cmd.Wait()
+	}
+}
+
 // DaemonPen is a group of daemons, managed as a unit.
 type DaemonPen struct {
 	daemons *[]daemon
+	sync.Mutex
 }
 
 // Start starts set of daemons, each specified by a command
 func (dp *DaemonPen) Start(commands []string, log termlog.Logger) {
+	dp.Lock()
+	defer dp.Unlock()
 	d := make([]daemon, len(commands))
 	for i, c := range commands {
 		d[i] = daemon{
@@ -135,9 +148,22 @@ func (dp *DaemonPen) Start(commands []string, log termlog.Logger) {
 
 // Restart all daemons in the pen
 func (dp *DaemonPen) Restart() {
+	dp.Lock()
+	defer dp.Unlock()
 	if dp.daemons != nil {
 		for _, d := range *dp.daemons {
 			d.Restart()
+		}
+	}
+}
+
+// Shutdown all daemons in the pen
+func (dp *DaemonPen) Shutdown(sig os.Signal) {
+	dp.Lock()
+	defer dp.Unlock()
+	if dp.daemons != nil {
+		for _, d := range *dp.daemons {
+			d.Shutdown(sig)
 		}
 	}
 }

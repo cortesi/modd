@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/cortesi/modd"
@@ -63,6 +65,12 @@ func main() {
 		log.Shout("%s", err)
 	}
 	d := modd.DaemonPen{}
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill)
+	go func() {
+		d.Shutdown(<-c)
+		os.Exit(0)
+	}()
 	d.Start(*daemons, log)
 	for mod := range modchan {
 		log.SayAs("debug", "Delta: \n%s", mod.String())
