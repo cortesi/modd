@@ -166,6 +166,51 @@ func _keys(m map[string]bool) []string {
 	return nil
 }
 
+type fset map[string]bool
+
+func mkmod(exists existenceChecker, added fset, removed fset, changed fset, renamed fset) *Mod {
+	ret := &Mod{}
+	for k := range renamed {
+		// If a file is moved from A to B, we'll get separate rename
+		// events for both A and B. The only way to know if it was the
+		// source or destination is to check if the file exists.
+		if exists.Check(k) {
+			added[k] = true
+		} else {
+			removed[k] = true
+		}
+	}
+	for k := range added {
+		if exists.Check(k) {
+			// If a file exists, and has been both added and
+			// changed, we just mark it as added
+			delete(changed, k)
+			delete(removed, k)
+		} else {
+			// If a file has been added, and now does not exist, we
+			// strike it everywhere. This probably means the file is
+			// transient - i.e. has been quickly added and removed, or
+			// we've just not recieved a removal notification.
+			delete(added, k)
+			delete(removed, k)
+			delete(changed, k)
+		}
+	}
+	for k := range removed {
+		if exists.Check(k) {
+			delete(removed, k)
+		} else {
+			delete(added, k)
+			delete(changed, k)
+		}
+	}
+	ret.Added = _keys(added)
+	ret.Changed = _keys(changed)
+	ret.Deleted = _keys(removed)
+	return ret
+
+}
+
 // This function batches events up, and emits just a list of paths for files
 // considered changed. It applies some heuristics to deal with short-lived
 // temporary files and unreliable filesystem events. There are all sorts of
@@ -182,14 +227,16 @@ func _keys(m map[string]bool) []string {
 //
 // In the face of all this, all we can do is layer on a set of heuristics to
 // try to get intuitive results.
-func batch(batchTime time.Duration, exists existenceChecker, ch chan notify.EventInfo) *Mod {
+func batch(lullTime time.Duration, exists existenceChecker, ch chan notify.EventInfo) *Mod {
 	added := make(map[string]bool)
 	removed := make(map[string]bool)
 	changed := make(map[string]bool)
 	renamed := make(map[string]bool)
+	hadMod := false
 	for {
 		select {
 		case evt := <-ch:
+			hadMod = true
 			Logger.SayAs("debug", "%s", evt)
 			switch evt.Event() {
 			case notify.Create:
@@ -201,56 +248,26 @@ func batch(batchTime time.Duration, exists existenceChecker, ch chan notify.Even
 			case notify.Rename:
 				renamed[evt.Path()] = true
 			}
-		case <-time.After(batchTime):
-			ret := &Mod{}
-			for k := range renamed {
-				// If a file is moved from A to B, we'll get separate rename
-				// events for both A and B. The only way to know if it was the
-				// source or destination is to check if the file exists.
-				if exists.Check(k) {
-					added[k] = true
-				} else {
-					removed[k] = true
-				}
+		case <-time.After(lullTime):
+			// Have we had a lull?
+			if hadMod == false {
+				return mkmod(exists, added, removed, changed, renamed)
 			}
-			for k := range added {
-				if exists.Check(k) {
-					// If a file exists, and has been both added and
-					// changed, we just mark it as added
-					delete(changed, k)
-					delete(removed, k)
-				} else {
-					// If a file has been added, and now does not exist, we
-					// strike it everywhere. This probably means the file is
-					// transient - i.e. has been quickly added and removed, or
-					// we've just not recieved a removal notification.
-					delete(added, k)
-					delete(removed, k)
-					delete(changed, k)
-				}
-			}
-			for k := range removed {
-				if exists.Check(k) {
-					delete(removed, k)
-				} else {
-					delete(added, k)
-					delete(changed, k)
-				}
-			}
-			ret.Added = _keys(added)
-			ret.Changed = _keys(changed)
-			ret.Deleted = _keys(removed)
-			return ret
+			hadMod = false
 		}
 	}
 }
 
-// Watch watches a path p, batching events with duration batchTime. A list of
-// strings are written to chan, representing all files changed, added or
-// removed. We apply heuristics to cope with things like transient files and
-// unreliable event notifications.
-func Watch(paths []string, excludes []string, batchTime time.Duration, ch chan Mod) error {
-	evtch := make(chan notify.EventInfo, 1024)
+// Watch watches a set of paths. Mod structs representing a changeset are sent
+// on the channel ch.
+//
+// Watc applies heuristics to cope with transient files and unreliable event
+// notifications. Modifications are batched up until there is a a lull in the
+// stream of changes of duration lullTime. This lets us represent processes
+// that progressively affect multiple files, like rendering, as a single
+// changeset.
+func Watch(paths []string, excludes []string, lullTime time.Duration, ch chan Mod) error {
+	evtch := make(chan notify.EventInfo, 4096)
 	for _, p := range paths {
 		stat, err := os.Stat(p)
 		if err != nil {
@@ -266,7 +283,7 @@ func Watch(paths []string, excludes []string, batchTime time.Duration, ch chan M
 	}
 	go func() {
 		for {
-			ret := batch(batchTime, statExistenceChecker{}, evtch)
+			ret := batch(lullTime, statExistenceChecker{}, evtch)
 			if ret != nil {
 				ret, err := ret.normPaths(paths)
 				if err != nil {

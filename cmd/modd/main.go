@@ -10,7 +10,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const batchTime = time.Millisecond * 200
+const lullTime = time.Millisecond * 300
 
 func main() {
 	paths := kingpin.Arg(
@@ -56,7 +56,7 @@ func main() {
 	}
 
 	modchan := make(chan modd.Mod)
-	err := modd.Watch(*paths, *excludes, batchTime, modchan)
+	err := modd.Watch(*paths, *excludes, lullTime, modchan)
 	if err != nil {
 		kingpin.Fatalf("Fatal error: %s", err)
 	}
