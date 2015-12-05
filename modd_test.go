@@ -110,7 +110,7 @@ func TestBatch(t *testing.T) {
 		for _, e := range tst.events {
 			input <- e
 		}
-		ret := batch(0, tst.exists, input)
+		ret := batch(0, MaxLullWait, tst.exists, input)
 		if !reflect.DeepEqual(*ret, tst.expected) {
 			t.Errorf("Test %d: expected\n%#v\ngot\n%#v", i, tst.expected, *ret)
 		}

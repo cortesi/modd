@@ -16,6 +16,10 @@ import (
 // Version is the modd release version
 const Version = "0.1"
 
+// MaxLullWait is the maximum time to wait for a lull. This only kicks in if
+// we've had a constant stream of modifications blocking us.
+const MaxLullWait = time.Second * 8
+
 // Logger receives events as "debug", and is silenced by default
 var Logger = defaultLogger()
 
@@ -227,16 +231,17 @@ func mkmod(exists existenceChecker, added fset, removed fset, changed fset, rena
 //
 // In the face of all this, all we can do is layer on a set of heuristics to
 // try to get intuitive results.
-func batch(lullTime time.Duration, exists existenceChecker, ch chan notify.EventInfo) *Mod {
+func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecker, ch chan notify.EventInfo) *Mod {
 	added := make(map[string]bool)
 	removed := make(map[string]bool)
 	changed := make(map[string]bool)
 	renamed := make(map[string]bool)
-	hadMod := false
+	// Have we had a modification in the last lull
+	hadLullMod := false
 	for {
 		select {
 		case evt := <-ch:
-			hadMod = true
+			hadLullMod = true
 			Logger.SayAs("debug", "%s", evt)
 			switch evt.Event() {
 			case notify.Create:
@@ -250,10 +255,12 @@ func batch(lullTime time.Duration, exists existenceChecker, ch chan notify.Event
 			}
 		case <-time.After(lullTime):
 			// Have we had a lull?
-			if hadMod == false {
+			if hadLullMod == false {
 				return mkmod(exists, added, removed, changed, renamed)
 			}
-			hadMod = false
+			hadLullMod = false
+		case <-time.After(maxTime):
+			return mkmod(exists, added, removed, changed, renamed)
 		}
 	}
 }
@@ -283,7 +290,7 @@ func Watch(paths []string, excludes []string, lullTime time.Duration, ch chan Mo
 	}
 	go func() {
 		for {
-			ret := batch(lullTime, statExistenceChecker{}, evtch)
+			ret := batch(lullTime, MaxLullWait, statExistenceChecker{}, evtch)
 			if ret != nil {
 				ret, err := ret.normPaths(paths)
 				if err != nil {
