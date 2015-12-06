@@ -18,9 +18,9 @@ func main() {
 		"Paths to monitor for changes.",
 	).Required().Strings()
 
-	cmdstats := kingpin.Flag("cmdstats", "Show stats on command execution").
-		Short('s').
-		Default("false").
+	nocommon := kingpin.Flag("nocommon", "Don't exclude commonly ignored files").
+		PlaceHolder("CMD").
+		Short('c').
 		Bool()
 
 	daemons := kingpin.Flag("daemon", "Daemon to keep running").
@@ -28,14 +28,19 @@ func main() {
 		Short('d').
 		Strings()
 
-	excludes := kingpin.Flag("exclude", "Glob pattern for files to exclude from monitoring").
-		PlaceHolder("PATTERN").
-		Short('x').
-		Strings()
-
 	prep := kingpin.Flag("prep", "Prep command to run before daemons are restarted").
 		PlaceHolder("CMD").
 		Short('p').
+		Strings()
+
+	cmdstats := kingpin.Flag("cmdstats", "Show stats on command execution").
+		Short('s').
+		Default("false").
+		Bool()
+
+	excludes := kingpin.Flag("exclude", "Glob pattern for files to exclude from monitoring").
+		PlaceHolder("PATTERN").
+		Short('x').
 		Strings()
 
 	debug := kingpin.Flag("debug", "Debugging for devd development").
@@ -56,7 +61,11 @@ func main() {
 	}
 
 	modchan := make(chan modd.Mod)
-	err := modd.Watch(*paths, *excludes, lullTime, modchan)
+	exc := *excludes
+	if !*nocommon {
+		exc = append(*excludes, modd.CommonExcludes...)
+	}
+	err := modd.Watch(*paths, exc, lullTime, modchan)
 	if err != nil {
 		kingpin.Fatalf("Fatal error: %s", err)
 	}

@@ -308,3 +308,26 @@ func Watch(paths []string, excludes []string, lullTime time.Duration, ch chan Mo
 	}()
 	return nil
 }
+
+// A list of commonly excluded files suitable for passing in the excludes
+// parameter to Watch - includes repo directories, temporary files, and so
+// forth.
+var CommonExcludes = []string{
+	// VCS
+	"**/.git/**",
+	"**/.hg/**",
+	"**/.svn/**",
+
+	// OSX
+	"**/.DS_Store/**",
+
+	// Temporary files
+	"**.tmp",
+	"**~",
+	"**#",
+	"**.bak",
+	"**.swp",
+
+	// Python
+	"**.py[cod]",
+}
