@@ -77,6 +77,7 @@ func main() {
 		err := modd.RunProcs(*prep, log)
 		if err != nil {
 			log.Shout("%s", err)
+			continue
 		}
 		d.Restart()
 	}
