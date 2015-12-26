@@ -75,7 +75,6 @@ func main() {
 	}
 	err = modd.RunProcs(*prep, log)
 	if err != nil {
-		log.Shout("%s", err)
 		if *beep {
 			fmt.Print("\a")
 		}
@@ -92,7 +91,6 @@ func main() {
 		log.SayAs("debug", "Delta: \n%s", mod.String())
 		err := modd.RunProcs(*prep, log)
 		if err != nil {
-			log.Shout("%s", err)
 			if *beep {
 				fmt.Print("\a")
 			}
