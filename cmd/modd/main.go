@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"time"
@@ -18,8 +19,11 @@ func main() {
 		"Paths to monitor for changes.",
 	).Required().Strings()
 
+	beep := kingpin.Flag("beep", "Beep if any command returned an error").
+		Short('b').
+		Bool()
+
 	nocommon := kingpin.Flag("nocommon", "Don't exclude commonly ignored files").
-		PlaceHolder("CMD").
 		Short('c').
 		Bool()
 
@@ -72,6 +76,9 @@ func main() {
 	err = modd.RunProcs(*prep, log)
 	if err != nil {
 		log.Shout("%s", err)
+		if *beep {
+			fmt.Print("\a")
+		}
 	}
 	d := modd.DaemonPen{}
 	c := make(chan os.Signal, 1)
@@ -86,6 +93,9 @@ func main() {
 		err := modd.RunProcs(*prep, log)
 		if err != nil {
 			log.Shout("%s", err)
+			if *beep {
+				fmt.Print("\a")
+			}
 			continue
 		}
 		d.Restart()
