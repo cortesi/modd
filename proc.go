@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/cortesi/termlog"
-	"github.com/fatih/color"
 )
 
 // MinRestart is the minimum amount of time between daemon restarts, in
@@ -40,7 +39,6 @@ func logOutput(fp io.ReadCloser, out func(string, ...interface{})) {
 
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd string, log termlog.Logger) error {
-	log.Say("%s %s", color.BlueString("running prep:"), cmd)
 	sh := getShell()
 	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()
@@ -68,9 +66,12 @@ func RunProc(cmd string, log termlog.Logger) error {
 }
 
 // RunProcs runs all commands in sequence. Stops if any command returns an error.
-func RunProcs(cmds []string, log termlog.Logger) error {
+func RunProcs(cmds []string, log termlog.TermLog) error {
 	for _, cmd := range cmds {
-		err := RunProc(cmd, log)
+		err := RunProc(
+			cmd,
+			log.Stream(cmd),
+		)
 		if err != nil {
 			return err
 		}
@@ -93,7 +94,6 @@ func (d *daemon) Run() {
 			time.Sleep(MinRestart - since)
 		}
 		lastStart = time.Now()
-		d.log.Say("%s %s", color.BlueString("starting daemon:"), d.commandString)
 		sh := getShell()
 		c := exec.Command(sh, "-c", d.commandString)
 		stdo, err := c.StdoutPipe()
@@ -143,14 +143,14 @@ type DaemonPen struct {
 }
 
 // Start starts set of daemons, each specified by a command
-func (dp *DaemonPen) Start(commands []string, log termlog.Logger) {
+func (dp *DaemonPen) Start(commands []string, log termlog.TermLog) {
 	dp.Lock()
 	defer dp.Unlock()
 	d := make([]daemon, len(commands))
 	for i, c := range commands {
 		d[i] = daemon{
 			commandString: c,
-			log:           log,
+			log:           log.Stream(c),
 		}
 		go d[i].Run()
 	}
