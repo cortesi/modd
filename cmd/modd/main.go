@@ -54,7 +54,6 @@ func main() {
 	kingpin.Version(modd.Version)
 	kingpin.Parse()
 	log := termlog.NewLog()
-	log.Notice("modd v%s", modd.Version)
 
 	if *debug {
 		log.Enable("debug")
