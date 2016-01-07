@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"sync"
 	"syscall"
 	"time"
@@ -142,6 +143,23 @@ type DaemonPen struct {
 	sync.Mutex
 }
 
+var ws = regexp.MustCompile(`\s\s+`)
+
+const lineLimit = 80
+const postamble = "..."
+
+// niceName tries to produce a nicer process name. We condense whitespace to
+// make commands split over multiple lines with indentation more legible, and
+// limit the line length to 80 characters.
+func niceName(in string) string {
+	in = ws.ReplaceAllString(in, " ")
+	if len(in) > lineLimit-len(postamble) {
+		post := termlog.DefaultPalette.Say.SprintFunc()(postamble)
+		return in[:lineLimit-len(postamble)] + post
+	}
+	return in
+}
+
 // Start starts set of daemons, each specified by a command
 func (dp *DaemonPen) Start(commands []string, log termlog.TermLog) {
 	dp.Lock()
@@ -150,7 +168,7 @@ func (dp *DaemonPen) Start(commands []string, log termlog.TermLog) {
 	for i, c := range commands {
 		d[i] = daemon{
 			commandString: c,
-			log:           log.Stream(c),
+			log:           log.Stream(niceName(c)),
 		}
 		go d[i].Run()
 	}
