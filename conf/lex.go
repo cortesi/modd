@@ -6,13 +6,58 @@ import (
 	"unicode/utf8"
 )
 
+const spaces = " \t"
+const quotes = `'"`
+
+// Characters we don't allow in bare strings
+const bareStringDisallowed = "{}#" + spaces + quotes + ":"
+
+// itemType identifies the type of lex items.
+type itemType int
+
 const (
 	itemError itemType = iota // error occurred; value is text of error
 	itemEOF
-	itemSpace
 	itemLeftParen
 	itemRightParen
+	itemBareString
+	itemQuotedString
+	itemComment
+
+	itemPrep
+	itemDaemon
+	itemExclude
+	itemColon
 )
+
+func (i itemType) String() string {
+	switch i {
+	case itemError:
+		return "error"
+	case itemEOF:
+		return "EOF"
+	case itemLeftParen:
+		return "lparen"
+	case itemRightParen:
+		return "rparen"
+	case itemBareString:
+		return "barestring"
+	case itemQuotedString:
+		return "quotedstring"
+	case itemComment:
+		return "comment"
+	case itemDaemon:
+		return "daemon"
+	case itemPrep:
+		return "prep"
+	case itemExclude:
+		return "exclude"
+	case itemColon:
+		return "colon"
+	default:
+		panic("unreachable")
+	}
+}
 
 // Pos represents a byte position in the original input text from which
 // this template was parsed.
@@ -30,19 +75,6 @@ type item struct {
 	val string   // The value of this item.
 }
 
-func (i item) String() string {
-	switch {
-	case i.typ == itemEOF:
-		return "EOF"
-	case i.typ == itemError:
-		return i.val
-	}
-	return fmt.Sprintf("%q", i.val)
-}
-
-// itemType identifies the type of lex items.
-type itemType int
-
 // lexer holds the state of the scanner.
 type lexer struct {
 	name    string    // the name of the input; used only for error reports
@@ -53,6 +85,10 @@ type lexer struct {
 	width   Pos       // width of last rune read from input
 	lastPos Pos       // position of most recent item returned by nextItem
 	items   chan item // channel of scanned items
+}
+
+func (l *lexer) current() string {
+	return l.input[l.start:l.pos]
 }
 
 // next returns the next rune in the input.
@@ -81,7 +117,7 @@ func (l *lexer) backup() {
 
 // emit passes an item back to the client.
 func (l *lexer) emit(t itemType) {
-	l.items <- item{t, l.start, l.input[l.start:l.pos]}
+	l.items <- item{t, l.start, l.current()}
 	l.start = l.pos
 }
 
@@ -104,6 +140,13 @@ func (l *lexer) acceptRun(valid string) {
 	for strings.IndexRune(valid, l.next()) >= 0 {
 	}
 	l.backup()
+}
+
+// acceptFunc accepts a run of characters based on a match function
+func (l *lexer) acceptFunc(match func(rune) bool) {
+	for match(l.peek()) {
+		l.next()
+	}
 }
 
 // lineNumber reports which line we're on, based on the position of
@@ -145,61 +188,120 @@ func (l *lexer) run() {
 	}
 }
 
-// stateFns
-func lexTop(l *lexer) stateFn {
+// acceptBareString accepts a bare, unquoted string
+func (l *lexer) acceptBareString() {
+	l.acceptFunc(
+		func(r rune) bool {
+			return !any(r, bareStringDisallowed) && r != eof
+		},
+	)
+}
+
+// acceptLine accepts the remainder of a line
+func (l *lexer) acceptLine() {
+	l.acceptFunc(
+		func(r rune) bool {
+			return r != '\n' && r != eof
+		},
+	)
+	l.accept("\n")
+}
+
+// acceptQuotedString accepts a quoted string
+func (l *lexer) acceptQuotedString(quote rune) bool {
 Loop:
 	for {
-		n := l.next()
-		switch n {
-		case ' ', '\t':
-			scanSpace(l)
-		case '{':
-			l.emit(itemLeftParen)
-			return lexInside
+		switch l.next() {
+		case '\\':
+			if r := l.next(); r != eof {
+				break
+			}
+			fallthrough
 		case eof:
-			l.emit(itemEOF)
-			return nil
-
-		default:
-			l.errorf("Invalid input.")
+			l.errorf("unterminated quoted string")
+			return false
+		case quote:
 			break Loop
 		}
 	}
-	return nil
+	return true
+}
+
+func any(r rune, s string) bool {
+	return strings.IndexRune(s, r) >= 0
+}
+
+// stateFns
+func lexTop(l *lexer) stateFn {
+	for {
+		n := l.next()
+		if n == '#' {
+			l.acceptLine()
+			l.emit(itemComment)
+		} else if any(n, quotes) {
+			if l.acceptQuotedString(n) {
+				l.emit(itemQuotedString)
+			} else {
+				return nil
+			}
+		} else if n == '{' {
+			l.emit(itemLeftParen)
+			return lexInside
+		} else if n == eof {
+			l.emit(itemEOF)
+			return nil
+		} else if any(n, spaces) {
+			l.acceptRun(spaces)
+			l.ignore()
+		} else if !any(n, bareStringDisallowed) {
+			l.acceptBareString()
+			l.emit(itemBareString)
+		} else {
+			l.errorf("invalid input")
+		}
+	}
 }
 
 func lexInside(l *lexer) stateFn {
-Loop:
 	for {
 		n := l.next()
-		switch n {
-		case ' ', '\t':
-			scanSpace(l)
-		case '}':
+		if n == '#' {
+			l.acceptLine()
+			l.emit(itemComment)
+		} else if any(n, quotes) {
+			if l.acceptQuotedString(n) {
+				l.emit(itemQuotedString)
+			} else {
+				return nil
+			}
+		} else if n == '}' {
 			l.emit(itemRightParen)
 			return lexTop
-		case eof:
-			l.emit(itemEOF)
+		} else if n == ':' {
+			l.emit(itemColon)
+		} else if n == '{' {
+			l.errorf("unterminated block")
 			return nil
-
-		default:
-			l.errorf("Invalid input.")
-			break Loop
+		} else if n == eof {
+			l.errorf("unterminated block")
+			return nil
+		} else if any(n, spaces) {
+			l.acceptRun(spaces)
+			l.ignore()
+		} else if !any(n, bareStringDisallowed) {
+			l.acceptBareString()
+			switch l.current() {
+			case "exclude":
+				l.emit(itemExclude)
+			case "daemon":
+				l.emit(itemDaemon)
+			case "prep":
+				l.emit(itemPrep)
+			default:
+				l.emit(itemBareString)
+			}
+		} else {
+			return l.errorf("invalid input")
 		}
 	}
-	return nil
-}
-
-// lexSpace scans a run of space characters.
-// One space has already been seen.
-func scanSpace(l *lexer) {
-	for isSpace(l.peek()) {
-		l.next()
-	}
-	l.emit(itemSpace)
-}
-
-// isSpace reports whether r is a space character.
-func isSpace(r rune) bool {
-	return r == ' ' || r == '\t'
 }
