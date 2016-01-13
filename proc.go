@@ -13,8 +13,7 @@ import (
 	"github.com/cortesi/termlog"
 )
 
-// MinRestart is the minimum amount of time between daemon restarts, in
-// nanoseconds.
+// MinRestart is the minimum amount of time between daemon restarts
 const MinRestart = 1 * time.Second
 
 func getShell() string {

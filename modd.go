@@ -268,7 +268,7 @@ func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecke
 // Watch watches a set of paths. Mod structs representing a changeset are sent
 // on the channel ch.
 //
-// Watc applies heuristics to cope with transient files and unreliable event
+// Watch applies heuristics to cope with transient files and unreliable event
 // notifications. Modifications are batched up until there is a a lull in the
 // stream of changes of duration lullTime. This lets us represent processes
 // that progressively affect multiple files, like rendering, as a single
