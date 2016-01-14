@@ -22,7 +22,9 @@ func lexcollect(l *lexer) []itm {
 		if nxt.typ == itemEOF {
 			break
 		}
-		back = append(back, itm{nxt.typ, nxt.val})
+		if nxt.typ != itemSpace {
+			back = append(back, itm{nxt.typ, nxt.val})
+		}
 		if nxt.typ == itemError {
 			break
 		}
@@ -79,20 +81,31 @@ var lexTests = []struct {
 		},
 	},
 	{
-		`one {two}`, []itm{
-			{itemBareString, "one"},
-			{itemLeftParen, "{"},
-			{itemBareString, "two"},
-			{itemRightParen, "}"},
-		},
-	},
-	{
-		`one { daemon: command }`, []itm{
+		"one {\ndaemon: foo\n}", []itm{
 			{itemBareString, "one"},
 			{itemLeftParen, "{"},
 			{itemDaemon, "daemon"},
 			{itemColon, ":"},
-			{itemBareString, "command"},
+			{itemCommand, "foo\n"},
+			{itemRightParen, "}"},
+		},
+	},
+	{
+		"one { daemon: command\nprep: command\nexclude: command\n}", []itm{
+			{itemBareString, "one"},
+			{itemLeftParen, "{"},
+			{itemDaemon, "daemon"},
+			{itemColon, ":"},
+			{itemCommand, "command\n"},
+
+			{itemPrep, "prep"},
+			{itemColon, ":"},
+			{itemCommand, "command\n"},
+
+			{itemExclude, "exclude"},
+			{itemColon, ":"},
+			{itemCommand, "command\n"},
+
 			{itemRightParen, "}"},
 		},
 	},
@@ -105,14 +118,16 @@ var lexTests = []struct {
 		},
 	},
 	{
-		"# comment\none two # comment2\n\tthree{ foo   }", []itm{
+		"# comment\none two # comment2\n\tthree{ daemon: foo\n   }", []itm{
 			{itemComment, "# comment\n"},
 			{itemBareString, "one"},
 			{itemBareString, "two"},
 			{itemComment, "# comment2\n"},
 			{itemBareString, "three"},
 			{itemLeftParen, "{"},
-			{itemBareString, "foo"},
+			{itemDaemon, "daemon"},
+			{itemColon, ":"},
+			{itemCommand, "foo\n"},
 			{itemRightParen, "}"},
 		},
 	},
@@ -122,7 +137,7 @@ func TestLex(t *testing.T) {
 	for i, tt := range lexTests {
 		ret := lexcollect(lex("test", tt.input))
 		if !reflect.DeepEqual(ret, tt.expected) {
-			t.Errorf("%d - expected\n%v\ngot\n%v", i, tt.expected, ret)
+			t.Errorf("%d %q - expected\n%v\ngot\n%v", i, tt.input, tt.expected, ret)
 		}
 	}
 }
