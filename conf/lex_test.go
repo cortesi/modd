@@ -84,9 +84,8 @@ var lexTests = []struct {
 		"one {\ndaemon: foo\n}", []itm{
 			{itemBareString, "one"},
 			{itemLeftParen, "{"},
-			{itemDaemon, "daemon"},
-			{itemColon, ":"},
-			{itemCommand, "foo\n"},
+			{itemDaemon, "daemon:"},
+			{itemBareString, "foo\n"},
 			{itemRightParen, "}"},
 		},
 	},
@@ -94,25 +93,23 @@ var lexTests = []struct {
 		"one { daemon: command\nprep: command\nexclude: command\n}", []itm{
 			{itemBareString, "one"},
 			{itemLeftParen, "{"},
-			{itemDaemon, "daemon"},
-			{itemColon, ":"},
-			{itemCommand, "command\n"},
+			{itemDaemon, "daemon:"},
+			{itemBareString, "command\n"},
 
-			{itemPrep, "prep"},
-			{itemColon, ":"},
-			{itemCommand, "command\n"},
+			{itemPrep, "prep:"},
+			{itemBareString, "command\n"},
 
-			{itemExclude, "exclude"},
-			{itemColon, ":"},
-			{itemCommand, "command\n"},
+			{itemExclude, "exclude:"},
+			{itemBareString, "command"},
 
 			{itemRightParen, "}"},
 		},
 	},
 	{
-		`"one{" {"two}"}`, []itm{
+		`"one{" { daemon: "two}"}`, []itm{
 			{itemQuotedString, "\"one{\""},
 			{itemLeftParen, "{"},
+			{itemDaemon, "daemon:"},
 			{itemQuotedString, "\"two}\""},
 			{itemRightParen, "}"},
 		},
@@ -125,9 +122,8 @@ var lexTests = []struct {
 			{itemComment, "# comment2\n"},
 			{itemBareString, "three"},
 			{itemLeftParen, "{"},
-			{itemDaemon, "daemon"},
-			{itemColon, ":"},
-			{itemCommand, "foo\n"},
+			{itemDaemon, "daemon:"},
+			{itemBareString, "foo\n"},
 			{itemRightParen, "}"},
 		},
 	},
@@ -150,11 +146,11 @@ var lexErrorTests = []struct {
 	{"'", "unterminated quoted string", 1},
 	{"'\\", "unterminated quoted string", 2},
 	{"  '\nfoo", "unterminated quoted string", 7},
+	{"foo }", "invalid input", 5},
 	{"{", "unterminated block", 1},
-	{"{{}", "unterminated block", 2},
-	{"{'}", "unterminated quoted string", 3},
+	{"{{}", "invalid input", 2},
+	{"{daemon: '}", "unterminated quoted string", 11},
 	{"{#}", "unterminated block", 3},
-	{":", "invalid input", 1},
 }
 
 func TestLexErrors(t *testing.T) {
@@ -163,13 +159,13 @@ func TestLexErrors(t *testing.T) {
 		ret := lexcollect(l)
 		itm := ret[len(ret)-1]
 		if itm.typ != itemError {
-			t.Errorf("%d: Expected error, got %s", i, itm)
+			t.Errorf("%d: %q - Expected error, got %s", i, tt.input, itm)
 		}
 		if itm.val != tt.error {
-			t.Errorf("%d: Expected error value %s, got %s", i, tt.error, itm.val)
+			t.Errorf("%d: %q - Expected error value %s, got %s", i, tt.input, tt.error, itm.val)
 		}
 		if tt.pos != l.pos {
-			t.Errorf("%d: Expected position %s, got %s", i, tt.pos, l.pos)
+			t.Errorf("%d: %q - Expected position %s, got %s", i, tt.input, tt.pos, l.pos)
 		}
 	}
 }

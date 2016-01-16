@@ -10,15 +10,13 @@ const spaces = " \t\n"
 const quotes = `'"`
 
 // Characters we don't allow in bare strings
-const bareStringDisallowed = "{}#\n" + spaces + quotes + ":"
+const bareStringDisallowed = "{}#\n" + spaces + quotes
 
 // itemType identifies the type of lex items.
 type itemType int
 
 const (
 	itemBareString itemType = iota
-	itemColon
-	itemCommand
 	itemComment
 	itemDaemon
 	itemError // error occurred; value is text of error
@@ -35,10 +33,6 @@ func (i itemType) String() string {
 	switch i {
 	case itemBareString:
 		return "barestring"
-	case itemColon:
-		return "colon"
-	case itemCommand:
-		return "command"
 	case itemComment:
 		return "comment"
 	case itemDaemon:
@@ -209,15 +203,6 @@ func (l *lexer) run() {
 	}
 }
 
-// acceptBareString accepts a bare, unquoted string
-func (l *lexer) acceptBareString() {
-	l.acceptFunc(
-		func(r rune) bool {
-			return !any(r, bareStringDisallowed) && r != eof
-		},
-	)
-}
-
 // acceptLine accepts the remainder of a line
 func (l *lexer) acceptLine() {
 	l.acceptFunc(
@@ -226,6 +211,15 @@ func (l *lexer) acceptLine() {
 		},
 	)
 	l.accept("\n")
+}
+
+// acceptBareString accepts a bare, unquoted string
+func (l *lexer) acceptBareString() {
+	l.acceptFunc(
+		func(r rune) bool {
+			return !any(r, bareStringDisallowed) && r != eof
+		},
+	)
 }
 
 // acceptQuotedString accepts a quoted string
@@ -251,8 +245,9 @@ func any(r rune, s string) bool {
 	return strings.IndexRune(s, r) >= 0
 }
 
-// stateFns
-func lexTop(l *lexer) stateFn {
+// collectStrings reads and emits consecutive strings. Strings can be interspersed with
+// comments.
+func lexStrings(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) stateFn {
 	for {
 		n := l.next()
 		if n == '#' {
@@ -264,10 +259,7 @@ func lexTop(l *lexer) stateFn {
 				l.errorf("%s", err)
 				return nil
 			}
-			l.emit(itemQuotedString)
-		} else if n == '{' {
-			l.emit(itemLeftParen)
-			return lexInside
+			l.emit(quotedItem)
 		} else if n == eof {
 			l.emit(itemEOF)
 			return nil
@@ -276,11 +268,28 @@ func lexTop(l *lexer) stateFn {
 			l.emit(itemSpace)
 		} else if !any(n, bareStringDisallowed) {
 			l.acceptBareString()
-			l.emit(itemBareString)
+			l.emit(bareItem)
 		} else {
-			return l.errorf("invalid input")
+			l.backup()
+			return ret
 		}
 	}
+}
+
+// stateFns
+func lexTop(l *lexer) stateFn {
+	return func(l *lexer) stateFn {
+		return lexStrings(l, lexBlockStart, itemQuotedString, itemBareString)
+	}
+}
+
+func lexBlockStart(l *lexer) stateFn {
+	n := l.next()
+	if n == '{' {
+		l.emit(itemLeftParen)
+		return lexInside
+	}
+	return l.errorf("invalid input")
 }
 
 func lexInside(l *lexer) stateFn {
@@ -289,18 +298,9 @@ func lexInside(l *lexer) stateFn {
 		if n == '#' {
 			l.acceptLine()
 			l.emit(itemComment)
-		} else if any(n, quotes) {
-			err := l.acceptQuotedString(n)
-			if err != nil {
-				l.errorf("%s", err)
-				return nil
-			}
-			l.emit(itemQuotedString)
 		} else if n == '}' {
 			l.emit(itemRightParen)
 			return lexTop
-		} else if n == '{' {
-			return l.errorf("unterminated block")
 		} else if n == eof {
 			return l.errorf("unterminated block")
 		} else if any(n, spaces) {
@@ -309,13 +309,15 @@ func lexInside(l *lexer) stateFn {
 		} else if !any(n, bareStringDisallowed) {
 			l.acceptBareString()
 			switch l.current() {
-			case "exclude":
+			case "exclude:":
 				l.emit(itemExclude)
-				return lexCommand
-			case "daemon":
+				return func(l *lexer) stateFn {
+					return lexStrings(l, lexInside, itemQuotedString, itemBareString)
+				}
+			case "daemon:":
 				l.emit(itemDaemon)
 				return lexCommand
-			case "prep":
+			case "prep:":
 				l.emit(itemPrep)
 				return lexCommand
 			default:
@@ -331,33 +333,23 @@ func lexInside(l *lexer) stateFn {
 // lexCommand lexes a single command. Commands can either be unquoted and on a
 // single line, or quoted and span multiple lines.
 func lexCommand(l *lexer) stateFn {
-	colonseen := false
 	for {
 		n := l.next()
-		if n == ':' {
-			colonseen = true
-			l.emit(itemColon)
-		} else if any(n, spaces) {
+		if any(n, spaces) {
 			l.acceptRun(spaces)
 			l.emit(itemSpace)
-		} else {
-			if colonseen {
-				if any(n, quotes) {
-					err := l.acceptQuotedString(n)
-					if err != nil {
-						l.errorf("%s", err)
-						return nil
-					}
-					l.emit(itemCommand)
-				} else {
-					l.acceptLine()
-					l.emit(itemCommand)
-
-				}
-				return lexInside
+		} else if any(n, quotes) {
+			err := l.acceptQuotedString(n)
+			if err != nil {
+				l.errorf("%s", err)
+				return nil
 			}
-			l.errorf("unexpected character")
-			return nil
+			l.emit(itemQuotedString)
+			return lexInside
+		} else {
+			l.acceptLine()
+			l.emit(itemBareString)
+			return lexInside
 		}
 	}
 }

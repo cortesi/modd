@@ -28,15 +28,6 @@ func (p *parser) next() item {
 	return nxt
 }
 
-// peek returns but does not consume the next token.
-func (p *parser) peek() item {
-	if p.peekItem == nil {
-		itm := p.lex.nextSignificantItem()
-		p.peekItem = &itm
-	}
-	return *p.peekItem
-}
-
 func anyType(t itemType, allowed []itemType) bool {
 	for _, i := range allowed {
 		if t == i {
@@ -44,6 +35,23 @@ func anyType(t itemType, allowed []itemType) bool {
 		}
 	}
 	return false
+}
+
+func (p *parser) mustNext(allowed ...itemType) item {
+	nxt := p.next()
+	if !anyType(nxt.typ, allowed) {
+		panic("invalid token type")
+	}
+	return nxt
+}
+
+// peek returns but does not consume the next token.
+func (p *parser) peek() item {
+	if p.peekItem == nil {
+		itm := p.lex.nextSignificantItem()
+		p.peekItem = &itm
+	}
+	return *p.peekItem
 }
 
 func (p *parser) collect(types ...itemType) []item {
@@ -107,15 +115,11 @@ func (p *parser) parse() (err error) {
 	defer p.recover(&err)
 	p.lex = lex(p.name, p.text)
 	p.config = &Config{}
-	blocks := []Block{}
 	for {
 		if p.peek().typ == itemEOF {
 			break
 		}
-		blocks = append(blocks, *p.parseBlock())
-	}
-	if len(blocks) > 0 {
-		p.config.Blocks = blocks
+		p.config.addBlock(*p.parseBlock())
 	}
 	return err
 }
@@ -124,18 +128,29 @@ func (p *parser) parseBlock() *Block {
 	block := &Block{
 		Patterns: p.collectStrings(),
 	}
-
 	nxt := p.next()
 	if nxt.typ != itemLeftParen {
-		p.errorf("expected block open parentheses")
+		p.errorf("expected block open parentheses, got %q", nxt.val)
 	}
 
-	nxt = p.next()
-	switch nxt.typ {
-	case itemRightParen:
-		break
-	default:
-		p.errorf("unexpected input: %s", nxt.val)
+Loop:
+	for {
+		nxt = p.next()
+		switch nxt.typ {
+		case itemExclude:
+			if block.Excludes != nil {
+				panic("duplicate exclude directive")
+			}
+			block.Excludes = p.collectStrings()
+		case itemDaemon:
+			block.addDaemon(p.mustNext(itemBareString, itemQuotedString).val)
+		case itemPrep:
+			block.addPrep(p.mustNext(itemBareString, itemQuotedString).val)
+		case itemRightParen:
+			break Loop
+		default:
+			p.errorf("unexpected input: %s", nxt.val)
+		}
 	}
 
 	return block

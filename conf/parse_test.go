@@ -47,16 +47,49 @@ var parseTests = []struct {
 			},
 		},
 	},
+	{
+		"foo {\ndaemon: command\n}",
+		&Config{
+			[]Block{
+				{
+					Patterns: []string{"foo"},
+					Daemons:  []string{"command\n"},
+				},
+			},
+		},
+	},
+	{
+		"foo {\nprep: command\n}",
+		&Config{
+			[]Block{
+				{
+					Patterns: []string{"foo"},
+					Preps:    []string{"command\n"},
+				},
+			},
+		},
+	},
+	{
+		"foo {\nexclude: **/*.foo **/*.bar\n}",
+		&Config{
+			[]Block{
+				{
+					Patterns: []string{"foo"},
+					Excludes: []string{"**/*.foo", "**/*.bar"},
+				},
+			},
+		},
+	},
 }
 
 func TestParse(t *testing.T) {
 	for i, tt := range parseTests {
 		ret, err := Parse("test", tt.input)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("%q - %s", tt.input, err)
 		}
 		if !reflect.DeepEqual(ret, tt.expected) {
-			t.Errorf("%d - expected\n%#v\ngot\n%#v", i, tt.expected, ret)
+			t.Errorf("%d %q\nexpected:\n\t%#v\ngot\n\t%#v", i, tt.input, tt.expected, ret)
 		}
 	}
 }
@@ -66,14 +99,15 @@ var parseErrorTests = []struct {
 	err   string
 }{
 	{"{", "test:1: unterminated block"},
-	{"a", "test:1: expected block open parentheses"},
+	{"a", "test:1: expected block open parentheses, got \"\""},
+	// {"x {\nexclude: foo\nexclude: bar\n}", "test:1: duplicate exclude directive"},
 }
 
 func TestParseErrors(t *testing.T) {
 	for i, tt := range parseErrorTests {
-		_, err := Parse("test", tt.input)
+		v, err := Parse("test", tt.input)
 		if err == nil {
-			t.Fatalf("%d: Expected error", i)
+			t.Fatalf("%d: Expected error, got %#v", i, v)
 		}
 		if err.Error() != tt.err {
 			t.Errorf("Expected %q, got %q", err.Error(), tt.err)
