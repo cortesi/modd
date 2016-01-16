@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 )
 
+const lowerAlphas = "abcdefghijklmnopqrstuvwxyz1234567890"
 const spaces = " \t\n"
 const quotes = `'"`
 
@@ -17,6 +18,7 @@ type itemType int
 
 const (
 	itemBareString itemType = iota
+	itemColon
 	itemComment
 	itemDaemon
 	itemError // error occurred; value is text of error
@@ -34,6 +36,8 @@ func (i itemType) String() string {
 		return "barestring"
 	case itemComment:
 		return "comment"
+	case itemColon:
+		return "colon"
 	case itemDaemon:
 		return "daemon"
 	case itemError:
@@ -219,6 +223,15 @@ func (l *lexer) acceptBareString() {
 	)
 }
 
+// acceptWord accepts a lowercase word
+func (l *lexer) acceptWord() {
+	l.acceptFunc(
+		func(r rune) bool {
+			return any(r, lowerAlphas)
+		},
+	)
+}
+
 // acceptQuotedString accepts a quoted string
 func (l *lexer) acceptQuotedString(quote rune) error {
 Loop:
@@ -241,6 +254,8 @@ Loop:
 func any(r rune, s string) bool {
 	return strings.IndexRune(s, r) >= 0
 }
+
+// stateFns
 
 // lexPatterns reads and emits consecutive file patterns. Strings can be
 // interspersed with comments.
@@ -289,7 +304,6 @@ func lexPatterns(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) 
 	}
 }
 
-// stateFns
 func lexTop(l *lexer) stateFn {
 	return func(l *lexer) stateFn {
 		return lexPatterns(l, lexBlockStart, itemQuotedString, itemBareString)
@@ -320,20 +334,40 @@ func lexInside(l *lexer) stateFn {
 			l.acceptRun(spaces)
 			l.emit(itemSpace)
 		} else if !any(n, bareStringDisallowed) {
-			l.acceptBareString()
+			l.acceptWord()
 			switch l.current() {
-			case "daemon:":
+			case "daemon":
 				l.emit(itemDaemon)
-				return lexCommand
-			case "prep:":
+				return lexOptions
+			case "prep":
 				l.emit(itemPrep)
-				return lexCommand
+				return lexOptions
 			default:
-				l.errorf("Unexpected directive in block: %s", l.current())
+				l.errorf("unknown directive: %s", l.current())
 				return nil
 			}
 		} else {
 			return l.errorf("invalid input")
+		}
+	}
+}
+
+// lexOptions lexes the options that precede a command specification.
+func lexOptions(l *lexer) stateFn {
+	for {
+		n := l.next()
+		if any(n, spaces) {
+			l.acceptRun(spaces)
+			l.emit(itemSpace)
+		} else if n == ':' {
+			l.emit(itemColon)
+			return lexCommand
+		} else if n == '+' {
+			l.acceptWord()
+			l.emit(itemBareString)
+		} else {
+			l.errorf("invalid command option")
+			return nil
 		}
 	}
 }

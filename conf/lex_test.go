@@ -84,7 +84,32 @@ var lexTests = []struct {
 		"one {\ndaemon: foo\n}", []itm{
 			{itemBareString, "one"},
 			{itemLeftParen, "{"},
-			{itemDaemon, "daemon:"},
+			{itemDaemon, "daemon"},
+			{itemColon, ":"},
+			{itemBareString, "foo\n"},
+			{itemRightParen, "}"},
+		},
+	},
+	{
+		"one {\ndaemon +optone +opttwo: foo\n}", []itm{
+			{itemBareString, "one"},
+			{itemLeftParen, "{"},
+			{itemDaemon, "daemon"},
+			{itemBareString, "+optone"},
+			{itemBareString, "+opttwo"},
+			{itemColon, ":"},
+			{itemBareString, "foo\n"},
+			{itemRightParen, "}"},
+		},
+	},
+	{
+		"one {\ndaemon +optone +opttwo : foo\n}", []itm{
+			{itemBareString, "one"},
+			{itemLeftParen, "{"},
+			{itemDaemon, "daemon"},
+			{itemBareString, "+optone"},
+			{itemBareString, "+opttwo"},
+			{itemColon, ":"},
 			{itemBareString, "foo\n"},
 			{itemRightParen, "}"},
 		},
@@ -93,10 +118,12 @@ var lexTests = []struct {
 		"one { daemon: command\nprep: command\n}", []itm{
 			{itemBareString, "one"},
 			{itemLeftParen, "{"},
-			{itemDaemon, "daemon:"},
+			{itemDaemon, "daemon"},
+			{itemColon, ":"},
 			{itemBareString, "command\n"},
 
-			{itemPrep, "prep:"},
+			{itemPrep, "prep"},
+			{itemColon, ":"},
 			{itemBareString, "command\n"},
 
 			{itemRightParen, "}"},
@@ -106,7 +133,8 @@ var lexTests = []struct {
 		`"one{" { daemon: "two}"}`, []itm{
 			{itemQuotedString, "\"one{\""},
 			{itemLeftParen, "{"},
-			{itemDaemon, "daemon:"},
+			{itemDaemon, "daemon"},
+			{itemColon, ":"},
 			{itemQuotedString, "\"two}\""},
 			{itemRightParen, "}"},
 		},
@@ -119,7 +147,8 @@ var lexTests = []struct {
 			{itemComment, "# comment2\n"},
 			{itemBareString, "three"},
 			{itemLeftParen, "{"},
-			{itemDaemon, "daemon:"},
+			{itemDaemon, "daemon"},
+			{itemColon, ":"},
 			{itemBareString, "foo\n"},
 			{itemRightParen, "}"},
 		},
@@ -169,6 +198,10 @@ var lexErrorTests = []struct {
 	{"{{}", "invalid input", 2},
 	{"{daemon: '}", "unterminated quoted string", 11},
 	{"{#}", "unterminated block", 3},
+	{"!'", "unterminated quoted string", 2},
+	{"{oink: bar}", "unknown directive: oink", 5},
+	{"! {}", "! must be followed by a string", 2},
+	{"{ daemon +*: foo\n}", "invalid command option", 11},
 }
 
 func TestLexErrors(t *testing.T) {
@@ -180,7 +213,7 @@ func TestLexErrors(t *testing.T) {
 			t.Errorf("%d: %q - Expected error, got %s", i, tt.input, itm)
 		}
 		if itm.val != tt.error {
-			t.Errorf("%d: %q - Expected error value %s, got %s", i, tt.input, tt.error, itm.val)
+			t.Errorf("%d: %q - Expected error value\n%s\ngot\n%s", i, tt.input, tt.error, itm.val)
 		}
 		if tt.pos != l.pos {
 			t.Errorf("%d: %q - Expected position %s, got %s", i, tt.input, tt.pos, l.pos)

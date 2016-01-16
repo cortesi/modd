@@ -40,7 +40,7 @@ func anyType(t itemType, allowed []itemType) bool {
 func (p *parser) mustNext(allowed ...itemType) item {
 	nxt := p.next()
 	if !anyType(nxt.typ, allowed) {
-		panic("invalid token type")
+		panic(fmt.Errorf("invalid syntax"))
 	}
 	return nxt
 }
@@ -65,6 +65,15 @@ func (p *parser) collect(types ...itemType) []item {
 		}
 	}
 	return itms
+}
+
+func (p *parser) collectValues(types ...itemType) []string {
+	items := p.collect(types...)
+	ret := make([]string, len(items))
+	for i, v := range items {
+		ret[i] = v.val
+	}
+	return ret
 }
 
 // Collects an arbitrary number of patterns, and returns a []Pattern,
@@ -161,9 +170,25 @@ Loop:
 		nxt = p.next()
 		switch nxt.typ {
 		case itemDaemon:
-			block.addDaemon(p.mustNext(itemBareString, itemQuotedString).val)
+			options := p.collectValues(itemBareString)
+			p.mustNext(itemColon)
+			err := block.addDaemon(
+				p.mustNext(itemBareString, itemQuotedString).val,
+				options,
+			)
+			if err != nil {
+				p.errorf("%s", err)
+			}
 		case itemPrep:
-			block.addPrep(p.mustNext(itemBareString, itemQuotedString).val)
+			options := p.collectValues(itemBareString)
+			p.mustNext(itemColon)
+			err := block.addPrep(
+				p.mustNext(itemBareString, itemQuotedString).val,
+				options,
+			)
+			if err != nil {
+				p.errorf("%s", err)
+			}
 		case itemRightParen:
 			break Loop
 		default:
