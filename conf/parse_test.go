@@ -72,6 +72,17 @@ var parseTests = []struct {
 		},
 	},
 	{
+		`foo +common {}`,
+		&Config{
+			[]Block{
+				{
+					Patterns:       []Pattern{{Spec: "foo"}},
+					NoCommonFilter: true,
+				},
+			},
+		},
+	},
+	{
 		"'foo bar' voing {}",
 		&Config{
 			[]Block{

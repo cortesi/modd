@@ -8,9 +8,11 @@ type Pattern struct {
 
 // Block is a match pattern and a set of specifications
 type Block struct {
-	Patterns []Pattern
-	Daemons  []string
-	Preps    []string
+	Patterns       []Pattern
+	NoCommonFilter bool
+
+	Daemons []string
+	Preps   []string
 }
 
 func (b *Block) addDaemon(s string) {

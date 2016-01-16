@@ -130,6 +130,12 @@ var lexTests = []struct {
 		},
 	},
 	{
+		"one +common ", []itm{
+			{itemBareString, "one"},
+			{itemBareString, "+common"},
+		},
+	},
+	{
 		`!"one"`, []itm{
 			{itemQuotedString, `!"one"`},
 		},
