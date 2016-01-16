@@ -90,7 +90,7 @@ var lexTests = []struct {
 		},
 	},
 	{
-		"one { daemon: command\nprep: command\nexclude: command\n}", []itm{
+		"one { daemon: command\nprep: command\n}", []itm{
 			{itemBareString, "one"},
 			{itemLeftParen, "{"},
 			{itemDaemon, "daemon:"},
@@ -98,9 +98,6 @@ var lexTests = []struct {
 
 			{itemPrep, "prep:"},
 			{itemBareString, "command\n"},
-
-			{itemExclude, "exclude:"},
-			{itemBareString, "command"},
 
 			{itemRightParen, "}"},
 		},

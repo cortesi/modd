@@ -5,7 +5,6 @@ type Block struct {
 	Patterns []string
 	Daemons  []string
 	Preps    []string
-	Excludes []string
 }
 
 func (b *Block) addDaemon(s string) {

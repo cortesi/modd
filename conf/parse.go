@@ -137,11 +137,6 @@ Loop:
 	for {
 		nxt = p.next()
 		switch nxt.typ {
-		case itemExclude:
-			if block.Excludes != nil {
-				panic("duplicate exclude directive")
-			}
-			block.Excludes = p.collectStrings()
 		case itemDaemon:
 			block.addDaemon(p.mustNext(itemBareString, itemQuotedString).val)
 		case itemPrep:

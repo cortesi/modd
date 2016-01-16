@@ -21,7 +21,6 @@ const (
 	itemDaemon
 	itemError // error occurred; value is text of error
 	itemEOF
-	itemExclude
 	itemLeftParen
 	itemQuotedString
 	itemPrep
@@ -41,8 +40,6 @@ func (i itemType) String() string {
 		return "error"
 	case itemEOF:
 		return "eof"
-	case itemExclude:
-		return "exclude"
 	case itemLeftParen:
 		return "lparen"
 	case itemPrep:
@@ -309,11 +306,6 @@ func lexInside(l *lexer) stateFn {
 		} else if !any(n, bareStringDisallowed) {
 			l.acceptBareString()
 			switch l.current() {
-			case "exclude:":
-				l.emit(itemExclude)
-				return func(l *lexer) stateFn {
-					return lexStrings(l, lexInside, itemQuotedString, itemBareString)
-				}
 			case "daemon:":
 				l.emit(itemDaemon)
 				return lexCommand

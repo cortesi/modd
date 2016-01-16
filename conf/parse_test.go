@@ -69,17 +69,6 @@ var parseTests = []struct {
 			},
 		},
 	},
-	{
-		"foo {\nexclude: **/*.foo **/*.bar\n}",
-		&Config{
-			[]Block{
-				{
-					Patterns: []string{"foo"},
-					Excludes: []string{"**/*.foo", "**/*.bar"},
-				},
-			},
-		},
-	},
 }
 
 func TestParse(t *testing.T) {
