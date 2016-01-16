@@ -22,7 +22,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []string{"foo"},
+					Patterns: []Pattern{{Spec: "foo"}},
 				},
 			},
 		},
@@ -32,7 +32,41 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []string{"foo", "bar"},
+					Patterns: []Pattern{{Spec: "foo"}, {Spec: "bar"}},
+				},
+			},
+		},
+	},
+	{
+		"!foo {}",
+		&Config{
+			[]Block{
+				{
+					Patterns: []Pattern{{Spec: "foo", Filter: true}},
+				},
+			},
+		},
+	},
+	{
+		`!"foo" {}`,
+		&Config{
+			[]Block{
+				{
+					Patterns: []Pattern{{Spec: "foo", Filter: true}},
+				},
+			},
+		},
+	},
+	{
+		`!"foo" !'bar' !voing {}`,
+		&Config{
+			[]Block{
+				{
+					Patterns: []Pattern{
+						{Spec: "foo", Filter: true},
+						{Spec: "bar", Filter: true},
+						{Spec: "voing", Filter: true},
+					},
 				},
 			},
 		},
@@ -42,7 +76,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []string{"foo bar", "voing"},
+					Patterns: []Pattern{{Spec: "foo bar"}, {Spec: "voing"}},
 				},
 			},
 		},
@@ -52,7 +86,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []string{"foo"},
+					Patterns: []Pattern{{Spec: "foo"}},
 					Daemons:  []string{"command\n"},
 				},
 			},
@@ -63,7 +97,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []string{"foo"},
+					Patterns: []Pattern{{Spec: "foo"}},
 					Preps:    []string{"command\n"},
 				},
 			},

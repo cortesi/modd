@@ -1,8 +1,14 @@
 package conf
 
+// A Pattern represents a single file match pattern
+type Pattern struct {
+	Spec   string
+	Filter bool
+}
+
 // Block is a match pattern and a set of specifications
 type Block struct {
-	Patterns []string
+	Patterns []Pattern
 	Daemons  []string
 	Preps    []string
 }

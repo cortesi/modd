@@ -67,15 +67,29 @@ func (p *parser) collect(types ...itemType) []item {
 	return itms
 }
 
-func (p *parser) collectStrings() []string {
+func (p *parser) collectPatterns() []Pattern {
 	vals := p.collect(itemBareString, itemQuotedString)
-	ret := make([]string, len(vals))
+	ret := make([]Pattern, len(vals))
 	for i, v := range vals {
 		switch v.typ {
 		case itemBareString:
-			ret[i] = v.val
+			if v.val[0] == '!' {
+				ret[i] = Pattern{
+					Spec:   v.val[1:],
+					Filter: true,
+				}
+			} else {
+				ret[i] = Pattern{Spec: v.val}
+			}
 		case itemQuotedString:
-			ret[i] = v.val[1 : len(v.val)-1]
+			if v.val[0] == '!' {
+				ret[i] = Pattern{
+					Spec:   v.val[2 : len(v.val)-1],
+					Filter: true,
+				}
+			} else {
+				ret[i] = Pattern{Spec: v.val[1 : len(v.val)-1]}
+			}
 		}
 	}
 	if len(ret) > 0 {
@@ -125,14 +139,11 @@ func (p *parser) parse() (err error) {
 }
 
 func (p *parser) parseBlock() *Block {
-	block := &Block{
-		Patterns: p.collectStrings(),
-	}
+	block := &Block{Patterns: p.collectPatterns()}
 	nxt := p.next()
 	if nxt.typ != itemLeftParen {
 		p.errorf("expected block open parentheses, got %q", nxt.val)
 	}
-
 Loop:
 	for {
 		nxt = p.next()
@@ -147,7 +158,6 @@ Loop:
 			p.errorf("unexpected input: %s", nxt.val)
 		}
 	}
-
 	return block
 }
 
