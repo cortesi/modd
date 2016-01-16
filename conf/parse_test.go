@@ -2,6 +2,7 @@ package conf
 
 import (
 	"reflect"
+	"syscall"
 	"testing"
 )
 
@@ -98,10 +99,42 @@ var parseTests = []struct {
 			[]Block{
 				{
 					Patterns: []Pattern{{Spec: "foo"}},
-					Daemons:  []string{"command\n"},
+					Daemons:  []Daemon{{"command\n", syscall.SIGHUP}},
 				},
 			},
 		},
+	},
+	{
+		"{\ndaemon +sighup: c\n}",
+		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGHUP}}}}},
+	},
+	{
+		"{\ndaemon +sigterm: c\n}",
+		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGTERM}}}}},
+	},
+	{
+		"{\ndaemon +sigint: c\n}",
+		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGINT}}}}},
+	},
+	{
+		"{\ndaemon +sigkill: c\n}",
+		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGKILL}}}}},
+	},
+	{
+		"{\ndaemon +sigquit: c\n}",
+		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGQUIT}}}}},
+	},
+	{
+		"{\ndaemon +sigusr1: c\n}",
+		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGUSR1}}}}},
+	},
+	{
+		"{\ndaemon +sigusr2: c\n}",
+		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGUSR2}}}}},
+	},
+	{
+		"{\ndaemon +sigwinch: c\n}",
+		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGWINCH}}}}},
 	},
 	{
 		"foo {\nprep: command\n}",
@@ -109,7 +142,18 @@ var parseTests = []struct {
 			[]Block{
 				{
 					Patterns: []Pattern{{Spec: "foo"}},
-					Preps:    []string{"command\n"},
+					Preps:    []Prep{Prep{Command: "command\n"}},
+				},
+			},
+		},
+	},
+	{
+		"foo #comment\nbar\n#comment\n{\n#comment\nprep: command\n}",
+		&Config{
+			[]Block{
+				{
+					Patterns: []Pattern{{Spec: "foo"}, {Spec: "bar"}},
+					Preps:    []Prep{Prep{Command: "command\n"}},
 				},
 			},
 		},
@@ -120,7 +164,7 @@ var parseTests = []struct {
 			[]Block{
 				{
 					Patterns: []Pattern{{Spec: "foo"}, {Spec: "bar"}},
-					Preps:    []string{"command\n"},
+					Preps:    []Prep{{"command\n"}},
 				},
 			},
 		},
