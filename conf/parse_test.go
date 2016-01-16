@@ -114,6 +114,17 @@ var parseTests = []struct {
 			},
 		},
 	},
+	{
+		"foo #comment\n#comment\nbar { #comment \nprep: command\n}",
+		&Config{
+			[]Block{
+				{
+					Patterns: []Pattern{{Spec: "foo"}, {Spec: "bar"}},
+					Preps:    []string{"command\n"},
+				},
+			},
+		},
+	},
 }
 
 func TestParse(t *testing.T) {
@@ -134,6 +145,9 @@ var parseErrorTests = []struct {
 }{
 	{"{", "test:1: unterminated block"},
 	{"a", "test:1: expected block open parentheses, got \"\""},
+	{`foo { "bar": "bar" }`, "test:1: invalid input"},
+	{"foo { daemon: \n }", "test:1: empty command specification"},
+	{"foo { daemon: \" }", "test:1: unterminated quoted string"},
 }
 
 func TestParseErrors(t *testing.T) {
@@ -143,7 +157,7 @@ func TestParseErrors(t *testing.T) {
 			t.Fatalf("%d: Expected error, got %#v", i, v)
 		}
 		if err.Error() != tt.err {
-			t.Errorf("Expected %q, got %q", err.Error(), tt.err)
+			t.Errorf("Expected\n%q\ngot\n%q", tt.err, err.Error())
 		}
 	}
 }

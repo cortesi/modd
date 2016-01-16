@@ -6,11 +6,12 @@ import (
 	"unicode/utf8"
 )
 
-const spaces = " \t\n"
+const spaces = " \t"
+const whitespace = spaces + "\n"
 const quotes = `'"`
 
 // Characters we don't allow in bare strings
-const bareStringDisallowed = "{}#\n" + spaces + quotes
+const bareStringDisallowed = "{}#\n" + whitespace + quotes
 
 // itemType identifies the type of lex items.
 type itemType int
@@ -253,8 +254,8 @@ func lexPatterns(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) 
 		} else if n == eof {
 			l.emit(itemEOF)
 			return nil
-		} else if any(n, spaces) {
-			l.acceptRun(spaces)
+		} else if any(n, whitespace) {
+			l.acceptRun(whitespace)
 			l.emit(itemSpace)
 		} else if n == '!' {
 			pk := l.next()
@@ -316,8 +317,8 @@ func lexInside(l *lexer) stateFn {
 			return lexTop
 		} else if n == eof {
 			return l.errorf("unterminated block")
-		} else if any(n, spaces) {
-			l.acceptRun(spaces)
+		} else if any(n, whitespace) {
+			l.acceptRun(whitespace)
 			l.emit(itemSpace)
 		} else if !any(n, bareStringDisallowed) {
 			l.acceptBareString()
@@ -343,9 +344,9 @@ func lexInside(l *lexer) stateFn {
 func lexCommand(l *lexer) stateFn {
 	for {
 		n := l.next()
-		if any(n, spaces) {
-			l.acceptRun(spaces)
-			l.emit(itemSpace)
+		if n == '\n' {
+			l.errorf("empty command specification")
+			return nil
 		} else if any(n, quotes) {
 			err := l.acceptQuotedString(n)
 			if err != nil {
@@ -354,6 +355,9 @@ func lexCommand(l *lexer) stateFn {
 			}
 			l.emit(itemQuotedString)
 			return lexInside
+		} else if any(n, spaces) {
+			l.acceptRun(spaces)
+			l.emit(itemSpace)
 		} else {
 			l.acceptLine()
 			l.emit(itemBareString)
