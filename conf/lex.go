@@ -242,14 +242,36 @@ func any(r rune, s string) bool {
 	return strings.IndexRune(s, r) >= 0
 }
 
-// collectStrings reads and emits consecutive strings. Strings can be interspersed with
-// comments.
-func lexStrings(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) stateFn {
+// lexPatterns reads and emits consecutive file patterns. Strings can be
+// interspersed with comments.
+func lexPatterns(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) stateFn {
 	for {
 		n := l.next()
 		if n == '#' {
 			l.acceptLine()
 			l.emit(itemComment)
+		} else if n == eof {
+			l.emit(itemEOF)
+			return nil
+		} else if any(n, spaces) {
+			l.acceptRun(spaces)
+			l.emit(itemSpace)
+		} else if n == '!' {
+			pk := l.next()
+			if any(pk, quotes) {
+				err := l.acceptQuotedString(pk)
+				if err != nil {
+					l.errorf("%s", err)
+					return nil
+				}
+				l.emit(quotedItem)
+			} else if !any(pk, bareStringDisallowed) {
+				l.acceptBareString()
+				l.emit(bareItem)
+			} else {
+				l.errorf("! must be followed by a string")
+				return nil
+			}
 		} else if any(n, quotes) {
 			err := l.acceptQuotedString(n)
 			if err != nil {
@@ -257,12 +279,6 @@ func lexStrings(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) s
 				return nil
 			}
 			l.emit(quotedItem)
-		} else if n == eof {
-			l.emit(itemEOF)
-			return nil
-		} else if any(n, spaces) {
-			l.acceptRun(spaces)
-			l.emit(itemSpace)
 		} else if !any(n, bareStringDisallowed) {
 			l.acceptBareString()
 			l.emit(bareItem)
@@ -276,7 +292,7 @@ func lexStrings(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) s
 // stateFns
 func lexTop(l *lexer) stateFn {
 	return func(l *lexer) stateFn {
-		return lexStrings(l, lexBlockStart, itemQuotedString, itemBareString)
+		return lexPatterns(l, lexBlockStart, itemQuotedString, itemBareString)
 	}
 }
 

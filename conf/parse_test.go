@@ -89,7 +89,6 @@ var parseErrorTests = []struct {
 }{
 	{"{", "test:1: unterminated block"},
 	{"a", "test:1: expected block open parentheses, got \"\""},
-	// {"x {\nexclude: foo\nexclude: bar\n}", "test:1: duplicate exclude directive"},
 }
 
 func TestParseErrors(t *testing.T) {

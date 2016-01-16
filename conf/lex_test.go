@@ -124,6 +124,21 @@ var lexTests = []struct {
 			{itemRightParen, "}"},
 		},
 	},
+	{
+		"!one ", []itm{
+			{itemBareString, "!one"},
+		},
+	},
+	{
+		`!"one"`, []itm{
+			{itemQuotedString, `!"one"`},
+		},
+	},
+	{
+		"!\"one\ntwo\"", []itm{
+			{itemQuotedString, "!\"one\ntwo\""},
+		},
+	},
 }
 
 func TestLex(t *testing.T) {
