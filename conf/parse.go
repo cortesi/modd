@@ -3,6 +3,7 @@ package conf
 import (
 	"fmt"
 	"runtime"
+	"strings"
 )
 
 type parser struct {
@@ -153,6 +154,15 @@ func (p *parser) parse() (err error) {
 	return err
 }
 
+func prepCommand(itm item) string {
+	val := itm.val
+	if itm.typ == itemQuotedString {
+		val = val[1 : len(val)-1]
+		val = strings.Replace(val, "\n", " ", -1)
+	}
+	return strings.TrimSpace(val)
+}
+
 func (p *parser) parseBlock() *Block {
 	block := &Block{}
 	block.Include, block.Exclude, block.NoCommonFilter = p.collectPatterns()
@@ -168,7 +178,7 @@ Loop:
 			options := p.collectValues(itemBareString)
 			p.mustNext(itemColon)
 			err := block.addDaemon(
-				p.mustNext(itemBareString, itemQuotedString).val,
+				prepCommand(p.mustNext(itemBareString, itemQuotedString)),
 				options,
 			)
 			if err != nil {
@@ -178,7 +188,7 @@ Loop:
 			options := p.collectValues(itemBareString)
 			p.mustNext(itemColon)
 			err := block.addPrep(
-				p.mustNext(itemBareString, itemQuotedString).val,
+				prepCommand(p.mustNext(itemBareString, itemQuotedString)),
 				options,
 			)
 			if err != nil {

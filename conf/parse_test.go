@@ -93,42 +93,42 @@ var parseTests = []struct {
 			[]Block{
 				{
 					Include: []string{"foo"},
-					Daemons: []Daemon{{"command\n", syscall.SIGHUP}},
+					Daemons: []Daemon{{"command", syscall.SIGHUP}},
 				},
 			},
 		},
 	},
 	{
 		"{\ndaemon +sighup: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGHUP}}}}},
+		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGHUP}}}}},
 	},
 	{
 		"{\ndaemon +sigterm: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGTERM}}}}},
+		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGTERM}}}}},
 	},
 	{
 		"{\ndaemon +sigint: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGINT}}}}},
+		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGINT}}}}},
 	},
 	{
 		"{\ndaemon +sigkill: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGKILL}}}}},
+		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGKILL}}}}},
 	},
 	{
 		"{\ndaemon +sigquit: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGQUIT}}}}},
+		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGQUIT}}}}},
 	},
 	{
 		"{\ndaemon +sigusr1: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGUSR1}}}}},
+		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGUSR1}}}}},
 	},
 	{
 		"{\ndaemon +sigusr2: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGUSR2}}}}},
+		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGUSR2}}}}},
 	},
 	{
 		"{\ndaemon +sigwinch: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c\n", syscall.SIGWINCH}}}}},
+		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGWINCH}}}}},
 	},
 	{
 		"foo {\nprep: command\n}",
@@ -136,7 +136,18 @@ var parseTests = []struct {
 			[]Block{
 				{
 					Include: []string{"foo"},
-					Preps:   []Prep{Prep{Command: "command\n"}},
+					Preps:   []Prep{Prep{Command: "command"}},
+				},
+			},
+		},
+	},
+	{
+		"foo {\nprep: 'command\n-one\n-two'}",
+		&Config{
+			[]Block{
+				{
+					Include: []string{"foo"},
+					Preps:   []Prep{Prep{Command: "command -one -two"}},
 				},
 			},
 		},
@@ -147,7 +158,7 @@ var parseTests = []struct {
 			[]Block{
 				{
 					Include: []string{"foo", "bar"},
-					Preps:   []Prep{Prep{Command: "command\n"}},
+					Preps:   []Prep{Prep{Command: "command"}},
 				},
 			},
 		},
@@ -158,7 +169,7 @@ var parseTests = []struct {
 			[]Block{
 				{
 					Include: []string{"foo", "bar"},
-					Preps:   []Prep{{"command\n"}},
+					Preps:   []Prep{{"command"}},
 				},
 			},
 		},
