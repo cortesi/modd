@@ -30,6 +30,10 @@ func main() {
 		Short('b').
 		Bool()
 
+	prep := kingpin.Flag("prep", "Run prep commands and exit").
+		Short('p').
+		Bool()
+
 	cmdstats := kingpin.Flag("cmdstats", "Show stats on command execution").
 		Short('s').
 		Default("false").
@@ -60,12 +64,6 @@ func main() {
 		kingpin.Fatalf("%s", err)
 	}
 
-	modchan := make(chan modd.Mod)
-	err = modd.Watch(cnf.WatchPaths(), lullTime, modchan)
-	if err != nil {
-		kingpin.Fatalf("Fatal error: %s", err)
-	}
-
 	daemonPens := make([]*modd.DaemonPen, len(cnf.Blocks))
 	for i, b := range cnf.Blocks {
 		if !b.NoCommonFilter {
@@ -86,8 +84,21 @@ func main() {
 			d.Shutdown(<-c)
 			os.Exit(0)
 		}()
-		d.Start(b.Daemons, log)
+		if !*prep {
+			d.Start(b.Daemons, log)
+		}
 		daemonPens[i] = &d
+	}
+	if *prep {
+		os.Exit(0)
+	}
+
+	// FIXME: This takes a long time. We could start it in parallel with the
+	// first process run in a goroutine
+	modchan := make(chan modd.Mod)
+	err = modd.Watch(cnf.WatchPaths(), lullTime, modchan)
+	if err != nil {
+		kingpin.Fatalf("Fatal error: %s", err)
 	}
 
 	for mod := range modchan {
