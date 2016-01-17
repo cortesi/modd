@@ -107,9 +107,9 @@ type daemon struct {
 }
 
 func (d *daemon) Run() {
-	d.log.Header()
 	var lastStart time.Time
 	for d.stop != true {
+		d.log.Header()
 		since := time.Now().Sub(lastStart)
 		if since < MinRestart {
 			time.Sleep(MinRestart - since)

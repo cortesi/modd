@@ -44,6 +44,8 @@ All **prep** commands in a block are run in order of occurrence before any
 **daemon** is restarted. If any prep command exits with an error, execution is
 stopped.
 
+All processes inherit the parent environment.
+
 
 # Features
 
@@ -87,22 +89,22 @@ actual signal sent is configurable per-daemon.
 
 
 
-## Excluding files
+## File watch patterns
 
-The **-x** flag supports the following terms:
+Watch patterns support the following terms:
 
 Term          | Meaning
 ------------- | -------
-`*`           | matches any sequence of non-path-separators
-`**`          | matches any sequence of characters, including path separators
-`?`           | matches any single non-path-separator character
-`[class]`     | matches any single non-path-separator character against a class of characters
-`{alt1,...}`  | matches a sequence of characters if one of the comma-separated alternatives matches
+`*`           | any sequence of non-path-separators
+`**`          | any sequence of characters, including path separators
+`?`           | any single non-path-separator character
+`[class]`     | any single non-path-separator character against a class of characters
+`{alt1,...}`  | any of the comma-separated alternatives - to avoid conflict with the block specification, patterns with curly-braces should be enclosed in quotes
 
 Any character with a special meaning can be escaped with a backslash (`\`). Character classes support the following:
 
 Class      | Meaning
 ---------- | -------
-`[abc]`    | matches any single character within the set
-`[a-z]`    | matches any single character in the range
-`[^class]` | matches any single character which does *not* match the class
+`[abc]`    | any character within the set
+`[a-z]`    | any character in the range
+`[^class]` | any character which does *not* match the class
