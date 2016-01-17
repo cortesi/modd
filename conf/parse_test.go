@@ -186,6 +186,9 @@ var parseErrorTests = []struct {
 	{`foo { "bar": "bar" }`, "test:1: invalid input"},
 	{"foo { daemon: \n }", "test:1: empty command specification"},
 	{"foo { daemon: \" }", "test:1: unterminated quoted string"},
+	{"foo { daemon *: foo }", "test:1: invalid syntax"},
+	{"foo { daemon +invalid: foo }", "test:1: unknown option: +invalid"},
+	{"foo { prep +invalid: foo }", "test:1: unknown option: +invalid"},
 }
 
 func TestParseErrors(t *testing.T) {

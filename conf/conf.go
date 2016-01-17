@@ -82,6 +82,12 @@ type Config struct {
 	Blocks []Block
 }
 
+// WatchPaths retreives the set of watched paths (with patterns removed) from
+// all blocks. The path set is de-duplicated.
+func (c *Config) WatchPaths() []string {
+	return nil
+}
+
 func (c *Config) addBlock(b Block) {
 	if c.Blocks == nil {
 		c.Blocks = []Block{}

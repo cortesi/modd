@@ -40,7 +40,7 @@ func anyType(t itemType, allowed []itemType) bool {
 func (p *parser) mustNext(allowed ...itemType) item {
 	nxt := p.next()
 	if !anyType(nxt.typ, allowed) {
-		panic(fmt.Errorf("invalid syntax"))
+		p.errorf("invalid syntax")
 	}
 	return nxt
 }
