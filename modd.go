@@ -265,53 +265,6 @@ func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecke
 	}
 }
 
-type subscriber struct {
-	includes []string
-	excludes []string
-	ch       chan Mod
-}
-
-// Watcher watches for modifications using Watch, and then fans notifcations
-// out to a set of subscribers.
-type Watcher struct {
-	Paths       []string
-	LullTime    time.Duration
-	subscribers []*subscriber
-	started     bool
-}
-
-// Subscribe to a watcher, with a given set of exclusions.
-func (w *Watcher) Subscribe(includes []string, excludes []string, ch chan Mod) error {
-	if w.started {
-		return fmt.Errorf("subscribe after start")
-	}
-	w.subscribers = append(w.subscribers, &subscriber{includes, excludes, ch})
-	return nil
-}
-
-// Run must be called to start the watcher. After Run is called, no further
-// calls to Subscribe may be made.
-func (w *Watcher) Run() error {
-	ch := make(chan Mod, 4096)
-	err := Watch(w.Paths, nil, nil, w.LullTime, ch)
-	if err != nil {
-		return err
-	}
-	w.started = true
-	go func() {
-		for m := range ch {
-			for _, s := range w.subscribers {
-				submod, err := m.Filter(s.includes, s.excludes)
-				if err != nil {
-					Logger.Shout("Error filtering paths: %s", err)
-				}
-				s.ch <- *submod
-			}
-		}
-	}()
-	return nil
-}
-
 // Watch watches a set of paths. Mod structs representing a changeset are sent
 // on the channel ch.
 //
@@ -320,7 +273,7 @@ func (w *Watcher) Run() error {
 // stream of changes of duration lullTime. This lets us represent processes
 // that progressively affect multiple files, like rendering, as a single
 // changeset.
-func Watch(paths []string, includes []string, excludes []string, lullTime time.Duration, ch chan Mod) error {
+func Watch(paths []string, lullTime time.Duration, ch chan Mod) error {
 	evtch := make(chan notify.EventInfo, 4096)
 	for _, p := range paths {
 		stat, err := os.Stat(p)
@@ -338,18 +291,12 @@ func Watch(paths []string, includes []string, excludes []string, lullTime time.D
 	go func() {
 		for {
 			ret := batch(lullTime, MaxLullWait, statExistenceChecker{}, evtch)
-			if ret != nil {
+			if ret != nil && !ret.Empty() {
 				ret, err := ret.normPaths(paths)
 				if err != nil {
 					Logger.Shout("Error normalising paths: %s", err)
 				}
-				ret, err = ret.Filter(includes, excludes)
-				if err != nil {
-					Logger.Shout("Error filtering paths: %s", err)
-				}
-				if !ret.Empty() {
-					ch <- *ret
-				}
+				ch <- *ret
 			}
 		}
 	}()

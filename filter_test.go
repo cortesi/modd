@@ -20,7 +20,14 @@ var filterFilesTests = []struct {
 		false,
 	},
 	{
+		[]string{"*"},
 		nil,
+		[]string{"main.cpp", "main.go", "main.h", "foo.go", "bar.py"},
+		[]string{"main.cpp", "main.go", "main.h", "foo.go", "bar.py"},
+		false,
+	},
+	{
+		[]string{"*"},
 		[]string{"*.go"},
 		[]string{"main.cpp", "main.go", "main.h", "foo.go", "bar.py"},
 		[]string{"main.cpp", "main.h", "bar.py"},
@@ -29,7 +36,7 @@ var filterFilesTests = []struct {
 	// Invalid patterns won't match anything. This would trigger a warning at
 	// runtime.
 	{
-		nil,
+		[]string{"*"},
 		[]string{"[["},
 		[]string{"main.cpp", "main.go", "main.h", "foo.go", "bar.py"},
 		[]string{"main.cpp", "main.go", "main.h", "foo.go", "bar.py"},
@@ -46,7 +53,15 @@ var filterFilesTests = []struct {
 	{
 		nil, nil,
 		[]string{"main.cpp", "main.go", "main.h", "foo.go", "bar.py"},
-		[]string{"main.cpp", "main.go", "main.h", "foo.go", "bar.py"},
+		[]string{},
+		false,
+	},
+
+	{
+		[]string{"**/*"},
+		nil,
+		[]string{"foo", "/test/foo", "/test/foo.go"},
+		[]string{"foo", "/test/foo", "/test/foo.go"},
 		false,
 	},
 }

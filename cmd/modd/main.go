@@ -61,7 +61,7 @@ func main() {
 	}
 
 	modchan := make(chan modd.Mod)
-	err = modd.Watch(cnf.WatchPaths(), nil, nil, lullTime, modchan)
+	err = modd.Watch(cnf.WatchPaths(), lullTime, modchan)
 	if err != nil {
 		kingpin.Fatalf("Fatal error: %s", err)
 	}
