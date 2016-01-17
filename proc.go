@@ -17,6 +17,24 @@ import (
 // MinRestart is the minimum amount of time between daemon restarts
 const MinRestart = 1 * time.Second
 
+const lineLimit = 80
+const postamble = "..."
+
+// niceHeader tries to produce a nicer process name. We condense whitespace to
+// make commands split over multiple lines with indentation more legible, and
+// limit the line length to 80 characters.
+func niceHeader(preamble string, in string) string {
+	pre := termlog.DefaultPalette.Timestamp.SprintFunc()(preamble)
+	post := ""
+	in = ws.ReplaceAllString(in, " ")
+	if len(in) > lineLimit-len(postamble) {
+		post = termlog.DefaultPalette.Say.SprintFunc()(postamble)
+		in = in[:lineLimit-len(postamble)]
+	}
+	in = termlog.DefaultPalette.Header.SprintFunc()(in)
+	return pre + in + post
+}
+
 func getShell() string {
 	sh := os.Getenv("SHELL")
 	if sh == "" {
@@ -72,7 +90,7 @@ func RunPreps(preps []conf.Prep, log termlog.TermLog) error {
 	for _, p := range preps {
 		err := RunProc(
 			p.Command,
-			log.Stream(p.Command),
+			log.Stream(niceHeader("prep: ", p.Command)),
 		)
 		if err != nil {
 			return err
@@ -148,21 +166,6 @@ type DaemonPen struct {
 
 var ws = regexp.MustCompile(`\s\s+`)
 
-const lineLimit = 80
-const postamble = "..."
-
-// niceName tries to produce a nicer process name. We condense whitespace to
-// make commands split over multiple lines with indentation more legible, and
-// limit the line length to 80 characters.
-func niceName(in string) string {
-	in = ws.ReplaceAllString(in, " ")
-	if len(in) > lineLimit-len(postamble) {
-		post := termlog.DefaultPalette.Say.SprintFunc()(postamble)
-		return in[:lineLimit-len(postamble)] + post
-	}
-	return in
-}
-
 // Start starts set of daemons, each specified by a command
 func (dp *DaemonPen) Start(daemons []conf.Daemon, log termlog.TermLog) {
 	dp.Lock()
@@ -171,7 +174,9 @@ func (dp *DaemonPen) Start(daemons []conf.Daemon, log termlog.TermLog) {
 	for i, dmn := range daemons {
 		d[i] = daemon{
 			conf: dmn,
-			log:  log.Stream(niceName(dmn.Command)),
+			log: log.Stream(
+				niceHeader("daemon: ", dmn.Command),
+			),
 		}
 		go d[i].Run()
 	}
