@@ -3,6 +3,8 @@ package conf
 import (
 	"fmt"
 	"os"
+	"path"
+	"strings"
 	"syscall"
 )
 
@@ -82,10 +84,34 @@ type Config struct {
 	Blocks []Block
 }
 
+// Returns the base path for a match pattern
+func basePath(pattern string) string {
+	split := strings.IndexAny(pattern, "*{}?[]")
+	if split >= 0 {
+		pattern = pattern[:split]
+	}
+	dir, _ := path.Split(pattern)
+	return dir
+}
+
 // WatchPaths retreives the set of watched paths (with patterns removed) from
 // all blocks. The path set is de-duplicated.
 func (c *Config) WatchPaths() []string {
-	return nil
+	m := make(map[string]bool)
+	for _, b := range c.Blocks {
+		for _, p := range b.Watch {
+			m[basePath(p)] = true
+		}
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		if k == "" {
+			keys = append(keys, ".")
+		} else {
+			keys = append(keys, k)
+		}
+	}
+	return keys
 }
 
 func (c *Config) addBlock(b Block) {

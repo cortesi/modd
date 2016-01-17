@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/termlog"
 )
 
@@ -65,12 +66,12 @@ func RunProc(cmd string, log termlog.Logger) error {
 	return nil
 }
 
-// RunProcs runs all commands in sequence. Stops if any command returns an error.
-func RunProcs(cmds []string, log termlog.TermLog) error {
-	for _, cmd := range cmds {
+// RunPreps runs all commands in sequence. Stops if any command returns an error.
+func RunPreps(preps []conf.Prep, log termlog.TermLog) error {
+	for _, p := range preps {
 		err := RunProc(
-			cmd,
-			log.Stream(cmd),
+			p.Command,
+			log.Stream(p.Command),
 		)
 		if err != nil {
 			return err
@@ -80,10 +81,10 @@ func RunProcs(cmds []string, log termlog.TermLog) error {
 }
 
 type daemon struct {
-	commandString string
-	log           termlog.Logger
-	cmd           *exec.Cmd
-	stop          bool
+	conf conf.Daemon
+	log  termlog.Logger
+	cmd  *exec.Cmd
+	stop bool
 }
 
 func (d *daemon) Run() {
@@ -95,7 +96,7 @@ func (d *daemon) Run() {
 		}
 		lastStart = time.Now()
 		sh := getShell()
-		c := exec.Command(sh, "-c", d.commandString)
+		c := exec.Command(sh, "-c", d.conf.Command)
 		stdo, err := c.StdoutPipe()
 		if err != nil {
 			d.log.Shout("%s", err)
@@ -160,14 +161,14 @@ func niceName(in string) string {
 }
 
 // Start starts set of daemons, each specified by a command
-func (dp *DaemonPen) Start(commands []string, log termlog.TermLog) {
+func (dp *DaemonPen) Start(daemons []conf.Daemon, log termlog.TermLog) {
 	dp.Lock()
 	defer dp.Unlock()
-	d := make([]daemon, len(commands))
-	for i, c := range commands {
+	d := make([]daemon, len(daemons))
+	for i, dmn := range daemons {
 		d[i] = daemon{
-			commandString: c,
-			log:           log.Stream(niceName(c)),
+			conf: dmn,
+			log:  log.Stream(niceName(dmn.Command)),
 		}
 		go d[i].Run()
 	}

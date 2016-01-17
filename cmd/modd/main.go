@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/cortesi/modd"
@@ -12,7 +14,7 @@ import (
 )
 
 const modfile = "./modd.conf"
-const lullTime = time.Millisecond * 300
+const lullTime = time.Millisecond * 100
 
 func main() {
 	file := kingpin.Flag(
@@ -23,41 +25,17 @@ func main() {
 		PlaceHolder("PATH").
 		Short('f').
 		String()
-	//
-	// paths := kingpin.Arg(
-	// 	"path",
-	// 	"Paths to monitor for changes.",
-	// ).Required().Strings()
-	//
-	// beep := kingpin.Flag("beep", "Beep if any command returned an error").
-	// 	Short('b').
-	// 	Bool()
-	//
-	// nocommon := kingpin.Flag("nocommon", "Don't exclude commonly ignored files").
-	// 	Short('c').
-	// 	Bool()
-	//
-	// daemons := kingpin.Flag("daemon", "Daemon to keep running").
-	// 	PlaceHolder("CMD").
-	// 	Short('d').
-	// 	Strings()
-	//
-	// prep := kingpin.Flag("prep", "Prep command to run before daemons are restarted").
-	// 	PlaceHolder("CMD").
-	// 	Short('p').
-	// 	Strings()
 
-	// excludes := kingpin.Flag("exclude", "Glob pattern for files to exclude from monitoring").
-	// 	PlaceHolder("PATTERN").
-	// 	Short('x').
-	// 	Strings()
+	beep := kingpin.Flag("beep", "Beep if any command returned an error").
+		Short('b').
+		Bool()
 
 	cmdstats := kingpin.Flag("cmdstats", "Show stats on command execution").
 		Short('s').
 		Default("false").
 		Bool()
 
-	debug := kingpin.Flag("debug", "Debugging for devd development").
+	debug := kingpin.Flag("debug", "Debugging for modd development").
 		Default("false").
 		Bool()
 
@@ -81,40 +59,55 @@ func main() {
 	if err != nil {
 		kingpin.Fatalf("%s", err)
 	}
-	fmt.Println(cnf)
 
-	// modchan := make(chan modd.Mod)
-	// exc := *excludes
-	// if !*nocommon {
-	// 	exc = append(*excludes, modd.CommonExcludes...)
-	// }
-	// err := modd.Watch(*paths, exc, lullTime, modchan)
-	// if err != nil {
-	// 	kingpin.Fatalf("Fatal error: %s", err)
-	// }
-	// err = modd.RunProcs(*prep, log)
-	// if err != nil {
-	// 	if *beep {
-	// 		fmt.Print("\a")
-	// 	}
-	// }
-	// d := modd.DaemonPen{}
-	// c := make(chan os.Signal, 1)
-	// signal.Notify(c, os.Interrupt, os.Kill)
-	// go func() {
-	// 	d.Shutdown(<-c)
-	// 	os.Exit(0)
-	// }()
-	// d.Start(*daemons, log)
-	// for mod := range modchan {
-	// 	log.SayAs("debug", "Delta: \n%s", mod.String())
-	// 	err := modd.RunProcs(*prep, log)
-	// 	if err != nil {
-	// 		if *beep {
-	// 			fmt.Print("\a")
-	// 		}
-	// 		continue
-	// 	}
-	// 	d.Restart()
-	// }
+	modchan := make(chan modd.Mod)
+	err = modd.Watch(cnf.WatchPaths(), nil, nil, lullTime, modchan)
+	if err != nil {
+		kingpin.Fatalf("Fatal error: %s", err)
+	}
+
+	daemonPens := make([]*modd.DaemonPen, len(cnf.Blocks))
+	for i, b := range cnf.Blocks {
+		if !b.NoCommonFilter {
+			b.Exclude = append(b.Exclude, modd.CommonExcludes...)
+		}
+		err = modd.RunPreps(b.Preps, log)
+		if err != nil {
+			if *beep {
+				fmt.Print("\a")
+			}
+		}
+		d := modd.DaemonPen{}
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, os.Kill)
+		go func() {
+			d.Shutdown(<-c)
+			os.Exit(0)
+		}()
+		d.Start(b.Daemons, log)
+		daemonPens[i] = &d
+	}
+
+	for mod := range modchan {
+		log.SayAs("debug", "Delta: \n%s", mod.String())
+		for i, b := range cnf.Blocks {
+			lmod, err := mod.Filter(b.Watch, b.Exclude)
+			if err != nil {
+				log.Shout("Error filtering events: %s", err)
+				continue
+			}
+			if lmod.Empty() {
+				continue
+			}
+
+			err = modd.RunPreps(b.Preps, log)
+			if err != nil {
+				if *beep {
+					fmt.Print("\a")
+				}
+				continue
+			}
+			daemonPens[i].Restart()
+		}
+	}
 }
