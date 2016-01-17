@@ -71,6 +71,8 @@ func main() {
 		if !b.NoCommonFilter {
 			b.Exclude = append(b.Exclude, modd.CommonExcludes...)
 		}
+		cnf.Blocks[i] = b
+
 		err = modd.RunPreps(b.Preps, log)
 		if err != nil {
 			if *beep {

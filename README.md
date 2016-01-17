@@ -2,8 +2,6 @@
 
 # modd: trigger commands when files change
 
-
-
 # Install
 
 Go to the [releases page](https://github.com/cortesi/modd/releases/latest),
@@ -17,7 +15,6 @@ If you have a working Go installation, you can also say
 
 # Quick start
 
-TODO
 
 
 # Features
