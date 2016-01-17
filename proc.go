@@ -39,7 +39,8 @@ func logOutput(fp io.ReadCloser, out func(string, ...interface{})) {
 }
 
 // RunProc runs a process to completion, sending output to log
-func RunProc(cmd string, log termlog.Logger) error {
+func RunProc(cmd string, log termlog.Stream) error {
+	log.Header()
 	sh := getShell()
 	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()
@@ -82,12 +83,13 @@ func RunPreps(preps []conf.Prep, log termlog.TermLog) error {
 
 type daemon struct {
 	conf conf.Daemon
-	log  termlog.Logger
+	log  termlog.Stream
 	cmd  *exec.Cmd
 	stop bool
 }
 
 func (d *daemon) Run() {
+	d.log.Header()
 	var lastStart time.Time
 	for d.stop != true {
 		since := time.Now().Sub(lastStart)
@@ -125,6 +127,7 @@ func (d *daemon) Run() {
 
 func (d *daemon) Restart() {
 	if d.cmd != nil {
+		d.log.Header()
 		d.cmd.Process.Signal(syscall.SIGHUP)
 	}
 }
