@@ -23,7 +23,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Watch: []string{"foo"},
+					Include: []string{"foo"},
 				},
 			},
 		},
@@ -33,7 +33,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Watch: []string{"foo", "bar"},
+					Include: []string{"foo", "bar"},
 				},
 			},
 		},
@@ -71,7 +71,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Watch:          []string{"foo"},
+					Include:        []string{"foo"},
 					NoCommonFilter: true,
 				},
 			},
@@ -82,7 +82,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Watch: []string{"foo bar", "voing"},
+					Include: []string{"foo bar", "voing"},
 				},
 			},
 		},
@@ -92,7 +92,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Watch:   []string{"foo"},
+					Include: []string{"foo"},
 					Daemons: []Daemon{{"command\n", syscall.SIGHUP}},
 				},
 			},
@@ -135,8 +135,8 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Watch: []string{"foo"},
-					Preps: []Prep{Prep{Command: "command\n"}},
+					Include: []string{"foo"},
+					Preps:   []Prep{Prep{Command: "command\n"}},
 				},
 			},
 		},
@@ -146,8 +146,8 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Watch: []string{"foo", "bar"},
-					Preps: []Prep{Prep{Command: "command\n"}},
+					Include: []string{"foo", "bar"},
+					Preps:   []Prep{Prep{Command: "command\n"}},
 				},
 			},
 		},
@@ -157,8 +157,8 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Watch: []string{"foo", "bar"},
-					Preps: []Prep{{"command\n"}},
+					Include: []string{"foo", "bar"},
+					Preps:   []Prep{{"command\n"}},
 				},
 			},
 		},

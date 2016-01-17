@@ -21,7 +21,7 @@ type Prep struct {
 
 // Block is a match pattern and a set of specifications
 type Block struct {
-	Watch          []string
+	Include        []string
 	Exclude        []string
 	NoCommonFilter bool
 
@@ -99,7 +99,7 @@ func basePath(pattern string) string {
 func (c *Config) WatchPaths() []string {
 	m := make(map[string]bool)
 	for _, b := range c.Blocks {
-		for _, p := range b.Watch {
+		for _, p := range b.Include {
 			m[basePath(p)] = true
 		}
 	}

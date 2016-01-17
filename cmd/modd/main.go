@@ -91,7 +91,7 @@ func main() {
 	for mod := range modchan {
 		log.SayAs("debug", "Delta: \n%s", mod.String())
 		for i, b := range cnf.Blocks {
-			lmod, err := mod.Filter(b.Watch, b.Exclude)
+			lmod, err := mod.Filter(b.Include, b.Exclude)
 			if err != nil {
 				log.Shout("Error filtering events: %s", err)
 				continue

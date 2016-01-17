@@ -155,7 +155,7 @@ func (p *parser) parse() (err error) {
 
 func (p *parser) parseBlock() *Block {
 	block := &Block{}
-	block.Watch, block.Exclude, block.NoCommonFilter = p.collectPatterns()
+	block.Include, block.Exclude, block.NoCommonFilter = p.collectPatterns()
 	nxt := p.next()
 	if nxt.typ != itemLeftParen {
 		p.errorf("expected block open parentheses, got %q", nxt.val)

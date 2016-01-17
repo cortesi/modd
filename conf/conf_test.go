@@ -30,8 +30,8 @@ func TestBasePath(t *testing.T) {
 func TestWatchPaths(t *testing.T) {
 	c := Config{
 		[]Block{
-			{Watch: []string{"a/foo", "a/bar"}},
-			{Watch: []string{"a/bar", "a/oink", "foo"}},
+			{Include: []string{"a/foo", "a/bar"}},
+			{Include: []string{"a/bar", "a/oink", "foo"}},
 		},
 	}
 	if !reflect.DeepEqual(c.WatchPaths(), []string{"a/", "."}) {
