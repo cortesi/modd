@@ -6,12 +6,6 @@ import (
 	"syscall"
 )
 
-// A Pattern represents a single file match pattern
-type Pattern struct {
-	Spec   string
-	Filter bool
-}
-
 // A Daemon is a persistent process that is kept running
 type Daemon struct {
 	Command       string
@@ -25,7 +19,8 @@ type Prep struct {
 
 // Block is a match pattern and a set of specifications
 type Block struct {
-	Patterns       []Pattern
+	Watch          []string
+	Exclude        []string
 	NoCommonFilter bool
 
 	Daemons []Daemon

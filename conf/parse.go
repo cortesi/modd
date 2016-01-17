@@ -76,46 +76,41 @@ func (p *parser) collectValues(types ...itemType) []string {
 	return ret
 }
 
-// Collects an arbitrary number of patterns, and returns a []Pattern,
-// NoCommonFilter tuple.
-func (p *parser) collectPatterns() ([]Pattern, bool) {
+// Collects an arbitrary number of patterns, and returns a (watch, exclude,
+// NoCommonFilter) tuple.
+func (p *parser) collectPatterns() ([]string, []string, bool) {
 	noCommonFilter := false
+	watch := []string{}
+	exclude := []string{}
+
 	vals := p.collect(itemBareString, itemQuotedString)
-	ret := []Pattern{}
 	for _, v := range vals {
-		var val *Pattern
 		switch v.typ {
 		case itemBareString:
 			if v.val[0] == '!' {
-				val = &Pattern{
-					Spec:   v.val[1:],
-					Filter: true,
-				}
+				exclude = append(exclude, v.val[1:])
 			} else {
 				if v.val == "+common" {
 					noCommonFilter = true
 				} else {
-					val = &Pattern{Spec: v.val}
+					watch = append(watch, v.val)
 				}
 			}
 		case itemQuotedString:
 			if v.val[0] == '!' {
-				val = &Pattern{
-					Spec:   v.val[2 : len(v.val)-1],
-					Filter: true,
-				}
+				exclude = append(exclude, v.val[2:len(v.val)-1])
 			} else {
-				val = &Pattern{Spec: v.val[1 : len(v.val)-1]}
+				watch = append(watch, v.val[1:len(v.val)-1])
 			}
 		}
-		if val != nil {
-			ret = append(ret, *val)
-		}
 	}
-	if len(ret) > 0 {
-		return ret, noCommonFilter
+	if len(watch) == 0 {
+		watch = nil
 	}
-	return nil, noCommonFilter
+	if len(exclude) == 0 {
+		exclude = nil
+	}
+	return watch, exclude, noCommonFilter
 }
 
 // errorf formats the error and terminates processing.
@@ -160,7 +155,7 @@ func (p *parser) parse() (err error) {
 
 func (p *parser) parseBlock() *Block {
 	block := &Block{}
-	block.Patterns, block.NoCommonFilter = p.collectPatterns()
+	block.Watch, block.Exclude, block.NoCommonFilter = p.collectPatterns()
 	nxt := p.next()
 	if nxt.typ != itemLeftParen {
 		p.errorf("expected block open parentheses, got %q", nxt.val)

@@ -23,7 +23,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo"}},
+					Watch: []string{"foo"},
 				},
 			},
 		},
@@ -33,7 +33,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo"}, {Spec: "bar"}},
+					Watch: []string{"foo", "bar"},
 				},
 			},
 		},
@@ -43,7 +43,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo", Filter: true}},
+					Exclude: []string{"foo"},
 				},
 			},
 		},
@@ -53,7 +53,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo", Filter: true}},
+					Exclude: []string{"foo"},
 				},
 			},
 		},
@@ -62,13 +62,7 @@ var parseTests = []struct {
 		`!"foo" !'bar' !voing {}`,
 		&Config{
 			[]Block{
-				{
-					Patterns: []Pattern{
-						{Spec: "foo", Filter: true},
-						{Spec: "bar", Filter: true},
-						{Spec: "voing", Filter: true},
-					},
-				},
+				{Exclude: []string{"foo", "bar", "voing"}},
 			},
 		},
 	},
@@ -77,7 +71,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns:       []Pattern{{Spec: "foo"}},
+					Watch:          []string{"foo"},
 					NoCommonFilter: true,
 				},
 			},
@@ -88,7 +82,7 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo bar"}, {Spec: "voing"}},
+					Watch: []string{"foo bar", "voing"},
 				},
 			},
 		},
@@ -98,8 +92,8 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo"}},
-					Daemons:  []Daemon{{"command\n", syscall.SIGHUP}},
+					Watch:   []string{"foo"},
+					Daemons: []Daemon{{"command\n", syscall.SIGHUP}},
 				},
 			},
 		},
@@ -141,8 +135,8 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo"}},
-					Preps:    []Prep{Prep{Command: "command\n"}},
+					Watch: []string{"foo"},
+					Preps: []Prep{Prep{Command: "command\n"}},
 				},
 			},
 		},
@@ -152,8 +146,8 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo"}, {Spec: "bar"}},
-					Preps:    []Prep{Prep{Command: "command\n"}},
+					Watch: []string{"foo", "bar"},
+					Preps: []Prep{Prep{Command: "command\n"}},
 				},
 			},
 		},
@@ -163,8 +157,8 @@ var parseTests = []struct {
 		&Config{
 			[]Block{
 				{
-					Patterns: []Pattern{{Spec: "foo"}, {Spec: "bar"}},
-					Preps:    []Prep{{"command\n"}},
+					Watch: []string{"foo", "bar"},
+					Preps: []Prep{{"command\n"}},
 				},
 			},
 		},
