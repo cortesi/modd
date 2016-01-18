@@ -35,13 +35,7 @@ func niceHeader(preamble string, in string) string {
 }
 
 func getShell() string {
-	sh := os.Getenv("SHELL")
-	if sh == "" {
-		if _, err := os.Stat("/bin/sh"); err == nil {
-			sh = "/bin/sh"
-		}
-	}
-	return sh
+	return "/bin/sh"
 }
 
 func logOutput(fp io.ReadCloser, out func(string, ...interface{})) {
