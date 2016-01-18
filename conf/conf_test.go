@@ -31,10 +31,10 @@ func TestWatchPaths(t *testing.T) {
 	c := Config{
 		[]Block{
 			{Include: []string{"a/foo", "a/bar"}},
-			{Include: []string{"a/bar", "a/oink", "foo"}},
+			{Include: []string{"a/bar", "a/oink", "foo", "b"}},
 		},
 	}
-	if !reflect.DeepEqual(c.WatchPaths(), []string{"a/", "."}) {
+	if !reflect.DeepEqual(c.WatchPaths(), []string{"a/", "b", "."}) {
 		t.Fail()
 	}
 
