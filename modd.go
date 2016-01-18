@@ -311,6 +311,7 @@ var CommonExcludes = []string{
 	"**/.git/**",
 	"**/.hg/**",
 	"**/.svn/**",
+	"**/.bzr/**",
 
 	// OSX
 	"**/.DS_Store/**",
