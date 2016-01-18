@@ -158,7 +158,6 @@ func prepCommand(itm item) string {
 	val := itm.val
 	if itm.typ == itemQuotedString {
 		val = val[1 : len(val)-1]
-		val = strings.Replace(val, "\n", " ", -1)
 	}
 	return strings.TrimSpace(val)
 }

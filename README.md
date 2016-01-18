@@ -143,13 +143,13 @@ to run. Here's an example showing all the basic features of the format:
     # capabilities like piping and output redirection
     prep: echo "i'm now rebuilding" | tee /tmp/output
 
-    # Commands can be quoted. Newlines are stripped from quoted commands, so
-    # escaping line endings when arguments span multiple lines is not needed
+    # Commands can be quoted, and can then span multiple lines. Commands are
+    # shell scripts, executed by default in /bin/sh
     prep: "
-        ls
-            -l
-            -a;
-        echo 'and hello again';
+        ls \
+            -l \
+            -a
+        echo 'and hello again'
     "
 }
 
