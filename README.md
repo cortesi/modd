@@ -24,7 +24,7 @@ specifying commands to run whenever files matching a set of patterns change.
 Here's a simple example:
 
     **/*.go {
-        prep: go test ./...
+        prep: go test
     }
 
 This config file looks for all changes to .go files recursively. When a change
@@ -39,12 +39,11 @@ We can now start modd, like so:
 Modd runs the command once on startup, and then waits for modifications that
 match the specified patterns before running again.
 
-Modd has another command type - **daemon** - for commands that you want to keep
-running. Daemons are restarted on modification, and modd will also attempt to
-restart daemons whenever they exit.
-
-Here's a modd configuration file that runs the test suite, builds and installs
-a daemon, and then runs that daemon for testing:
+There's a second command type - **daemon** - for commands that you want to keep
+running. Daemons are sent a SIGHUP (by defaut) when triggered, and will also be
+restarted whenever they exit. Below is a simplified version of the modd.conf
+file I use when hacking on devd. It runs the test suite, builds and installs
+devd, and then runs an instance for testing:
 
     **/*.go {
         prep: go test
@@ -56,10 +55,21 @@ Output looks like this:
 
 ![screenshot](doc/modd-example2.png "modd in action")
 
+All prep commands in a block are run in order of occurrence before any daemon
+is restarted. If any prep command exits with an error, execution is stopped.
 
-All **prep** commands in a block are run in order of occurrence before any
-**daemon** is restarted. If any prep command exits with an error, execution is
-stopped.
+There's one small problem with the devd example - when devd sees a SIGHUP it
+doesn't exit, it triggers browser livereload. This is precisely what you want
+when devd is being used to serve a web project you're hacking on, but for devd
+*development*, we actually want it to exit. So, we tell modd to send a SIGTERM
+to the daemon instead, which has the desired result:
+
+    **/*.go {
+        prep: go test
+        prep: go install ./cmd/devd
+        daemon +sigterm: devd -m ./tmp
+    }
+
 
 All processes inherit the parent environment.
 
