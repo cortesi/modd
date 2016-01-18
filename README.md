@@ -17,28 +17,45 @@ If you have a working Go installation, you can also say
 
 # Quick start
 
-Modd is driven by a **modd.conf** file with a simple but powerful syntax. Let's look at some examples.
+When modd is started, it looks for a file called **modd.conf** in the current
+directory. This file has a simple but powerful syntax - one or more blocks
+specifying commands to run whenever files matching a set of patterns change.
 
-This config file looks for all changes to .go files recursively in all
-directories. When a change is detected, a **prep** command runs the unit test
-suite with *go test*. A **prep** command is simply a command that's expected to
-terminate, as opposed to a **daemon** which modd expects to keep running.
+Here's a simple example:
 
-```
-**/*.go {
-    prep: go test ./...
-}
-```
+    **/*.go {
+        prep: go test ./...
+    }
 
-Say the project we're working on is a daemon, and we'd like to keep a test instance of it running. The config file might look like this:
+This config file looks for all changes to .go files recursively. When a change
+is detected, a **prep** command runs the unit test suite with *go test*.  A
+**prep** command is simply a command that's expected to terminate - for
+example, compiling, running a test suite or running a linter.
 
-```
-**/*.go {
-    prep: go test ./...
-    prep: go install ./cmd/myserver
-    daemon: myserver /static/data
-}
-```
+We can now start modd, like so:
+
+![screenshot](doc/modd-example1.png "modd in action")
+
+Modd runs the command once on startup, and then waits for modifications that
+match the specified patterns before running again.
+
+Modd has another command type - **daemon** - for commands that you want to keep
+running. Daemons are restarted on modification, and modd will also attempt to
+restart daemons whenever they exit.
+
+Here's a modd configuration file that runs the test suite, builds and installs
+a daemon, and then runs that daemon for testing:
+
+    **/*.go {
+        prep: go test
+        prep: go install ./cmd/devd
+        daemon: devd -m ./tmp
+    }
+
+Output looks like this:
+
+![screenshot](doc/modd-example2.png "modd in action")
+
 
 All **prep** commands in a block are run in order of occurrence before any
 **daemon** is restarted. If any prep command exits with an error, execution is
@@ -85,6 +102,10 @@ actual signal sent is configurable per-daemon.
 
 
 # Config file format
+
+The modd.conf file format is very simple.
+
+
 
 
 
