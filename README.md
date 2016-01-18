@@ -6,9 +6,10 @@ Modd triggers commands and manages daemons in response to filesystem changes.
 
 # Install
 
-Go to the [releases page](https://github.com/cortesi/modd/releases/latest),
-download the package for your OS, and copy the binary to somewhere on your
-PATH.
+Modd is a single statically compiled binary with no external dependencies, and
+is released for OSX and Linux. Go to the [releases
+page](https://github.com/cortesi/modd/releases/latest), download the package
+for your OS, and copy the binary to somewhere on your PATH.
 
 If you have a working Go installation, you can also say
 
@@ -35,17 +36,26 @@ will be run.
 
 # Leisurely start
 
+## Intro
+
 When modd is started, it looks for a file called **modd.conf** in the current
-directory. This file has a simple, powerful syntax - one or more blocks, each
-starting with a set of file patterns, and a specifying set of commands to run
-when any matching file changes.
+directory. This file has a simple, powerful syntax - one or more blocks of
+commands, each of which can be triggered on changes to files matching a set of
+file patterns. Commands have two flavors: **prep** commands that run and
+terminate (e.g. compiling, running test suites or running linters), and
+**daemon** commands that run and keep running (e.g databases or webservers).
+Daemons are sent a SIGHUP (by default) when their block is triggered, and will
+be restarted if they exit unexpectedly.
 
-Commands have two flavors: **prep** commands that run and terminate (e.g.
-compiling, running test suites or running linters), and **daemon** commands
-that run and keep running. Daemons are sent a SIGHUP (by default) when their
-block is triggered, and will be restarted if they exit unexpectedly.
+All prep commands in a block are run in order of occurrence. If all prep
+commands succeed, daemons are then restarted, also in order of occurrence. If
+any prep command exits with an error, execution is stopped immediately. If
+multiple blocks are triggered, they too run in order from top to bottom.
 
-Below is a slightly simplified version of the modd.conf file I use when hacking
+
+## An example
+
+Let's start with a simplified version of the modd.conf file I use when hacking
 on devd. It runs the test suite, builds and installs devd, and keeps a test
 daemon instance running throughout:
 
@@ -57,18 +67,13 @@ daemon instance running throughout:
 }
 ```
 
-Output on startup looks like this:
-
-![screenshot](doc/modd-example2.png "modd in action")
-
-All prep commands in a block are run in order of occurrence before any daemon
-is restarted. If any prep command exits with an error, execution is stopped.
-
-There's one small problem with this devd example - when devd gets a SIGHUP it
-doesn't exit, it triggers browser livereload. This is *precisely* what you want
-when devd is being used to serve a web project you're hacking on, but when
-developing devd itself, we actually want it to exit. So, we tell modd to send a
-SIGTERM to the daemon instead, which has the desired result:
+This works, but there's one small problem - when devd gets a SIGHUP it doesn't
+exit, it triggers browser livereload. This is *precisely* what you want when
+devd is being used to serve a web project you're hacking on, and is the key
+reason why devd is so useful in conjunction with modd. However, when developing
+devd _itself_, we actually want it to exit and restart to pick up changes. So,
+we tell modd to send a SIGTERM to the daemon instead, which has the desired
+result:
 
 ```
 **/*.go {
@@ -78,13 +83,27 @@ SIGTERM to the daemon instead, which has the desired result:
 }
 ```
 
+Now, it's not really necessary to do an install and restart the daemon if we've
+only changed a unit test file. Let's change the config file so we run the test
+suite whenever we change any source file, but skip the rest if we've only
+modified a test specification. We do this by excluding test files with the **!**
+operator, and adding another block.
+
+```
+**/*.go {
+    prep: go test
+}
+
+# All test files are of the form *_test.go
+**/*.go !**/*_test.go {
+    prep: go install ./cmd/devd
+    daemon +sigterm: devd -m ./tmp
+}
+```
+
 
 # Features
 
-### Cross-platform and self-contained
-
-Modd is a single statically compiled binary with no external dependencies, and
-is released for OSX and Linux.
 
 ### Works well with programmers
 
