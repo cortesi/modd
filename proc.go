@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"regexp"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/cortesi/modd/conf"
@@ -146,7 +145,7 @@ func (d *daemon) Run() {
 func (d *daemon) Restart() {
 	if d.cmd != nil {
 		d.log.Header()
-		d.cmd.Process.Signal(syscall.SIGHUP)
+		d.cmd.Process.Signal(d.conf.RestartSignal)
 	}
 }
 
