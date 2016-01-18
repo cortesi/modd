@@ -96,6 +96,8 @@ func basePath(pattern string) string {
 
 // WatchPaths retreives the set of watched paths (with patterns removed) from
 // all blocks. The path set is de-duplicated.
+// FIXME: return a consistent order here, so we can test without mysterious
+// errors
 func (c *Config) WatchPaths() []string {
 	m := make(map[string]bool)
 	for _, b := range c.Blocks {

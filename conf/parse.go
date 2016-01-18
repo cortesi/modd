@@ -15,6 +15,14 @@ type parser struct {
 	peekItem *item
 }
 
+// Dreadfully naive at the momet, but then so is the lexer.
+func unquote(s string) string {
+	quote := s[0:1]
+	s = s[1 : len(s)-1]
+	s = strings.Replace(s, `\`+quote, quote, -1)
+	return s
+}
+
 // next returns the next token.
 func (p *parser) next() item {
 	if p.peekItem != nil {
@@ -99,9 +107,9 @@ func (p *parser) collectPatterns() ([]string, []string, bool) {
 			}
 		case itemQuotedString:
 			if v.val[0] == '!' {
-				exclude = append(exclude, v.val[2:len(v.val)-1])
+				exclude = append(exclude, unquote(v.val[1:]))
 			} else {
-				watch = append(watch, v.val[1:len(v.val)-1])
+				watch = append(watch, unquote(v.val))
 			}
 		}
 	}
@@ -157,7 +165,7 @@ func (p *parser) parse() (err error) {
 func prepCommand(itm item) string {
 	val := itm.val
 	if itm.typ == itemQuotedString {
-		val = val[1 : len(val)-1]
+		val = unquote(val)
 	}
 	return strings.TrimSpace(val)
 }
