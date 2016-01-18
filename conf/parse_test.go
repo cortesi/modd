@@ -147,7 +147,7 @@ var parseTests = []struct {
 			[]Block{
 				{
 					Include: []string{"foo"},
-					Preps:   []Prep{Prep{Command: "command -one -two"}},
+					Preps:   []Prep{Prep{Command: "command\n-one\n-two"}},
 				},
 			},
 		},
