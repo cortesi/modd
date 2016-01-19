@@ -18,7 +18,6 @@ import (
 const MinRestart = 1 * time.Second
 
 const lineLimit = 80
-const postamble = " ..."
 
 // shortCommand shortens a command to a name we can use in a notification
 // header.
@@ -41,14 +40,8 @@ func shortCommand(command string) string {
 // limit the line length to 80 characters.
 func niceHeader(preamble string, command string) string {
 	pre := termlog.DefaultPalette.Timestamp.SprintFunc()(preamble)
-	post := ""
-	parts := strings.Split(command, "\n")
-	command = parts[0]
-	if len(parts) > 1 {
-		post = termlog.DefaultPalette.Say.SprintFunc()(postamble)
-	}
-	command = termlog.DefaultPalette.Header.SprintFunc()(command)
-	return pre + command + post
+	command = termlog.DefaultPalette.Header.SprintFunc()(shortCommand(command))
+	return pre + command
 }
 
 func getShell() string {

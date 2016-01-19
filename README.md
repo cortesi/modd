@@ -84,10 +84,9 @@ result:
 ```
 
 Now, it's not really necessary to do an install and restart the daemon if we've
-only changed a unit test file. Let's change the config file so we run the test
-suite whenever we change any source file, but skip the rest if we've only
-modified a test specification. We do this by excluding test files with the **!**
-operator, and adding another block.
+only changed a unit test file. Let's change the config file so modd runs the
+test suite whenever we change any source file, but skips the rest if we've only
+modified a test specification. We do this by excluding test files with the **!** operator, and adding another block.
 
 ```
 **/*.go {
@@ -188,6 +187,19 @@ Class      | Meaning
 `[a-z]`    | any character in the range
 `[^class]` | any character which does *not* match the class
 
+Patterns can be negated with a leading **!**. For quoted patterns, the
+exclamation mark goes outside of the quotes:
+
+```
+** !**/*.html !"My Documents/**" {
+    prep: echo changed
+}
+```
+
+Negations are applied after all positive patterns - that is, modd collects all
+files matching all the positive patterns, regardless of order, then remove
+files matching the negation patterns.
+
 
 ## Some notes on running commands
 
@@ -200,17 +212,16 @@ pass environment variables down to commands like so:
 env MYCONFIG=foo modd
 ```
 
-On the terminal, we output a short header to show which command is responsible
-for a given line of output. This header is calculated from the input command,
-using the first significant non-whitespace line of text - backslash escapes are
-removed from the end of the line, comment characters are removed from the
-beginning, and whitespace is stripped. This gives you some control over how the
-command appears in the logs. You can also get creative and use the fact that
-the shell itself permits comments to give an entirely custom process name.
+On the terminal, modd outputs a short header to show which command is
+responsible for a given line of output. This header is calculated from the
+input command, using the first significant non-whitespace line of text -
+backslash escapes are removed from the end of the line, comment characters are
+removed from the beginning, and whitespace is stripped. Using the fact that the
+shell itself permits comments, you can completely control the log display name.
 
 ```
 {
-    # This will show as "prep: mycommand ..."
+    # This will show as "prep: mycommand"
     prep: "
         mycommand \
             --longoption 1 \
