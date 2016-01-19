@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,21 +18,37 @@ import (
 const MinRestart = 1 * time.Second
 
 const lineLimit = 80
-const postamble = "..."
+const postamble = " ..."
+
+// shortCommand shortens a command to a name we can use in a notification
+// header.
+func shortCommand(command string) string {
+	ret := command
+	parts := strings.Split(command, "\n")
+	for _, i := range parts {
+		i = strings.TrimLeft(i, " \t#")
+		i = strings.TrimRight(i, " \t\\")
+		if i != "" {
+			ret = i
+			break
+		}
+	}
+	return ret
+}
 
 // niceHeader tries to produce a nicer process name. We condense whitespace to
 // make commands split over multiple lines with indentation more legible, and
 // limit the line length to 80 characters.
-func niceHeader(preamble string, in string) string {
+func niceHeader(preamble string, command string) string {
 	pre := termlog.DefaultPalette.Timestamp.SprintFunc()(preamble)
 	post := ""
-	in = ws.ReplaceAllString(in, " ")
-	if len(in) > lineLimit-len(postamble) {
+	parts := strings.Split(command, "\n")
+	command = parts[0]
+	if len(parts) > 1 {
 		post = termlog.DefaultPalette.Say.SprintFunc()(postamble)
-		in = in[:lineLimit-len(postamble)]
 	}
-	in = termlog.DefaultPalette.Header.SprintFunc()(in)
-	return pre + in + post
+	command = termlog.DefaultPalette.Header.SprintFunc()(command)
+	return pre + command + post
 }
 
 func getShell() string {

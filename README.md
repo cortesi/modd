@@ -189,6 +189,39 @@ Class      | Meaning
 `[^class]` | any character which does *not* match the class
 
 
-## Running commands
+## Some notes on running commands
 
-All processes inherit the parent environment.
+All commands are executed in the standard shell - **/bin/sh**. This ensures
+that *modd.conf* files remain portable, and can be used reliably regardless of
+the user's shell choice. Processes inherit the parent's environment, so you can
+pass environment variables down to commands like so:
+
+```
+env MYCONFIG=foo modd
+```
+
+On the terminal, we output a short header to show which command is responsible
+for a given line of output. This header is calculated from the input command,
+using the first significant non-whitespace line of text - backslash escapes are
+removed from the end of the line, comment characters are removed from the
+beginning, and whitespace is stripped. This gives you some control over how the
+command appears in the logs. You can also get creative and use the fact that
+the shell itself permits comments to give an entirely custom process name.
+
+```
+{
+    # This will show as "prep: mycommand ..."
+    prep: "
+        mycommand \
+            --longoption 1 \
+            --longoption 2
+    "
+    # This will show as "prep: daemon 1"
+    prep: "
+        # daemon 1
+        mycommand \
+            --longoption 1 \
+            --longoption 2
+    "
+}
+```

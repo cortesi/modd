@@ -31,11 +31,12 @@ func TestWatchPaths(t *testing.T) {
 	c := Config{
 		[]Block{
 			{Include: []string{"a/foo", "a/bar"}},
-			{Include: []string{"a/bar", "a/oink", "foo", "b"}},
+			{Include: []string{"a/bar", "a/oink", "foo", "b/foo"}},
 		},
 	}
-	if !reflect.DeepEqual(c.WatchPaths(), []string{"a/", "b", "."}) {
-		t.Fail()
+	expected := []string{".", "a/", "b/"}
+	got := c.WatchPaths()
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("Expected %#v, got %#v", expected, got)
 	}
-
 }
