@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cortesi/modd/filter"
 	"github.com/cortesi/termlog"
 	"github.com/rjeczalik/notify"
 )
@@ -125,15 +126,15 @@ func (mod Mod) Empty() bool {
 
 // Filter applies a filter, returning a new Mod structure
 func (mod *Mod) Filter(includes []string, excludes []string) (*Mod, error) {
-	changed, err := filterFiles(mod.Changed, includes, excludes)
+	changed, err := filter.Files(mod.Changed, includes, excludes)
 	if err != nil {
 		return nil, err
 	}
-	deleted, err := filterFiles(mod.Deleted, includes, excludes)
+	deleted, err := filter.Files(mod.Deleted, includes, excludes)
 	if err != nil {
 		return nil, err
 	}
-	added, err := filterFiles(mod.Added, includes, excludes)
+	added, err := filter.Files(mod.Added, includes, excludes)
 	if err != nil {
 		return nil, err
 	}
@@ -325,4 +326,7 @@ var CommonExcludes = []string{
 
 	// Python
 	"**.py[cod]",
+
+	// Node
+	"**/node_modules/**",
 }

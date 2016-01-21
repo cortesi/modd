@@ -3,10 +3,10 @@ package conf
 import (
 	"fmt"
 	"os"
-	"path"
 	"sort"
-	"strings"
 	"syscall"
+
+	"github.com/cortesi/modd/filter"
 )
 
 // A Daemon is a persistent process that is kept running
@@ -85,35 +85,15 @@ type Config struct {
 	Blocks []Block
 }
 
-// Returns the base path for a match pattern
-func basePath(pattern string) string {
-	split := strings.IndexAny(pattern, "*{}?[]")
-	if split >= 0 {
-		pattern = pattern[:split]
-	}
-	dir, _ := path.Split(pattern)
-	return dir
-}
-
 // WatchPaths retreives the set of watched paths (with patterns removed) from
 // all blocks. The path set is de-duplicated.
 func (c *Config) WatchPaths() []string {
-	m := make(map[string]bool)
+	paths := []string{}
 	for _, b := range c.Blocks {
-		for _, p := range b.Include {
-			m[basePath(p)] = true
-		}
+		paths = filter.GetBasePaths(paths, b.Include)
 	}
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		if k == "" {
-			keys = append(keys, ".")
-		} else {
-			keys = append(keys, k)
-		}
-	}
-	sort.Strings(keys)
-	return keys
+	sort.Strings(paths)
+	return paths
 }
 
 func (c *Config) addBlock(b Block) {

@@ -5,28 +5,6 @@ import (
 	"testing"
 )
 
-var basePathTests = []struct {
-	pattern  string
-	expected string
-}{
-	{"foo", ""},
-	{"test/foo", "test/"},
-	{"test/foo*", "test/"},
-	{"test/*.**", "test/"},
-	{"**/*", ""},
-	{"foo*/bar", ""},
-	{"foo/**/bar", "foo/"},
-}
-
-func TestBasePath(t *testing.T) {
-	for i, tt := range basePathTests {
-		ret := basePath(tt.pattern)
-		if ret != tt.expected {
-			t.Errorf("%d: %q - Expected %q, got %q", i, tt.pattern, tt.expected, ret)
-		}
-	}
-}
-
 func TestWatchPaths(t *testing.T) {
 	c := Config{
 		[]Block{
@@ -34,7 +12,7 @@ func TestWatchPaths(t *testing.T) {
 			{Include: []string{"a/bar", "a/oink", "foo", "b/foo"}},
 		},
 	}
-	expected := []string{".", "a/", "b/"}
+	expected := []string{"."}
 	got := c.WatchPaths()
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Expected %#v, got %#v", expected, got)
