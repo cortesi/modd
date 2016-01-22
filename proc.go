@@ -63,7 +63,7 @@ func niceHeader(preamble string, command string) string {
 }
 
 func getShell() string {
-	return "/bin/sh"
+	return "bash"
 }
 
 func logOutput(fp io.ReadCloser, out func(string, ...interface{})) {
