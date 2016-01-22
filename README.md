@@ -2,7 +2,7 @@
 
 # modd
 
-Modd triggers commands and manages daemons in response to filesystem changes.
+A dev tool that runs commands and manages daemons in response to filesystem changes.
 
 # Install
 
@@ -35,8 +35,6 @@ will be run.
 
 
 # Leisurely start
-
-## Intro
 
 When modd is started, it looks for a file called **modd.conf** in the current
 directory. This file has a simple, powerful syntax - one or more blocks of
@@ -143,7 +141,7 @@ to run. Here's an example showing all the basic features of the format:
     prep: echo "i'm now rebuilding" | tee /tmp/output
 
     # Commands can be quoted, and can then span multiple lines. Commands are
-    # shell scripts, executed by default in /bin/sh
+    # shell scripts, executed in bash
     prep: "
         ls \
             -l \
@@ -203,10 +201,11 @@ files matching the negation patterns.
 
 ## Some notes on running commands
 
-All commands are executed in the standard shell - **/bin/sh**. This ensures
-that *modd.conf* files remain portable, and can be used reliably regardless of
-the user's shell choice. Processes inherit the parent's environment, so you can
-pass environment variables down to commands like so:
+All commands are executed in **bash**, which is assumed to be somewhere on the
+user's path. Fixing on one shell ensures that *modd.conf* files remain
+portable, and can be used reliably regardless of the user's personal shell
+choice. Processes inherit the parent's environment, so you can pass environment
+variables down to commands like so:
 
 ```
 env MYCONFIG=foo modd
