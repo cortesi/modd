@@ -101,16 +101,14 @@ func (mod Mod) String() string {
 	)
 }
 
-// All returns a single list of all changed files
+// All returns a single list of all files changed or added - deleted files are
+// not included.
 func (mod Mod) All() []string {
 	all := make(map[string]bool)
 	for _, p := range mod.Changed {
 		all[p] = true
 	}
 	for _, p := range mod.Added {
-		all[p] = true
-	}
-	for _, p := range mod.Deleted {
 		all[p] = true
 	}
 	return _keys(all)

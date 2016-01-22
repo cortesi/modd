@@ -25,3 +25,21 @@ func TestShortCommand(t *testing.T) {
 		}
 	}
 }
+
+var quotePathTests = []struct {
+	path     string
+	expected string
+}{
+	{`one`, `one`},
+	{` one`, `\ one`},
+	{`one `, `one\ `},
+}
+
+func TestQuotePath(t *testing.T) {
+	for i, tst := range quotePathTests {
+		result := quotePath(tst.path)
+		if result != tst.expected {
+			t.Errorf("Test %d: expected\n%q\ngot\n%q", i, tst.expected, result)
+		}
+	}
+}

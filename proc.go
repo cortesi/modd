@@ -11,13 +11,31 @@ import (
 	"time"
 
 	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/filter"
 	"github.com/cortesi/termlog"
 )
+
+const moddMarker = "|MODD|"
 
 // MinRestart is the minimum amount of time between daemon restarts
 const MinRestart = 1 * time.Second
 
 const lineLimit = 80
+
+// quotePath quotes a path for use on the command-line
+func quotePath(path string) string {
+	path = strings.Replace(path, "\"", "\\\"", -1)
+	return "\"" + path + "\""
+}
+
+// mkArgs prepares a list of paths for the command line
+func mkArgs(paths []string) string {
+	escaped := make([]string, len(paths))
+	for i, s := range paths {
+		escaped[i] = quotePath(s)
+	}
+	return strings.Join(escaped, " ")
+}
 
 // shortCommand shortens a command to a name we can use in a notification
 // header.
@@ -89,12 +107,29 @@ func RunProc(cmd string, log termlog.Stream) error {
 }
 
 // RunPreps runs all commands in sequence. Stops if any command returns an error.
-func RunPreps(preps []conf.Prep, log termlog.TermLog) error {
-	for _, p := range preps {
-		err := RunProc(
-			p.Command,
-			log.Stream(niceHeader("prep: ", p.Command)),
-		)
+func RunPreps(b conf.Block, mod *Mod, log termlog.TermLog) error {
+	var fargs *string
+	for _, p := range b.Preps {
+		cmd := p.Command
+		if strings.Contains(cmd, moddMarker) {
+			// We only want to calculate this once
+			if fargs == nil {
+				var modified []string
+				var err error
+				if mod != nil {
+					modified = mod.All()
+				} else {
+					modified, err = filter.Find(".", b.Include, b.Exclude)
+					if err != nil {
+						return err
+					}
+				}
+				args := mkArgs(modified)
+				fargs = &args
+			}
+			cmd = strings.Replace(cmd, moddMarker, *fargs, -1)
+		}
+		err := RunProc(cmd, log.Stream(niceHeader("prep: ", p.Command)))
 		if err != nil {
 			return err
 		}

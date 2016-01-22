@@ -71,7 +71,7 @@ func main() {
 		}
 		cnf.Blocks[i] = b
 
-		err = modd.RunPreps(b.Preps, log)
+		err = modd.RunPreps(b, nil, log)
 		if err != nil {
 			if *beep {
 				fmt.Print("\a")
@@ -113,7 +113,7 @@ func main() {
 				continue
 			}
 
-			err = modd.RunPreps(b.Preps, log)
+			err = modd.RunPreps(b, lmod, log)
 			if err != nil {
 				if *beep {
 					fmt.Print("\a")

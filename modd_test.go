@@ -176,7 +176,7 @@ func TestMod(t *testing.T) {
 	if m.Empty() {
 		t.Error("Expected mod not to be empty")
 	}
-	if !reflect.DeepEqual(m.All(), []string{"add", "change", "rm"}) {
+	if !reflect.DeepEqual(m.All(), []string{"add", "change"}) {
 		t.Error("Unexpeced return from Mod.All")
 	}
 
