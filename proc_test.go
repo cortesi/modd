@@ -30,9 +30,9 @@ var quotePathTests = []struct {
 	path     string
 	expected string
 }{
-	{`one`, `one`},
-	{` one`, `\ one`},
-	{`one `, `one\ `},
+	{`one`, `"one"`},
+	{` one`, `" one"`},
+	{`one `, `"one "`},
 }
 
 func TestQuotePath(t *testing.T) {
