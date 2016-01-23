@@ -66,7 +66,8 @@ func getShell() string {
 	return "bash"
 }
 
-func logOutput(fp io.ReadCloser, out func(string, ...interface{})) {
+func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interface{})) {
+	defer wg.Done()
 	r := bufio.NewReader(fp)
 	for {
 		line, _, err := r.ReadLine()
@@ -79,7 +80,6 @@ func logOutput(fp io.ReadCloser, out func(string, ...interface{})) {
 
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd string, log termlog.Stream) error {
-	log.Header()
 	sh := getShell()
 	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()
@@ -90,8 +90,10 @@ func RunProc(cmd string, log termlog.Stream) error {
 	if err != nil {
 		return err
 	}
-	go logOutput(stde, log.Warn)
-	go logOutput(stdo, log.Say)
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go logOutput(&wg, stde, log.Warn)
+	go logOutput(&wg, stdo, log.Say)
 	err = c.Start()
 	if err != nil {
 		return err
@@ -101,6 +103,8 @@ func RunProc(cmd string, log termlog.Stream) error {
 		log.Shout("%s", c.ProcessState.String())
 		return err
 	}
+	wg.Wait()
+	log.Notice(">> done")
 	// FIXME: rusage stats here
 	log.NoticeAs("cmdstats", "run time: %s", c.ProcessState.UserTime())
 	return nil
@@ -147,7 +151,7 @@ type daemon struct {
 func (d *daemon) Run() {
 	var lastStart time.Time
 	for d.stop != true {
-		d.log.Header()
+		d.log.Notice(">> starting...")
 		since := time.Now().Sub(lastStart)
 		if since < MinRestart {
 			time.Sleep(MinRestart - since)
@@ -165,8 +169,10 @@ func (d *daemon) Run() {
 			d.log.Shout("%s", err)
 			continue
 		}
-		go logOutput(stde, d.log.Warn)
-		go logOutput(stdo, d.log.Say)
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+		go logOutput(&wg, stde, d.log.Warn)
+		go logOutput(&wg, stdo, d.log.Say)
 		err = c.Start()
 		if err != nil {
 			d.log.Shout("%s", err)
@@ -174,6 +180,7 @@ func (d *daemon) Run() {
 		}
 		d.cmd = c
 		err = c.Wait()
+		wg.Wait()
 		if err != nil {
 			d.log.Shout("%s", c.ProcessState.String())
 			continue
@@ -183,7 +190,7 @@ func (d *daemon) Run() {
 
 func (d *daemon) Restart() {
 	if d.cmd != nil {
-		d.log.Header()
+		d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
 		d.cmd.Process.Signal(d.conf.RestartSignal)
 	}
 }
