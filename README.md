@@ -4,7 +4,24 @@
 
 A dev tool that runs commands and manages daemons in response to filesystem changes.
 
-**Modd has not been released yet - the design is stabilising and I should have version 0.1 out the door soon.**
+Modd does file change detection right - or at least tries. Usefully responding
+to file system changes is a hairy, knotty, horrible problem, and most tools
+similar to modd simply don't get it right. Modd aims to do the best possible
+job across all platforms for typical developer work patterns. It ignores
+temporary files, VCS directories, swap files and many other nuisances by
+default. Its detection algorithm waits for a lull in filesystem activity so
+that events are triggered **after** render or compilation processes that may
+touch many files. Modd tries to do the right thing in corner cases, like
+receiving file modification notice while previously triggered commands are
+being run.
+
+Modd's sister project is [devd](https://github.com/cortesi/devd), a compact
+HTTP daemon for developers. Devd integrates with modd, allowing you to trigger
+in-browser livereload with modd. 
+
+**Modd has not been released yet - the design is stabilising and I should have
+**version 0.1 out the door soon.**
+
 
 # Install
 
@@ -16,6 +33,9 @@ for your OS, and copy the binary to somewhere on your PATH.
 If you have a working Go installation, you can also say
 
     go get github.com/cortesi/modd/cmd/modd
+
+
+
 
 
 # Quick start
@@ -101,74 +121,47 @@ modified a test specification. We do this by excluding test files with the **!**
 ```
 
 
-# Features
-
-
-### Works well with programmers
-
-Modd is designed to be a simple, reliable that does what's needed and gets out
-of your way.
-
-
-### Works well with devd
-
-Modd's sister project is [devd](https://github.com/cortesi/devd), a compact
-HTTP daemon for developers. Devd integrates with modd, allowing you to trigger
-in-browser livereload after static resource rebuilds complete.
-
-### Does file change detection right
-
-Or at least tries. Usefully responding to file system changes is a hairy,
-knotty, horrible problem, and most tools similar to modd simply don't get it
-right. Modd aims to do the best possible job across all platforms for typical
-developer work patterns. It ignores temporary files, VCS directories, swap
-files and many other nuisances by default. Its detection algorithm waits for a
-lull in filesystem activity so that events are triggered **after** render or
-compilation processes that may touch many files. Modd tries to do the right
-thing in corner cases, like receiving file modification notice while previously
-triggered commands are being run.
-
-
 # Config file format
 
-A modd config file consists of one or more blocks, each starting with a set of
-file watch patterns, and specifying a set of **prep** and **daemon** commands
-to run. Here's an example showing all the basic features of the format:
+A modd config file consists of blocks that start with zero or more file watch
+patterns, and each contain a set of **prep** and **daemon** commands.
+
+
+## File watch patterns
 
 ```
 # File patterns can be naked or quoted
 **/*.js "**/*.html" {
-    # Commands are executed in a shell, and can make full use of shell
-    # capabilities like piping and output redirection
-    prep: echo "i'm now rebuilding" | tee /tmp/output
-
-    # Commands can be quoted, and can then span multiple lines. Commands are
-    # shell scripts, executed in bash
-    prep: "
-        ls \
-            -l \
-            -a
-        echo 'and hello again'
-    "
+    prep: echo hello
 }
 
-# A double-asterisk recursively matches all files so this block will trigger on
-# any change
+# Recursively matches any file
 ** {
-    prep: go test
+    prep: echo hello
 }
 
-# This is a special block with no file match pattern. This means prep commands
-# run once only at startup, and daemons are kept running but never restarted by
+# No match pattern. Prep commands run once only at startup. Daemons are
+# restarted if they exit, but won't ever be explicitly signaled to restart by
 # modd.
 {
-    prep: echo "i run exactly once"
+    prep: echo hello
 }
 ```
 
-## File watch patterns
+Patterns can be negated with a leading **!**. For quoted patterns, the
+exclamation mark goes outside of the quotes:
 
-Watch patterns support the following terms:
+```
+** !**/*.html !"docs/**" {
+    prep: echo changed
+}
+```
+
+Negations are applied after all positive patterns - that is, modd collects all
+files matching all the positive patterns, regardless of order, then remove
+files matching the negation patterns.
+
+File patterns support the following syntax:
 
 Term          | Meaning
 ------------- | -------
@@ -187,38 +180,76 @@ Class      | Meaning
 `[a-z]`    | any character in the range
 `[^class]` | any character which does *not* match the class
 
-Patterns can be negated with a leading **!**. For quoted patterns, the
-exclamation mark goes outside of the quotes:
+
+## Commands
+
+Commands are shell scripts specified in-line in the *modd.conf* file. They are
+executed in **bash**, which is assumed to be on the user's path, and inherit
+the parent's environment. Single-line commands don't need to be quoted:
 
 ```
-** !**/*.html !"My Documents/**" {
-    prep: echo changed
+prep: echo "i'm now rebuilding" | tee /tmp/output
+```
+
+Multi-line commands must be quoted using single or double quotes. Within a
+multi-line command, the enclosing quote type can be backslash-escaped.
+
+```
+prep: "
+    ls \
+        -l \
+        -a
+    echo \"hello again\"
+"
+```
+
+
+### prep
+
+Within each block, all prep commands are run in order of occurance before any
+daemons are restarted. If any prep command exits with an error, execution
+stops.
+
+Prep commands can include a special marker **|MODD|**, which is replaced with a
+shell-escaped list of files that have changed or been added since the last run.
+When modd is first run, and the prep command is not being triggered by a
+change, the marker is replaced by all matching files on disk. So, given a
+config file like this, modd will run eslint on all .js files when started, and
+then after that only run eslint on files if they change:
+
+```
+**/*.js {
+    prep: eslint |MODD|
 }
 ```
 
-Negations are applied after all positive patterns - that is, modd collects all
-files matching all the positive patterns, regardless of order, then remove
-files matching the negation patterns.
+### daemon
 
+Daemons are executed on startup, and are restarted by modd if they exit.
+Whenever a block containing a daemon is triggered, modd sends a signal to the
+daemon process. It's up to the daemon how the signal is handled - for example,
+a SIGHUP might cause a daemon to reload config without restarting, or it could
+simply exit, in which case modd will restart it automatically.
 
-## Some notes on running commands
-
-All commands are executed in **bash**, which is assumed to be somewhere on the
-user's path. Fixing on one shell ensures that *modd.conf* files remain
-portable, and can be used reliably regardless of the user's personal shell
-choice. Processes inherit the parent's environment, so you can pass environment
-variables down to commands like so:
+By default, modd sends a SIGHUP, but the signal can be controlled using
+modifier flags, like so:
 
 ```
-env MYCONFIG=foo modd
+daemon +sigterm: mydaemon --config ./foo.conf
 ```
+
+The following signals are supported: **sighup**, **sigterm**, **sigint**,
+**sigkill**, **sigquit**, **sigusr1**, **sigusr2**, **sigwinch**.
+
+
+### Log headers
 
 On the terminal, modd outputs a short header to show which command is
-responsible for a given line of output. This header is calculated from the
-input command, using the first significant non-whitespace line of text -
-backslash escapes are removed from the end of the line, comment characters are
-removed from the beginning, and whitespace is stripped. Using the fact that the
-shell itself permits comments, you can completely control the log display name.
+responsible for output. This header is calculated from the input command using
+the first significant non-whitespace line of text - backslash escapes are
+removed from the end of the line, comment characters are removed from the
+beginning, and whitespace is stripped. Using the fact that the shell itself
+permits comments, you can completely control the log display name.
 
 ```
 {
