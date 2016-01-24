@@ -35,7 +35,7 @@ If you have a working Go installation, you can also say
 
 # Quick start
 
-Put this in a file called **modd.conf**:
+Put this in a file called *modd.conf*:
 
 ```
 **/*.go {
@@ -53,7 +53,7 @@ will be run.
 
 # Leisurely start
 
-When modd is started, it looks for a file called **modd.conf** in the current
+When modd is started, it looks for a file called *modd.conf* in the current
 directory. This file has a simple, powerful syntax - one or more blocks of
 commands, each of which can be triggered on changes to files matching a set of
 file patterns. Commands have two flavors: **prep** commands that run and
@@ -67,10 +67,7 @@ commands succeed, daemons are then restarted, also in order of occurrence. If
 any prep command exits with an error, execution is stopped immediately. If
 multiple blocks are triggered, they too run in order from top to bottom.
 
-
-## An example
-
-Let's start with a simplified version of the modd.conf file I use when hacking
+Let's look at a simplified version of the *modd.conf* file I use when hacking
 on devd. It runs the test suite, builds and installs devd, and keeps a test
 daemon instance running throughout:
 
@@ -98,13 +95,33 @@ result:
 }
 ```
 
-Now, it's not really necessary to do an install and restart the daemon if we've
-only changed a unit test file. Let's change the config file so modd runs the
-test suite whenever we change any source file, but skips the rest if we've only
-modified a test specification. We do this by excluding test files with the **!** operator, and adding another block.
+Next, it's not really necessary to do an install and restart the daemon if
+we've only changed a unit test file. Let's change the config file so modd runs
+the test suite whenever we change any source file, but skips the rest if we've
+only modified a test specification. We do this by excluding test files with the **!** operator, and adding another block.
 
 ```
 **/*.go {
+    prep: go test
+}
+
+# All test files are of the form *_test.go
+**/*.go !**/*_test.go {
+    prep: go install ./cmd/devd
+    daemon +sigterm: devd -m ./tmp
+}
+```
+
+Lastly, let's say we want to run *gofmt* to auto-format files whenever they are
+modified. We can use the **|MODD|** marker in prep commands for this. On first
+run it is expanded to a shell-safe list of all matching files on disk.
+Subsequently, when responding to an actual change, it expands to a list of
+files that have been modified or added. Our final *modd.conf* file looks like
+this:
+
+```
+**/*.go {
+    prep: gofmt -w |MODD|
     prep: go test
 }
 
