@@ -1,23 +1,21 @@
 [![Build Status](https://drone.io/github.com/cortesi/modd/status.png)](https://drone.io/github.com/cortesi/modd/latest)
 
-# modd
+Modd is a developer tool that runs commands and manages daemons in response to
+filesystem changes.
 
-A dev tool that runs commands and manages daemons in response to filesystem changes.
-
-Modd does file change detection right - or at least tries. Usefully responding
-to file system changes is a hairy, knotty, horrible problem, and most tools
-similar to modd simply don't get it right. Modd aims to do the best possible
-job across all platforms for typical developer work patterns. It ignores
-temporary files, VCS directories, swap files and many other nuisances by
-default. Its detection algorithm waits for a lull in filesystem activity so
+Modd does file change detection right - or at least triesto. Usefully
+responding to file system changes is a hairy, knotty, horrible problem, and
+most tools similar to modd simply don't get it right. Modd aims to do the best
+possible job across all platforms for typical developer work patterns. It
+ignores temporary files, VCS directories, swap files and many other nuisances
+by default. Its detection algorithm waits for a lull in filesystem activity so
 that events are triggered **after** render or compilation processes that may
-touch many files. Modd tries to do the right thing in corner cases, like
-receiving file modification notice while previously triggered commands are
-being run.
+touch many files. Modd tries to do the right thing in corner cases, like file
+modifications while previously triggered commands are still being run.
 
 Modd's sister project is [devd](https://github.com/cortesi/devd), a compact
 HTTP daemon for developers. Devd integrates with modd, allowing you to trigger
-in-browser livereload with modd. 
+in-browser livereload with modd.
 
 **Modd has not been released yet - the design is stabilising and I should have
 **version 0.1 out the door soon.**
@@ -33,9 +31,6 @@ for your OS, and copy the binary to somewhere on your PATH.
 If you have a working Go installation, you can also say
 
     go get github.com/cortesi/modd/cmd/modd
-
-
-
 
 
 # Quick start
