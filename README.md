@@ -4,6 +4,8 @@
 
 A dev tool that runs commands and manages daemons in response to filesystem changes.
 
+**Modd has not been released yet - the design is stabilising and I should have version 0.1 out the door soon.**
+
 # Install
 
 Modd is a single statically compiled binary with no external dependencies, and
