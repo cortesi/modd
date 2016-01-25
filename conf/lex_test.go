@@ -159,9 +159,9 @@ var lexTests = []struct {
 		},
 	},
 	{
-		"one +common ", []itm{
+		"one +noignore ", []itm{
 			{itemBareString, "one"},
-			{itemBareString, "+common"},
+			{itemBareString, "+noignore"},
 		},
 	},
 	{

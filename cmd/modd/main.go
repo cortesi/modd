@@ -30,6 +30,10 @@ func main() {
 		Short('b').
 		Bool()
 
+	ignores := kingpin.Flag("ignores", "List default ignore patterns and exit").
+		Short('i').
+		Bool()
+
 	prep := kingpin.Flag("prep", "Run prep commands and exit").
 		Short('p').
 		Bool()
@@ -45,6 +49,14 @@ func main() {
 
 	kingpin.Version(modd.Version)
 	kingpin.Parse()
+
+	if *ignores {
+		for _, patt := range modd.CommonExcludes {
+			fmt.Println(patt)
+		}
+		os.Exit(0)
+	}
+
 	log := termlog.NewLog()
 
 	if *debug {

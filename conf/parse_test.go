@@ -67,7 +67,7 @@ var parseTests = []struct {
 		},
 	},
 	{
-		`foo +common {}`,
+		`foo +noignore {}`,
 		&Config{
 			[]Block{
 				{

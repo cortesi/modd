@@ -99,7 +99,7 @@ func (p *parser) collectPatterns() ([]string, []string, bool) {
 			if v.val[0] == '!' {
 				exclude = append(exclude, v.val[1:])
 			} else {
-				if v.val == "+common" {
+				if v.val == "+noignore" {
 					noCommonFilter = true
 				} else {
 					watch = append(watch, v.val)
