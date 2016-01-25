@@ -104,12 +104,12 @@ only modified a test specification. We do this by excluding test files with the 
 }
 ```
 
-Lastly, let's say we want to run *gofmt* to auto-format files whenever they are
-modified. We can use the **|MODD|** marker in prep commands for this. On first
-run it is expanded to a shell-safe list of all matching files on disk.
-Subsequently, when responding to an actual change, it expands to a list of
-files that have been modified or added. Our final *modd.conf* file looks like
-this:
+Lastly, let's say for the sake of this example that we want to run *gofmt* to
+auto-format files whenever they are modified. We can use the **|MODD|** marker
+in prep commands for this. On first run it is expanded to a shell-safe list of
+all matching files on disk. Subsequently, when responding to an actual change,
+it expands to a list of files that have been modified or added. Our final
+*modd.conf* file looks like this:
 
 ```
 **/*.go {
