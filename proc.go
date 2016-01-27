@@ -80,6 +80,7 @@ func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interfa
 
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd string, log termlog.Stream) error {
+	log.Header()
 	sh := getShell()
 	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()

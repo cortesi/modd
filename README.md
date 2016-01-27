@@ -188,7 +188,7 @@ prep: "
 ```
 
 
-### prep
+### Prep commands
 
 All prep commands in a block are run in order before any daemons are restarted.
 If any prep command exits with an error, execution stops.
@@ -205,7 +205,7 @@ started, and then after that only run eslint on files if they change:
 }
 ```
 
-### daemon
+### Daemon commands
 
 Daemons are executed on startup, and are restarted by modd whenever they exit.
 When a block containing a daemon command is triggered, modd sends a signal to
