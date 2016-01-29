@@ -9,6 +9,7 @@ import (
 
 	"github.com/cortesi/modd"
 	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/notify"
 	"github.com/cortesi/termlog"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -37,6 +38,10 @@ var ignores = kingpin.Flag("ignores", "List default ignore patterns and exit").
 	Short('i').
 	Bool()
 
+var doNotify = kingpin.Flag("notify", "Send stderr to system notification if commands error").
+	Short('n').
+	Bool()
+
 var prep = kingpin.Flag("prep", "Run prep commands and exit").
 	Short('p').
 	Bool()
@@ -49,6 +54,22 @@ var cmdstats = kingpin.Flag("cmdstats", "Show stats on command execution").
 var debug = kingpin.Flag("debug", "Debugging for modd development").
 	Default("false").
 	Bool()
+
+func prepsAndNotify(b conf.Block, lmod *modd.Mod, log termlog.TermLog) error {
+	err := modd.RunPreps(b, lmod, log)
+	if err != nil {
+		if *beep {
+			fmt.Print("\a")
+		}
+	}
+	if pe, ok := err.(modd.ProcError); ok && *doNotify {
+		n := notify.NewNotifier()
+		if n != nil {
+			n.Push("modd error", pe.Output, "")
+		}
+	}
+	return err
+}
 
 func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 	modchan := make(chan *modd.Mod, 1024)
@@ -66,12 +87,8 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 		}
 		cnf.Blocks[i] = b
 
-		err := modd.RunPreps(b, nil, log)
-		if err != nil {
-			if *beep {
-				fmt.Print("\a")
-			}
-		}
+		prepsAndNotify(b, nil, log)
+
 		d := modd.DaemonPen{}
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt, os.Kill)
@@ -130,11 +147,8 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 				continue
 			}
 
-			err = modd.RunPreps(b, lmod, log)
+			err = prepsAndNotify(b, lmod, log)
 			if err != nil {
-				if *beep {
-					fmt.Print("\a")
-				}
 				continue
 			}
 			daemonPens[i].Restart()
@@ -163,9 +177,6 @@ func main() {
 	cnf, err := conf.Parse(*file, string(ret))
 	if err != nil {
 		kingpin.Fatalf("%s", err)
-	}
-	if err != nil {
-		kingpin.Fatalf("Fatal error: %s", err)
 	}
 	watchfile := *file
 	if *noconf {

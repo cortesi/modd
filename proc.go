@@ -2,6 +2,7 @@ package modd
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"os"
 	"os/exec"
@@ -78,6 +79,16 @@ func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interfa
 	}
 }
 
+// ProcError is a process error, possibly containing command output
+type ProcError struct {
+	shorttext string
+	Output    string
+}
+
+func (p ProcError) Error() string {
+	return p.shorttext
+}
+
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd string, log termlog.Stream) error {
 	log.Header()
@@ -93,18 +104,29 @@ func RunProc(cmd string, log termlog.Stream) error {
 	}
 	wg := sync.WaitGroup{}
 	wg.Add(2)
-	go logOutput(&wg, stde, log.Warn)
+	buff := new(bytes.Buffer)
+	mut := sync.Mutex{}
+	go logOutput(
+		&wg, stde,
+		func(s string, args ...interface{}) {
+			log.Warn(s)
+
+			mut.Lock()
+			defer mut.Unlock()
+			buff.WriteString(s + "\n")
+		},
+	)
 	go logOutput(&wg, stdo, log.Say)
 	err = c.Start()
 	if err != nil {
 		return err
 	}
 	err = c.Wait()
+	wg.Wait()
 	if err != nil {
 		log.Shout("%s", c.ProcessState.String())
-		return err
+		return ProcError{err.Error(), buff.String()}
 	}
-	wg.Wait()
 	log.Notice(">> done")
 	// FIXME: rusage stats here
 	log.NoticeAs("cmdstats", "run time: %s", c.ProcessState.UserTime())
