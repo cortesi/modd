@@ -16,64 +16,47 @@ import (
 const modfile = "./modd.conf"
 const lullTime = time.Millisecond * 100
 
-func main() {
-	file := kingpin.Flag(
-		"file",
-		fmt.Sprintf("Path to modfile (%s)", modfile),
-	).
-		Default(modfile).
-		PlaceHolder("PATH").
-		Short('f').
-		String()
+var file = kingpin.Flag(
+	"file",
+	fmt.Sprintf("Path to modfile (%s)", modfile),
+).
+	Default(modfile).
+	PlaceHolder("PATH").
+	Short('f').
+	String()
 
-	beep := kingpin.Flag("beep", "Beep if any command returned an error").
-		Short('b').
-		Bool()
+var noconf = kingpin.Flag("noconf", "Don't watch our own config file").
+	Short('c').
+	Bool()
 
-	ignores := kingpin.Flag("ignores", "List default ignore patterns and exit").
-		Short('i').
-		Bool()
+var beep = kingpin.Flag("bell", "Ring terminal bell if any command returns an error").
+	Short('b').
+	Bool()
 
-	prep := kingpin.Flag("prep", "Run prep commands and exit").
-		Short('p').
-		Bool()
+var ignores = kingpin.Flag("ignores", "List default ignore patterns and exit").
+	Short('i').
+	Bool()
 
-	cmdstats := kingpin.Flag("cmdstats", "Show stats on command execution").
-		Short('s').
-		Default("false").
-		Bool()
+var prep = kingpin.Flag("prep", "Run prep commands and exit").
+	Short('p').
+	Bool()
 
-	debug := kingpin.Flag("debug", "Debugging for modd development").
-		Default("false").
-		Bool()
+var cmdstats = kingpin.Flag("cmdstats", "Show stats on command execution").
+	Short('s').
+	Default("false").
+	Bool()
 
-	kingpin.Version(modd.Version)
-	kingpin.Parse()
+var debug = kingpin.Flag("debug", "Debugging for modd development").
+	Default("false").
+	Bool()
 
+func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
+	modchan := make(chan *modd.Mod, 1024)
 	if *ignores {
 		for _, patt := range modd.CommonExcludes {
 			fmt.Println(patt)
 		}
 		os.Exit(0)
-	}
-
-	log := termlog.NewLog()
-
-	if *debug {
-		log.Enable("debug")
-		modd.Logger = log
-	}
-	if *cmdstats {
-		log.Enable("cmdstats")
-	}
-
-	ret, err := ioutil.ReadFile(*file)
-	if err != nil {
-		kingpin.Fatalf("%s", err)
-	}
-	cnf, err := conf.Parse(*file, string(ret))
-	if err != nil {
-		kingpin.Fatalf("%s", err)
 	}
 
 	daemonPens := make([]*modd.DaemonPen, len(cnf.Blocks))
@@ -83,7 +66,7 @@ func main() {
 		}
 		cnf.Blocks[i] = b
 
-		err = modd.RunPreps(b, nil, log)
+		err := modd.RunPreps(b, nil, log)
 		if err != nil {
 			if *beep {
 				fmt.Print("\a")
@@ -105,15 +88,37 @@ func main() {
 		os.Exit(0)
 	}
 
+	watchpaths := cnf.WatchPaths()
+	if watchconf != "" {
+		watchpaths = append(watchpaths, watchconf)
+	}
+
 	// FIXME: This takes a long time. We could start it in parallel with the
 	// first process run in a goroutine
-	modchan := make(chan modd.Mod)
-	err = modd.Watch(cnf.WatchPaths(), lullTime, modchan)
+	watcher, err := modd.Watch(watchpaths, lullTime, modchan)
+	defer watcher.Stop()
 	if err != nil {
 		kingpin.Fatalf("Fatal error: %s", err)
 	}
 
 	for mod := range modchan {
+		if watchconf != "" && mod.Has(watchconf) {
+			ret, err := ioutil.ReadFile(watchconf)
+			if err != nil {
+				log.Warn("Reloading config - error reading %s: %s", watchconf, err)
+				continue
+			}
+			cnf, err := conf.Parse(*file, string(ret))
+			if err != nil {
+				log.Warn("Reloading config - error reading %s: %s", watchconf, err)
+				continue
+			}
+			log.Notice("Reloading config %s", watchconf)
+			return cnf
+		}
+		if mod == nil {
+			break
+		}
 		log.SayAs("debug", "Delta: \n%s", mod.String())
 		for i, b := range cnf.Blocks {
 			lmod, err := mod.Filter(b.Include, b.Exclude)
@@ -133,6 +138,44 @@ func main() {
 				continue
 			}
 			daemonPens[i].Restart()
+		}
+	}
+	return nil
+}
+
+func main() {
+	kingpin.Version(modd.Version)
+	kingpin.Parse()
+
+	log := termlog.NewLog()
+	if *debug {
+		log.Enable("debug")
+		modd.Logger = log
+	}
+	if *cmdstats {
+		log.Enable("cmdstats")
+	}
+
+	ret, err := ioutil.ReadFile(*file)
+	if err != nil {
+		kingpin.Fatalf("%s", err)
+	}
+	cnf, err := conf.Parse(*file, string(ret))
+	if err != nil {
+		kingpin.Fatalf("%s", err)
+	}
+	if err != nil {
+		kingpin.Fatalf("Fatal error: %s", err)
+	}
+	watchfile := *file
+	if *noconf {
+		watchfile = ""
+	}
+
+	for {
+		cnf = run(log, cnf, watchfile)
+		if cnf == nil {
+			break
 		}
 	}
 }

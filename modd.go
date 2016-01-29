@@ -114,6 +114,16 @@ func (mod Mod) All() []string {
 	return _keys(all)
 }
 
+// Has checks if a given Mod includes a specified file
+func (mod Mod) Has(p string) bool {
+	for _, v := range mod.All() {
+		if path.Clean(p) == path.Clean(v) {
+			return true
+		}
+	}
+	return false
+}
+
 // Empty checks if this mod set is empty
 func (mod Mod) Empty() bool {
 	if len(mod.Changed) > 0 || len(mod.Deleted) > 0 || len(mod.Added) > 0 {
@@ -264,6 +274,16 @@ func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecke
 	}
 }
 
+// Watcher is a handle that allows a Watch to be terminated
+type Watcher struct {
+	evtch chan notify.EventInfo
+}
+
+// Stop watching
+func (w *Watcher) Stop() {
+	notify.Stop(w.evtch)
+}
+
 // Watch watches a set of paths. Mod structs representing a changeset are sent
 // on the channel ch.
 //
@@ -272,19 +292,19 @@ func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecke
 // stream of changes of duration lullTime. This lets us represent processes
 // that progressively affect multiple files, like rendering, as a single
 // changeset.
-func Watch(paths []string, lullTime time.Duration, ch chan Mod) error {
+func Watch(paths []string, lullTime time.Duration, ch chan *Mod) (*Watcher, error) {
 	evtch := make(chan notify.EventInfo, 4096)
 	for _, p := range paths {
 		stat, err := os.Stat(p)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if stat.IsDir() {
 			p = path.Join(p, "...")
 		}
 		err = notify.Watch(p, evtch, notify.All)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	go func() {
@@ -295,11 +315,11 @@ func Watch(paths []string, lullTime time.Duration, ch chan Mod) error {
 				if err != nil {
 					Logger.Shout("Error normalising paths: %s", err)
 				}
-				ch <- *ret
+				ch <- ret
 			}
 		}
 	}()
-	return nil
+	return &Watcher{evtch}, nil
 }
 
 // CommonExcludes is a list of commonly excluded files suitable for passing in
