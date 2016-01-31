@@ -224,6 +224,19 @@ var lexTests = []struct {
 			{itemQuotedString, "'foo'"},
 		},
 	},
+	{
+		"one {\ndaemon: foo\n}\n@b=foo", []itm{
+			{itemBareString, "one"},
+			{itemLeftParen, "{"},
+			{itemDaemon, "daemon"},
+			{itemColon, ":"},
+			{itemBareString, "foo\n"},
+			{itemRightParen, "}"},
+			{itemVarName, "@b"},
+			{itemEquals, "="},
+			{itemBareString, "foo"},
+		},
+	},
 }
 
 func TestLex(t *testing.T) {
@@ -252,6 +265,8 @@ var lexErrorTests = []struct {
 	{"{oink: bar}", "unknown directive: oink", 5},
 	{"! {}", "! must be followed by a string", 2},
 	{"{ daemon +*: foo\n}", "invalid command option", 11},
+	{"@foo = \n}", "= must be followed by a string", 9},
+	{"@foo = '", "unterminated quoted string", 8},
 }
 
 func TestLexErrors(t *testing.T) {
