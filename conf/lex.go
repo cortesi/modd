@@ -365,7 +365,10 @@ func lexVariables(l *lexer) stateFn {
 				l.emit(itemEquals)
 			}
 			n = l.maybeSpace()
-			if any(n, quotes) {
+			if n == eof {
+				l.errorf("unterminated variable assignment")
+				return nil
+			} else if any(n, quotes) {
 				err := l.acceptQuotedString(n)
 				if err != nil {
 					l.errorf("%s", err)

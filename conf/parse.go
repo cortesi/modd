@@ -154,12 +154,47 @@ func (p *parser) parse() (err error) {
 	p.lex = lex(p.name, p.text)
 	p.config = &Config{}
 	for {
+		for {
+			k, v, err := p.parseVariable()
+			if err != nil {
+				return err
+			}
+			if k == "" && v == "" {
+				break
+			}
+			err = p.config.addVariable(k, v)
+			if err != nil {
+				return err
+			}
+		}
 		if p.peek().typ == itemEOF {
 			break
 		}
 		p.config.addBlock(*p.parseBlock())
 	}
 	return err
+}
+
+func (p *parser) parseVariable() (string, string, error) {
+	if p.peek().typ != itemVarName {
+		return "", "", nil
+	}
+	name := p.next().val
+
+	eq := p.next()
+	if eq.typ != itemEquals {
+		p.errorf("Expected =")
+	}
+	nxt := p.next()
+	val := ""
+	if nxt.typ == itemQuotedString {
+		val = unquote(nxt.val)
+	} else if nxt.typ == itemBareString {
+		val = nxt.val
+	} else {
+		p.errorf("Expected variable value")
+	}
+	return name, val, nil
 }
 
 func prepCommand(itm item) string {

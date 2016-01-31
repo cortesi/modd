@@ -3,6 +3,7 @@ package conf
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"syscall"
 
@@ -82,7 +83,23 @@ func (b *Block) addPrep(command string, options []string) error {
 
 // Config represents a complete configuration
 type Config struct {
-	Blocks []Block
+	Blocks    []Block
+	Variables map[string]string
+}
+
+// Equals checks if this Config equals another
+func (c *Config) Equals(other *Config) bool {
+	if (c.Blocks != nil || len(c.Blocks) != 0) || (other.Blocks != nil || len(other.Blocks) != 0) {
+		if !reflect.DeepEqual(c.Blocks, other.Blocks) {
+			return false
+		}
+	}
+	if (c.Variables != nil || len(c.Variables) != 0) || (other.Variables != nil || len(other.Variables) != 0) {
+		if !reflect.DeepEqual(c.Variables, other.Variables) {
+			return false
+		}
+	}
+	return true
 }
 
 // WatchPaths retreives the set of watched paths (with patterns removed) from
@@ -101,4 +118,12 @@ func (c *Config) addBlock(b Block) {
 		c.Blocks = []Block{}
 	}
 	c.Blocks = append(c.Blocks, b)
+}
+
+func (c *Config) addVariable(key string, value string) error {
+	if c.Variables == nil {
+		c.Variables = map[string]string{}
+	}
+	c.Variables[key] = value
+	return nil
 }

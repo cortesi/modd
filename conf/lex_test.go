@@ -266,6 +266,7 @@ var lexErrorTests = []struct {
 	{"! {}", "! must be followed by a string", 2},
 	{"{ daemon +*: foo\n}", "invalid command option", 11},
 	{"@foo = \n}", "= must be followed by a string", 9},
+	{"@foo =", "unterminated variable assignment", 6},
 	{"@foo = '", "unterminated quoted string", 8},
 }
 

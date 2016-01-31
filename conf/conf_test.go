@@ -7,7 +7,7 @@ import (
 
 func TestWatchPaths(t *testing.T) {
 	c := Config{
-		[]Block{
+		Blocks: []Block{
 			{Include: []string{"a/foo", "a/bar"}},
 			{Include: []string{"a/bar", "a/oink", "foo", "b/foo"}},
 		},

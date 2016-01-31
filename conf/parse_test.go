@@ -1,7 +1,6 @@
 package conf
 
 import (
-	"reflect"
 	"syscall"
 	"testing"
 )
@@ -16,12 +15,16 @@ var parseTests = []struct {
 	},
 	{
 		"{}",
-		&Config{[]Block{{}}},
+		&Config{
+			Blocks: []Block{
+				{},
+			},
+		},
 	},
 	{
 		"foo {}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include: []string{"foo"},
 				},
@@ -31,7 +34,7 @@ var parseTests = []struct {
 	{
 		"foo bar {}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include: []string{"foo", "bar"},
 				},
@@ -41,7 +44,7 @@ var parseTests = []struct {
 	{
 		"!foo {}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Exclude: []string{"foo"},
 				},
@@ -51,7 +54,7 @@ var parseTests = []struct {
 	{
 		`!"foo" {}`,
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Exclude: []string{"foo"},
 				},
@@ -61,7 +64,7 @@ var parseTests = []struct {
 	{
 		`!"foo" !'bar' !voing {}`,
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{Exclude: []string{"foo", "bar", "voing"}},
 			},
 		},
@@ -69,7 +72,7 @@ var parseTests = []struct {
 	{
 		`foo +noignore {}`,
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include:        []string{"foo"},
 					NoCommonFilter: true,
@@ -80,7 +83,7 @@ var parseTests = []struct {
 	{
 		"'foo bar' voing {}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include: []string{"foo bar", "voing"},
 				},
@@ -90,7 +93,7 @@ var parseTests = []struct {
 	{
 		"foo {\ndaemon: command\n}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include: []string{"foo"},
 					Daemons: []Daemon{{"command", syscall.SIGHUP}},
@@ -100,40 +103,44 @@ var parseTests = []struct {
 	},
 	{
 		"{\ndaemon +sighup: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGHUP}}}}},
+		&Config{
+			Blocks: []Block{
+				{Daemons: []Daemon{{"c", syscall.SIGHUP}}},
+			},
+		},
 	},
 	{
 		"{\ndaemon +sigterm: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGTERM}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGTERM}}}}},
 	},
 	{
 		"{\ndaemon +sigint: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGINT}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGINT}}}}},
 	},
 	{
 		"{\ndaemon +sigkill: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGKILL}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGKILL}}}}},
 	},
 	{
 		"{\ndaemon +sigquit: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGQUIT}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGQUIT}}}}},
 	},
 	{
 		"{\ndaemon +sigusr1: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGUSR1}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGUSR1}}}}},
 	},
 	{
 		"{\ndaemon +sigusr2: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGUSR2}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGUSR2}}}}},
 	},
 	{
 		"{\ndaemon +sigwinch: c\n}",
-		&Config{[]Block{{Daemons: []Daemon{{"c", syscall.SIGWINCH}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGWINCH}}}}},
 	},
 	{
 		"foo {\nprep: command\n}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include: []string{"foo"},
 					Preps:   []Prep{Prep{Command: "command"}},
@@ -144,7 +151,7 @@ var parseTests = []struct {
 	{
 		"foo {\nprep: 'command\n-one\n-two'}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include: []string{"foo"},
 					Preps:   []Prep{Prep{Command: "command\n-one\n-two"}},
@@ -155,7 +162,7 @@ var parseTests = []struct {
 	{
 		"foo #comment\nbar\n#comment\n{\n#comment\nprep: command\n}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include: []string{"foo", "bar"},
 					Preps:   []Prep{Prep{Command: "command"}},
@@ -166,11 +173,64 @@ var parseTests = []struct {
 	{
 		"foo #comment\n#comment\nbar { #comment \nprep: command\n}",
 		&Config{
-			[]Block{
+			Blocks: []Block{
 				{
 					Include: []string{"foo", "bar"},
 					Preps:   []Prep{{"command"}},
 				},
+			},
+		},
+	},
+	{
+		"@var=bar\nfoo {}",
+		&Config{
+			Blocks: []Block{
+				{
+					Include: []string{"foo"},
+				},
+			},
+			Variables: map[string]string{
+				"@var": "bar",
+			},
+		},
+	},
+	{
+		"@var='bar\nvoing'\nfoo {}",
+		&Config{
+			Blocks: []Block{
+				{
+					Include: []string{"foo"},
+				},
+			},
+			Variables: map[string]string{
+				"@var": "bar\nvoing",
+			},
+		},
+	},
+	{
+		"foo {}\n@var=bar\n",
+		&Config{
+			Blocks: []Block{
+				{
+					Include: []string{"foo"},
+				},
+			},
+			Variables: map[string]string{
+				"@var": "bar",
+			},
+		},
+	},
+	{
+		"@oink=foo\nfoo {}\n@var=bar\n",
+		&Config{
+			Blocks: []Block{
+				{
+					Include: []string{"foo"},
+				},
+			},
+			Variables: map[string]string{
+				"@var":  "bar",
+				"@oink": "foo",
 			},
 		},
 	},
@@ -182,7 +242,7 @@ func TestParse(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%q - %s", tt.input, err)
 		}
-		if !reflect.DeepEqual(ret, tt.expected) {
+		if !ret.Equals(tt.expected) {
 			t.Errorf("%d %q\nexpected:\n\t%#v\ngot\n\t%#v", i, tt.input, tt.expected, ret)
 		}
 	}
@@ -200,9 +260,11 @@ var parseErrorTests = []struct {
 	{"foo { daemon *: foo }", "test:1: invalid syntax"},
 	{"foo { daemon +invalid: foo }", "test:1: unknown option: +invalid"},
 	{"foo { prep +invalid: foo }", "test:1: unknown option: +invalid"},
+	{"@foo bar {}", "test:1: Expected ="},
+	{"@foo =", "test:1: unterminated variable assignment"},
 }
 
-func TestParseErrors(t *testing.T) {
+func TestErrorsParse(t *testing.T) {
 	for i, tt := range parseErrorTests {
 		v, err := Parse("test", tt.input)
 		if err == nil {
