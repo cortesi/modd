@@ -48,6 +48,11 @@ var lexTests = []struct {
 		},
 	},
 	{
+		"# two three\\\n", []itm{
+			{itemComment, "# two three"},
+		},
+	},
+	{
 		"# one two\n# three four", []itm{
 			{itemComment, "# one two\n"},
 			{itemComment, "# three four"},

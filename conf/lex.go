@@ -206,9 +206,12 @@ func (l *lexer) run() {
 }
 
 // acceptLine accepts the remainder of a line
-func (l *lexer) acceptLine() {
+func (l *lexer) acceptLine(permitEscaping bool) {
 	escaped := false
 	for {
+		if !permitEscaping {
+			escaped = false
+		}
 		nxt := l.peek()
 		switch nxt {
 		case '\n':
@@ -278,7 +281,7 @@ func lexPatterns(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) 
 	for {
 		n := l.next()
 		if n == '#' {
-			l.acceptLine()
+			l.acceptLine(false)
 			l.emit(itemComment)
 		} else if n == eof {
 			l.emit(itemEOF)
@@ -338,7 +341,7 @@ func lexInside(l *lexer) stateFn {
 	for {
 		n := l.next()
 		if n == '#' {
-			l.acceptLine()
+			l.acceptLine(false)
 			l.emit(itemComment)
 		} else if n == '}' {
 			l.emit(itemRightParen)
@@ -407,7 +410,7 @@ func lexCommand(l *lexer) stateFn {
 			l.acceptRun(spaces)
 			l.emit(itemSpace)
 		} else {
-			l.acceptLine()
+			l.acceptLine(true)
 			l.emit(itemBareString)
 			return lexInside
 		}
