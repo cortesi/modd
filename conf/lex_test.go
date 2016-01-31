@@ -49,7 +49,7 @@ var lexTests = []struct {
 	},
 	{
 		"# two three\\\n", []itm{
-			{itemComment, "# two three"},
+			{itemComment, "# two three\\\n"},
 		},
 	},
 	{
@@ -62,6 +62,13 @@ var lexTests = []struct {
 		"one # two three", []itm{
 			{itemBareString, "one"},
 			{itemComment, "# two three"},
+		},
+	},
+	{
+		"one\n# two three\ntwo", []itm{
+			{itemBareString, "one"},
+			{itemComment, "# two three\n"},
+			{itemBareString, "two"},
 		},
 	},
 	{
@@ -187,6 +194,34 @@ var lexTests = []struct {
 	{
 		"!\"one\ntwo\"", []itm{
 			{itemQuotedString, "!\"one\ntwo\""},
+		},
+	},
+	{
+		"@a = b", []itm{
+			{itemVarName, "@a"},
+			{itemEquals, "="},
+			{itemBareString, "b"},
+		},
+	},
+	{
+		"@a = b\n@b='foo'", []itm{
+			{itemVarName, "@a"},
+			{itemEquals, "="},
+			{itemBareString, "b"},
+			{itemVarName, "@b"},
+			{itemEquals, "="},
+			{itemQuotedString, "'foo'"},
+		},
+	},
+	{
+		"@a = b\n#comment\n@b='foo'", []itm{
+			{itemVarName, "@a"},
+			{itemEquals, "="},
+			{itemBareString, "b"},
+			{itemComment, "#comment\n"},
+			{itemVarName, "@b"},
+			{itemEquals, "="},
+			{itemQuotedString, "'foo'"},
 		},
 	},
 }

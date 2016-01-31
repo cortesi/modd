@@ -8,7 +8,7 @@ import (
 
 const spaces = " \t"
 const whitespace = spaces + "\n"
-const lowerAlphas = "abcdefghijklmnopqrstuvwxyz1234567890"
+const wordRunes = "abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVXYZ_"
 const quotes = `'"`
 
 // Characters we don't allow in bare strings
@@ -29,6 +29,8 @@ const (
 	itemPrep
 	itemRightParen
 	itemSpace
+	itemVarName
+	itemEquals
 )
 
 func (i itemType) String() string {
@@ -43,6 +45,8 @@ func (i itemType) String() string {
 		return "daemon"
 	case itemError:
 		return "error"
+	case itemEquals:
+		return "="
 	case itemEOF:
 		return "eof"
 	case itemLeftParen:
@@ -55,6 +59,8 @@ func (i itemType) String() string {
 		return "rparen"
 	case itemSpace:
 		return "space"
+	case itemVarName:
+		return "var"
 	default:
 		panic("unreachable")
 	}
@@ -147,6 +153,37 @@ func (l *lexer) acceptRun(valid string) {
 func (l *lexer) acceptFunc(match func(rune) bool) {
 	for match(l.peek()) {
 		l.next()
+	}
+}
+
+// Eats and emits a run of whitespace, if any, and returns the next sigificant
+// rune
+func (l *lexer) maybeSpace() rune {
+	for {
+		n := l.next()
+		if any(n, whitespace) {
+			l.acceptRun(whitespace)
+			l.emit(itemSpace)
+		} else {
+			return n
+		}
+	}
+}
+
+// Eats and emits a run of whitespace and comments, and returns the next
+// sigificant rune
+func (l *lexer) eatSpaceAndComments() rune {
+	for {
+		n := l.next()
+		if n == '#' {
+			l.acceptLine(false)
+			l.emit(itemComment)
+		} else if any(n, whitespace) {
+			l.acceptRun(whitespace)
+			l.emit(itemSpace)
+		} else {
+			return n
+		}
 	}
 }
 
@@ -245,7 +282,7 @@ func (l *lexer) acceptBareString() {
 func (l *lexer) acceptWord() {
 	l.acceptFunc(
 		func(r rune) bool {
-			return any(r, lowerAlphas)
+			return any(r, wordRunes)
 		},
 	)
 }
@@ -277,18 +314,12 @@ func any(r rune, s string) bool {
 
 // lexPatterns reads and emits consecutive file patterns. Strings can be
 // interspersed with comments.
-func lexPatterns(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) stateFn {
+func lexPatterns(l *lexer) stateFn {
 	for {
-		n := l.next()
-		if n == '#' {
-			l.acceptLine(false)
-			l.emit(itemComment)
-		} else if n == eof {
+		n := l.eatSpaceAndComments()
+		if n == eof {
 			l.emit(itemEOF)
 			return nil
-		} else if any(n, whitespace) {
-			l.acceptRun(whitespace)
-			l.emit(itemSpace)
 		} else if n == '!' {
 			pk := l.next()
 			if any(pk, quotes) {
@@ -297,10 +328,10 @@ func lexPatterns(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) 
 					l.errorf("%s", err)
 					return nil
 				}
-				l.emit(quotedItem)
+				l.emit(itemQuotedString)
 			} else if !any(pk, bareStringDisallowed) {
 				l.acceptBareString()
-				l.emit(bareItem)
+				l.emit(itemBareString)
 			} else {
 				l.errorf("! must be followed by a string")
 				return nil
@@ -311,21 +342,52 @@ func lexPatterns(l *lexer, ret stateFn, quotedItem itemType, bareItem itemType) 
 				l.errorf("%s", err)
 				return nil
 			}
-			l.emit(quotedItem)
+			l.emit(itemQuotedString)
 		} else if !any(n, bareStringDisallowed) {
 			l.acceptBareString()
-			l.emit(bareItem)
+			l.emit(itemBareString)
 		} else {
 			l.backup()
-			return ret
+			return lexBlockStart
+		}
+	}
+}
+
+// lexVariables reads a block of variable declarations.
+func lexVariables(l *lexer) stateFn {
+	for {
+		n := l.eatSpaceAndComments()
+		if n == '@' {
+			l.acceptWord()
+			l.emit(itemVarName)
+			n = l.maybeSpace()
+			if n == '=' {
+				l.emit(itemEquals)
+			}
+			n = l.maybeSpace()
+			if any(n, quotes) {
+				err := l.acceptQuotedString(n)
+				if err != nil {
+					l.errorf("%s", err)
+					return nil
+				}
+				l.emit(itemQuotedString)
+			} else if !any(n, bareStringDisallowed) {
+				l.acceptBareString()
+				l.emit(itemBareString)
+			} else {
+				l.errorf("= must be followed by a string")
+				return nil
+			}
+		} else {
+			l.backup()
+			return lexPatterns
 		}
 	}
 }
 
 func lexTop(l *lexer) stateFn {
-	return func(l *lexer) stateFn {
-		return lexPatterns(l, lexBlockStart, itemQuotedString, itemBareString)
-	}
+	return lexVariables
 }
 
 func lexBlockStart(l *lexer) stateFn {
@@ -339,18 +401,12 @@ func lexBlockStart(l *lexer) stateFn {
 
 func lexInside(l *lexer) stateFn {
 	for {
-		n := l.next()
-		if n == '#' {
-			l.acceptLine(false)
-			l.emit(itemComment)
-		} else if n == '}' {
+		n := l.eatSpaceAndComments()
+		if n == '}' {
 			l.emit(itemRightParen)
 			return lexTop
 		} else if n == eof {
 			return l.errorf("unterminated block")
-		} else if any(n, whitespace) {
-			l.acceptRun(whitespace)
-			l.emit(itemSpace)
 		} else if !any(n, bareStringDisallowed) {
 			l.acceptWord()
 			switch l.current() {
