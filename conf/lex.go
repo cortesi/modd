@@ -207,12 +207,26 @@ func (l *lexer) run() {
 
 // acceptLine accepts the remainder of a line
 func (l *lexer) acceptLine() {
-	l.acceptFunc(
-		func(r rune) bool {
-			return r != '\n' && r != eof
-		},
-	)
-	l.accept("\n")
+	escaped := false
+	for {
+		nxt := l.peek()
+		switch nxt {
+		case '\n':
+			l.next()
+			if !escaped {
+				return
+			}
+		case eof:
+			return
+		case '\\':
+			escaped = true
+			l.next()
+			continue
+		default:
+			l.next()
+		}
+		escaped = false
+	}
 }
 
 // acceptBareString accepts a bare, unquoted string

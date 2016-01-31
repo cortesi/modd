@@ -91,6 +91,16 @@ var lexTests = []struct {
 		},
 	},
 	{
+		"one {\ndaemon: foo\\\nbar\n}", []itm{
+			{itemBareString, "one"},
+			{itemLeftParen, "{"},
+			{itemDaemon, "daemon"},
+			{itemColon, ":"},
+			{itemBareString, "foo\\\nbar\n"},
+			{itemRightParen, "}"},
+		},
+	},
+	{
 		"one {\ndaemon +optone +opttwo: foo\n}", []itm{
 			{itemBareString, "one"},
 			{itemLeftParen, "{"},

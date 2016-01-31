@@ -175,8 +175,17 @@ the parent's environment. Single-line commands don't need to be quoted:
 prep: echo "i'm now rebuilding" | tee /tmp/output
 ```
 
-Multi-line commands must be quoted using single or double quotes. Within a
-multi-line command, the enclosing quote type can be backslash-escaped.
+Newlines can be escaped with a backslash for multi-line commands:
+
+```
+prep: ls \
+        -l \
+        -a
+```
+
+You can also enclose commands in single or double quotes, letting easily
+specify compound, multi-statement commands. These can contain anything you'd
+normally put in a shell script, and the same quoting and escaping conventions apply.
 
 ```
 prep: "
@@ -184,6 +193,7 @@ prep: "
         -l \
         -a
     echo \"hello again\"
+    echo \"hello yet again\"
 "
 ```
 
