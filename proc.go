@@ -166,6 +166,7 @@ type daemon struct {
 	conf conf.Daemon
 	log  termlog.Stream
 	cmd  *exec.Cmd
+	vars map[string]string
 	stop bool
 }
 
@@ -179,7 +180,14 @@ func (d *daemon) Run() {
 		}
 		lastStart = time.Now()
 		sh := getShell()
-		c := exec.Command(sh, "-c", d.conf.Command)
+
+		finalcmd, err := varcmd.Render(d.conf.Command, d.vars)
+		if err != nil {
+			d.log.Shout("%s", err)
+			continue
+		}
+
+		c := exec.Command(sh, "-c", finalcmd)
 		stdo, err := c.StdoutPipe()
 		if err != nil {
 			d.log.Shout("%s", err)
@@ -233,13 +241,14 @@ type DaemonPen struct {
 var ws = regexp.MustCompile(`\s\s+`)
 
 // Start starts set of daemons, each specified by a command
-func (dp *DaemonPen) Start(daemons []conf.Daemon, log termlog.TermLog) {
+func (dp *DaemonPen) Start(daemons []conf.Daemon, vars map[string]string, log termlog.TermLog) {
 	dp.Lock()
 	defer dp.Unlock()
 	d := make([]daemon, len(daemons))
 	for i, dmn := range daemons {
 		d[i] = daemon{
 			conf: dmn,
+			vars: vars,
 			log: log.Stream(
 				niceHeader("daemon: ", dmn.Command),
 			),

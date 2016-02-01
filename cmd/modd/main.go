@@ -104,7 +104,7 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 			os.Exit(0)
 		}()
 		if !*prep {
-			d.Start(b.Daemons, log)
+			d.Start(b.Daemons, cnf.GetVariables(), log)
 		}
 		daemonPens[i] = &d
 	}
