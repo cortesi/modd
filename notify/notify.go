@@ -1,11 +1,16 @@
 package notify
 
-import (
-	"os/exec"
-	"runtime"
-)
+import "os/exec"
 
 const prog = "modd"
+
+func hasExecutable(name string) bool {
+	_, err := exec.LookPath("growlnotify")
+	if err != nil {
+		return false
+	}
+	return true
+}
 
 // A Notifier notifies
 type Notifier interface {
@@ -16,14 +21,6 @@ type Notifier interface {
 type GrowlNotifier struct {
 }
 
-func hasGrowlNotify() bool {
-	_, err := exec.LookPath("growlnotify")
-	if err != nil {
-		return false
-	}
-	return true
-}
-
 // Push implements Notifier
 func (GrowlNotifier) Push(title string, text string, iconPath string) {
 	cmd := exec.Command(
@@ -32,10 +29,24 @@ func (GrowlNotifier) Push(title string, text string, iconPath string) {
 	go cmd.Run()
 }
 
+// LibnotifyNotifier is a notifier for lib-notify
+type LibnotifyNotifier struct {
+}
+
+// Push implements Notifier
+func (LibnotifyNotifier) Push(title string, text string, iconPath string) {
+	cmd := exec.Command(
+		"notify-send", prog, text,
+	)
+	go cmd.Run()
+}
+
 // NewNotifier finds a notifier for this platform
 func NewNotifier() Notifier {
-	if runtime.GOOS == "darwin" && hasGrowlNotify() {
+	if hasExecutable("growlnotify") {
 		return &GrowlNotifier{}
+	} else if hasExecutable("notify-send") {
+		return &LibnotifyNotifier{}
 	}
 	return nil
 }

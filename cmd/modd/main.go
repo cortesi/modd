@@ -61,7 +61,9 @@ func prepsAndNotify(b conf.Block, vars map[string]string, lmod *modd.Mod, log te
 		}
 		if *doNotify {
 			n := notify.NewNotifier()
-			if n != nil {
+			if n == nil {
+				log.Shout("Could not find a desktop notifier")
+			} else {
 				n.Push("modd error", pe.Output, "")
 			}
 		}

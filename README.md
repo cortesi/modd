@@ -284,3 +284,26 @@ started, and then after that only run eslint on files if they change:
     prep: eslint @mods
 }
 ```
+
+
+# Desktop Notifications
+
+When the **-n** flag is specified, modd sends anything sent to *stderr* from
+any prep commands that exit abnormally to a desktop notifier. To be useful
+here, notifiers have to be able to handle substantial quantities of text - at
+the moment, this is limited to [Growl](http://growl.info/) on OSX, and
+[libnotify](https://launchpad.net/ubuntu/+source/libnotify) on Linux and other
+Unix systems.
+
+## Growl
+
+For Growl to work, you will need Growl itself to be running, and have the
+growlnotify command installed. Growlnotify is an additional tool that you can
+download it from the official [Growl website](http://growl.info/downloads.php).
+
+
+## Libnotify
+
+Libnotify is a general notification framework available on most Unix-like
+systems. You'll need to use your system package manager to install
+**libnotify**.
