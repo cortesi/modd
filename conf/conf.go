@@ -127,3 +127,12 @@ func (c *Config) addVariable(key string, value string) error {
 	c.Variables[key] = value
 	return nil
 }
+
+// GetVariables returns a copy of the Variables map
+func (c *Config) GetVariables() map[string]string {
+	n := map[string]string{}
+	for k, v := range c.Variables {
+		n[k] = v
+	}
+	return n
+}

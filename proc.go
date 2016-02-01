@@ -13,9 +13,11 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/filter"
+	"github.com/cortesi/modd/varcmd"
 	"github.com/cortesi/termlog"
 )
 
+const moddVar = "@mods"
 const moddMarker = "|MODD|"
 
 // MinRestart is the minimum amount of time between daemon restarts
@@ -134,29 +136,27 @@ func RunProc(cmd string, log termlog.Stream) error {
 }
 
 // RunPreps runs all commands in sequence. Stops if any command returns an error.
-func RunPreps(b conf.Block, mod *Mod, log termlog.TermLog) error {
-	var fargs *string
+func RunPreps(b conf.Block, vars map[string]string, mod *Mod, log termlog.TermLog) error {
 	for _, p := range b.Preps {
-		cmd := p.Command
-		if strings.Contains(cmd, moddMarker) {
-			// We only want to calculate this once
-			if fargs == nil {
-				var modified []string
-				var err error
-				if mod != nil {
-					modified = mod.All()
-				} else {
-					modified, err = filter.Find(".", b.Include, b.Exclude)
+		if varcmd.HasVar(p.Command, moddVar) {
+			if mod == nil {
+				// First run - only do the expensive find once
+				if _, ok := vars[moddVar]; !ok {
+					modified, err := filter.Find(".", b.Include, b.Exclude)
 					if err != nil {
 						return err
 					}
+					vars[moddVar] = mkArgs(modified)
 				}
-				args := mkArgs(modified)
-				fargs = &args
+			} else {
+				vars[moddVar] = mkArgs(mod.All())
 			}
-			cmd = strings.Replace(cmd, moddMarker, *fargs, -1)
 		}
-		err := RunProc(cmd, log.Stream(niceHeader("prep: ", p.Command)))
+		cmd, err := varcmd.Render(p.Command, vars)
+		if err != nil {
+			return err
+		}
+		err = RunProc(cmd, log.Stream(niceHeader("prep: ", p.Command)))
 		if err != nil {
 			return err
 		}

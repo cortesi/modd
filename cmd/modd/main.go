@@ -55,20 +55,26 @@ var debug = kingpin.Flag("debug", "Debugging for modd development").
 	Default("false").
 	Bool()
 
-func prepsAndNotify(b conf.Block, lmod *modd.Mod, log termlog.TermLog) error {
-	err := modd.RunPreps(b, lmod, log)
-	if err != nil {
+// Returns a (continue, error) tuple. If continue is true, execution of the
+// remainder of the block should proceed. If error is not nil, modd should
+// exit.
+func prepsAndNotify(b conf.Block, vars map[string]string, lmod *modd.Mod, log termlog.TermLog) (bool, error) {
+	err := modd.RunPreps(b, vars, lmod, log)
+	if pe, ok := err.(modd.ProcError); ok {
 		if *beep {
 			fmt.Print("\a")
 		}
-	}
-	if pe, ok := err.(modd.ProcError); ok && *doNotify {
-		n := notify.NewNotifier()
-		if n != nil {
-			n.Push("modd error", pe.Output, "")
+		if *doNotify {
+			n := notify.NewNotifier()
+			if n != nil {
+				n.Push("modd error", pe.Output, "")
+			}
 		}
+		return false, nil
+	} else if err != nil {
+		return false, err
 	}
-	return err
+	return true, nil
 }
 
 func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
@@ -87,7 +93,11 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 		}
 		cnf.Blocks[i] = b
 
-		prepsAndNotify(b, nil, log)
+		_, err := prepsAndNotify(b, cnf.GetVariables(), nil, log)
+		if err != nil {
+			log.Shout("%s", err)
+			return nil
+		}
 
 		d := modd.DaemonPen{}
 		c := make(chan os.Signal, 1)
@@ -147,8 +157,12 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 				continue
 			}
 
-			err = prepsAndNotify(b, lmod, log)
+			proceed, err := prepsAndNotify(b, cnf.GetVariables(), lmod, log)
 			if err != nil {
+				log.Shout("%s", err)
+				return nil
+			}
+			if !proceed {
 				continue
 			}
 			daemonPens[i].Restart()

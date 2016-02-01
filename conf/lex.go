@@ -376,7 +376,7 @@ func lexVariables(l *lexer) stateFn {
 				}
 				l.emit(itemQuotedString)
 			} else if !any(n, bareStringDisallowed) {
-				l.acceptBareString()
+				l.acceptLine(true)
 				l.emit(itemBareString)
 			} else {
 				l.errorf("= must be followed by a string")

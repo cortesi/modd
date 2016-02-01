@@ -203,18 +203,6 @@ prep: "
 All prep commands in a block are run in order before any daemons are restarted.
 If any prep command exits with an error, execution stops.
 
-Prep commands can include a special marker **|MODD|**, which is replaced with a
-shell-escaped list of files that have changed or been added since the last run.
-When modd is first run, the list of files includes all matching files on disk.
-So, given a config file like this, modd will run eslint on all .js files when
-started, and then after that only run eslint on files if they change:
-
-```
-**/*.js {
-    prep: eslint |MODD|
-}
-```
-
 ### Daemon commands
 
 Daemons are executed on startup, and are restarted by modd whenever they exit.
@@ -258,5 +246,41 @@ control the log display name.
             --longoption 1 \
             --longoption 2
     "
+}
+```
+
+
+# Variables
+
+You can declare variables like this:
+
+```
+@variable = value
+```
+
+Variables can only be declared in the global scope (i.e. not inside blocks).
+All values are strings and follow the same semantics as commands - that is,
+they can have escaped line endings, or be quoted strings. Variables are read
+once at startup, and it is an error to re-declare a variable that already
+exists.
+
+You can use variables in commands like so:
+
+```
+@dst = ./build/dst
+** {
+    prep: ls @dst
+}
+```
+
+Modd declares the magic variable **@mods** for prep commands that contains a
+shell-escaped list of files that have changed or been added since the last run.
+When modd is first run, the list of files includes all matching files on disk.
+So, given a config file like this, modd will run eslint on all .js files when
+started, and then after that only run eslint on files if they change:
+
+```
+**/*.js {
+    prep: eslint |MODD|
 }
 ```

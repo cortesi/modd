@@ -194,6 +194,7 @@ func (p *parser) parseVariable() (string, string, error) {
 	} else {
 		p.errorf("Expected variable value")
 	}
+	val = strings.TrimSpace(val)
 	return name, val, nil
 }
 

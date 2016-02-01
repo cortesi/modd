@@ -207,7 +207,7 @@ var lexTests = []struct {
 		"@a = b\n@b='foo'", []itm{
 			{itemVarName, "@a"},
 			{itemEquals, "="},
-			{itemBareString, "b"},
+			{itemBareString, "b\n"},
 			{itemVarName, "@b"},
 			{itemEquals, "="},
 			{itemQuotedString, "'foo'"},
@@ -217,11 +217,21 @@ var lexTests = []struct {
 		"@a = b\n#comment\n@b='foo'", []itm{
 			{itemVarName, "@a"},
 			{itemEquals, "="},
-			{itemBareString, "b"},
+			{itemBareString, "b\n"},
 			{itemComment, "#comment\n"},
 			{itemVarName, "@b"},
 			{itemEquals, "="},
 			{itemQuotedString, "'foo'"},
+		},
+	},
+	{
+		"@a = b c d\n@b='foo\nvoing'", []itm{
+			{itemVarName, "@a"},
+			{itemEquals, "="},
+			{itemBareString, "b c d\n"},
+			{itemVarName, "@b"},
+			{itemEquals, "="},
+			{itemQuotedString, "'foo\nvoing'"},
 		},
 	},
 	{
