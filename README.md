@@ -281,6 +281,6 @@ started, and then after that only run eslint on files if they change:
 
 ```
 **/*.js {
-    prep: eslint |MODD|
+    prep: eslint @mods
 }
 ```
