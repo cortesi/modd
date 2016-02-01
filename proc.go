@@ -129,9 +129,7 @@ func RunProc(cmd string, log termlog.Stream) error {
 		log.Shout("%s", c.ProcessState.String())
 		return ProcError{err.Error(), buff.String()}
 	}
-	log.Notice(">> done")
-	// FIXME: rusage stats here
-	log.NoticeAs("cmdstats", "run time: %s", c.ProcessState.UserTime())
+	log.Notice(">> done (%s)", c.ProcessState.UserTime())
 	return nil
 }
 

@@ -46,11 +46,6 @@ var prep = kingpin.Flag("prep", "Run prep commands and exit").
 	Short('p').
 	Bool()
 
-var cmdstats = kingpin.Flag("cmdstats", "Show stats on command execution").
-	Short('s').
-	Default("false").
-	Bool()
-
 var debug = kingpin.Flag("debug", "Debugging for modd development").
 	Default("false").
 	Bool()
@@ -179,9 +174,6 @@ func main() {
 	if *debug {
 		log.Enable("debug")
 		modd.Logger = log
-	}
-	if *cmdstats {
-		log.Enable("cmdstats")
 	}
 
 	ret, err := ioutil.ReadFile(*file)

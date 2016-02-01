@@ -11,7 +11,7 @@ import subprocess
 DSTDIR = "./tmp"
 ARCHS = [
     ("darwin", "amd64", "osx64", "tgz"),
-    ("windows", "amd64", "windows64", "zip"),
+#    ("windows", "amd64", "windows64", "zip"),
     ("linux", "amd64", "linux64", "tgz"),
     ("linux", "arm", "linuxARM", "tgz"),
     ("netbsd", "amd64", "netbsd64", "tgz"),
