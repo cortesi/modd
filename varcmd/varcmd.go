@@ -2,6 +2,8 @@ package varcmd
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -11,6 +13,19 @@ import (
 )
 
 var name = regexp.MustCompile(`@\w+`)
+
+func getDirs(paths []string) []string {
+	m := map[string]bool{}
+	for _, p := range paths {
+		p := path.Dir(p)
+		m[p] = true
+	}
+	keys := []string{}
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
 
 // quotePath quotes a path for use on the command-line
 func quotePath(path string) string {
@@ -22,7 +37,10 @@ func quotePath(path string) string {
 func mkArgs(paths []string) string {
 	escaped := make([]string, len(paths))
 	for i, s := range paths {
-		escaped[i] = quotePath(s)
+		// FIXME: We'll need to find a more portable way for Windows
+		escaped[i] = quotePath(
+			"." + string(filepath.Separator) + s,
+		)
 	}
 	return strings.Join(escaped, " ")
 }
@@ -40,7 +58,7 @@ func (v *VarCmd) get(name string) (string, error) {
 	if val, ok := v.Vars[name]; ok {
 		return val, nil
 	}
-	if name == "@mods" && v.Block != nil {
+	if (name == "@mods" || name == "@dirmods") && v.Block != nil {
 		var modified []string
 		if v.Mod == nil {
 			var err error
@@ -51,7 +69,8 @@ func (v *VarCmd) get(name string) (string, error) {
 		} else {
 			modified = v.Mod.All()
 		}
-		v.Vars[name] = mkArgs(modified)
+		v.Vars["@mods"] = mkArgs(modified)
+		v.Vars["@dirmods"] = mkArgs(getDirs(modified))
 		return v.Vars[name], nil
 	}
 	return "", fmt.Errorf("No such variable: %s", name)
