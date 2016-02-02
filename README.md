@@ -8,9 +8,6 @@ If you use modd, you should also look at
 Devd integrates with modd, allowing you to trigger in-browser livereload with
 modd.
 
-**Modd has not been released yet - the design is stabilising and I should have
-version 0.1 out the door soon.**
-
 
 # Install
 
@@ -30,7 +27,7 @@ Put this in a file called *modd.conf*:
 
 ```
 **/*.go {
-    prep: go test ./...
+    prep: go test @dirmods
 }
 ```
 
@@ -40,8 +37,9 @@ Now run modd like so:
 # modd
 ```
 
-Whenever any file with the .go extension is modified, the "go test" command
-will be run.
+The first time modd is run, it will run the tests of all Go modules. Whenever
+any file with the .go extension is modified, the "go test" command will be run
+only on the enclosing module.
 
 
 # Leisurely start
@@ -67,7 +65,7 @@ non-test file is changed, and keeps a test instance running throughout.
 
 ```
 **/*.go {
-    prep: go test
+    prep: go test @dirmods
 }
 
 # Exclude all test files of the form *_test.go
@@ -76,6 +74,12 @@ non-test file is changed, and keeps a test instance running throughout.
     daemon +sigterm: devd -m ./tmp
 }
 ```
+
+The **@dirmods** variable expands to a properly escaped list of all directories
+containing changed files. When modd is first run, this includes all directories
+containing matching files. So, this meanst that modd will run all tests on
+startup, and then subsequently run the tests only for the affected module
+whenever there's a change. There's a corresponding **@mods** variable that contains all changed files.
 
 Note the *+sigterm* flag to the daemon command. When devd receives a SIGHUP
 (the default signal sent by modd), it triggers a browser livereload, rather
@@ -205,6 +209,26 @@ prep: "
 All prep commands in a block are run in order before any daemons are restarted.
 If any prep command exits with an error, execution stops.
 
+There following variables are automatically generated for prep commands
+
+Variable      | Meaning
+------------- | -------
+@mods         | On first run, all files matching the block patterns. On subsequent change, a list of all modified files.
+@dirmods      | On first run, all directories containing files matching the block patterns. On subsequent change, a list of all directories containing modified files.
+
+All file names in variables are relative to the current directory, and
+shell-escaped for safety.
+
+SO, given a config file like this, modd will run eslint on all .js files when
+started, and then after that only run eslint on files if they change:
+
+```
+**/*.js {
+    prep: eslint @mods
+}
+```
+
+
 ### Daemon commands
 
 Daemons are executed on startup, and are restarted by modd whenever they exit.
@@ -272,18 +296,6 @@ You can use variables in commands like so:
 @dst = ./build/dst
 ** {
     prep: ls @dst
-}
-```
-
-Modd declares the magic variable **@mods** for prep commands that contains a
-shell-escaped list of files that have changed or been added since the last run.
-When modd is first run, the list of files includes all matching files on disk.
-So, given a config file like this, modd will run eslint on all .js files when
-started, and then after that only run eslint on files if they change:
-
-```
-**/*.js {
-    prep: eslint @mods
 }
 ```
 
