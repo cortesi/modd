@@ -8,6 +8,14 @@ If you use modd, you should also look at
 Devd integrates with modd, allowing you to trigger in-browser livereload with
 modd.
 
+# Examples
+
+File                                         |
+-------------------------------------------- | -------
+[frontend.conf](./examples/frontend.conf)    | A front-end project using React + Browserify + Babel. Modd and devd replace many functions of Gulp/Grunt.
+[go.conf](./examples/go.conf)                | Run Go tests on change.
+[python.conf](./examples/python.conf)        | A Python + Redis project, with devd managing livereload.
+
 
 # Install
 
