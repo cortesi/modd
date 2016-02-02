@@ -36,7 +36,9 @@ Put this in a file called *modd.conf*:
 
 Now run modd like so:
 
-![screenshot](doc/modd-example1.png "modd in action")
+```
+# modd
+```
 
 Whenever any file with the .go extension is modified, the "go test" command
 will be run.
