@@ -54,11 +54,11 @@ func TestVarCmd(t *testing.T) {
 	b := conf.Block{}
 	b.Include = []string{"tdir/**"}
 	vc := VarCmd{&b, nil, map[string]string{}}
-	ret, err := vc.Render("@mods")
+	ret, err := vc.Render("@mods @dirmods")
 	if err != nil {
 		t.Fatal("unexpected error")
 	}
-	if ret != `"tdir/tfile"` {
+	if ret != `"./tdir/tfile" "./tdir"` {
 		t.Errorf("Unexpected return: %s", ret)
 	}
 
@@ -67,11 +67,11 @@ func TestVarCmd(t *testing.T) {
 		&watch.Mod{Changed: []string{"foo"}},
 		map[string]string{},
 	}
-	ret, err = vc.Render("@mods")
+	ret, err = vc.Render("@mods @dirmods")
 	if err != nil {
 		t.Fatal("unexpected error")
 	}
-	if ret != `"foo"` {
+	if ret != `"./foo" "./."` {
 		t.Errorf("Unexpected return: %s", ret)
 	}
 }
