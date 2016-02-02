@@ -84,7 +84,7 @@ func (b *Block) addPrep(command string, options []string) error {
 // Config represents a complete configuration
 type Config struct {
 	Blocks    []Block
-	Variables map[string]string
+	variables map[string]string
 }
 
 // Equals checks if this Config equals another
@@ -94,8 +94,8 @@ func (c *Config) Equals(other *Config) bool {
 			return false
 		}
 	}
-	if (c.Variables != nil || len(c.Variables) != 0) || (other.Variables != nil || len(other.Variables) != 0) {
-		if !reflect.DeepEqual(c.Variables, other.Variables) {
+	if (c.variables != nil || len(c.variables) != 0) || (other.variables != nil || len(other.variables) != 0) {
+		if !reflect.DeepEqual(c.variables, other.variables) {
 			return false
 		}
 	}
@@ -121,17 +121,17 @@ func (c *Config) addBlock(b Block) {
 }
 
 func (c *Config) addVariable(key string, value string) error {
-	if c.Variables == nil {
-		c.Variables = map[string]string{}
+	if c.variables == nil {
+		c.variables = map[string]string{}
 	}
-	c.Variables[key] = value
+	c.variables[key] = value
 	return nil
 }
 
 // GetVariables returns a copy of the Variables map
 func (c *Config) GetVariables() map[string]string {
 	n := map[string]string{}
-	for k, v := range c.Variables {
+	for k, v := range c.variables {
 		n[k] = v
 	}
 	return n

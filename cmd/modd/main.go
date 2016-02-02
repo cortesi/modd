@@ -10,6 +10,7 @@ import (
 	"github.com/cortesi/modd"
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
+	"github.com/cortesi/modd/watch"
 	"github.com/cortesi/termlog"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -53,7 +54,7 @@ var debug = kingpin.Flag("debug", "Debugging for modd development").
 // Returns a (continue, error) tuple. If continue is true, execution of the
 // remainder of the block should proceed. If error is not nil, modd should
 // exit.
-func prepsAndNotify(b conf.Block, vars map[string]string, lmod *modd.Mod, log termlog.TermLog) (bool, error) {
+func prepsAndNotify(b conf.Block, vars map[string]string, lmod *watch.Mod, log termlog.TermLog) (bool, error) {
 	err := modd.RunPreps(b, vars, lmod, log)
 	if pe, ok := err.(modd.ProcError); ok {
 		if *beep {
@@ -75,9 +76,9 @@ func prepsAndNotify(b conf.Block, vars map[string]string, lmod *modd.Mod, log te
 }
 
 func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
-	modchan := make(chan *modd.Mod, 1024)
+	modchan := make(chan *watch.Mod, 1024)
 	if *ignores {
-		for _, patt := range modd.CommonExcludes {
+		for _, patt := range watch.CommonExcludes {
 			fmt.Println(patt)
 		}
 		os.Exit(0)
@@ -86,7 +87,7 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 	daemonPens := make([]*modd.DaemonPen, len(cnf.Blocks))
 	for i, b := range cnf.Blocks {
 		if !b.NoCommonFilter {
-			b.Exclude = append(b.Exclude, modd.CommonExcludes...)
+			b.Exclude = append(b.Exclude, watch.CommonExcludes...)
 		}
 		cnf.Blocks[i] = b
 
@@ -119,7 +120,7 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 
 	// FIXME: This takes a long time. We could start it in parallel with the
 	// first process run in a goroutine
-	watcher, err := modd.Watch(watchpaths, lullTime, modchan)
+	watcher, err := watch.Watch(watchpaths, lullTime, modchan)
 	defer watcher.Stop()
 	if err != nil {
 		kingpin.Fatalf("Fatal error: %s", err)
@@ -169,13 +170,13 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 }
 
 func main() {
-	kingpin.Version(modd.Version)
+	kingpin.Version(watch.Version)
 	kingpin.Parse()
 
 	log := termlog.NewLog()
 	if *debug {
 		log.Enable("debug")
-		modd.Logger = log
+		watch.Logger = log
 	}
 
 	ret, err := ioutil.ReadFile(*file)

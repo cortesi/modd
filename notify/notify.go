@@ -5,7 +5,7 @@ import "os/exec"
 const prog = "modd"
 
 func hasExecutable(name string) bool {
-	_, err := exec.LookPath("growlnotify")
+	_, err := exec.LookPath(name)
 	if err != nil {
 		return false
 	}

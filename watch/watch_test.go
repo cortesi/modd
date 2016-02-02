@@ -1,4 +1,4 @@
-package modd
+package watch
 
 import (
 	"os"

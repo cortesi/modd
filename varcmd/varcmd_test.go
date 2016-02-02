@@ -1,32 +1,26 @@
 package varcmd
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/watch"
 )
 
-var varsTests = []struct {
-	in  string
-	out []string
+var quotePathTests = []struct {
+	path     string
+	expected string
 }{
-	{"@foo", []string{"@foo"}},
-	{"foo", nil},
-	{"@foo bar @voing", []string{"@foo", "@voing"}},
+	{`one`, `"one"`},
+	{` one`, `" one"`},
+	{`one `, `"one "`},
 }
 
-func TestVars(t *testing.T) {
-	for _, tt := range varsTests {
-		ret := Vars(tt.in)
-		if !reflect.DeepEqual(ret, tt.out) {
-			t.Errorf("expected %#v, got %#v", tt.out, ret)
-		}
-		for _, v := range tt.out {
-			if !HasVar(tt.in, v) {
-				t.Errorf("Expected to have %q", v)
-			}
-		}
-		if HasVar(tt.in, "nonexistent") {
-			t.Errorf("Expected not to have nonexistent")
+func TestQuotePath(t *testing.T) {
+	for i, tst := range quotePathTests {
+		result := quotePath(tst.path)
+		if result != tst.expected {
+			t.Errorf("Test %d: expected\n%q\ngot\n%q", i, tst.expected, result)
 		}
 	}
 }
@@ -43,7 +37,10 @@ var renderTests = []struct {
 
 func TestRender(t *testing.T) {
 	for _, tt := range renderTests {
-		ret, err := Render(tt.in, tt.vars)
+		b := conf.Block{}
+		mod := watch.Mod{}
+		vc := VarCmd{&b, &mod, tt.vars}
+		ret, err := vc.Render(tt.in)
 		if err != nil {
 			t.Error("Unexpected error")
 		}
@@ -53,8 +50,37 @@ func TestRender(t *testing.T) {
 	}
 }
 
+func TestVarCmd(t *testing.T) {
+	b := conf.Block{}
+	b.Include = []string{"tdir/**"}
+	vc := VarCmd{&b, nil, map[string]string{}}
+	ret, err := vc.Render("@mods")
+	if err != nil {
+		t.Fatal("unexpected error")
+	}
+	if ret != `"tdir/tfile"` {
+		t.Errorf("Unexpected return: %s", ret)
+	}
+
+	vc = VarCmd{
+		&b,
+		&watch.Mod{Changed: []string{"foo"}},
+		map[string]string{},
+	}
+	ret, err = vc.Render("@mods")
+	if err != nil {
+		t.Fatal("unexpected error")
+	}
+	if ret != `"foo"` {
+		t.Errorf("Unexpected return: %s", ret)
+	}
+}
+
 func TestRenderErrors(t *testing.T) {
-	_, err := Render("@nonexistent", map[string]string{})
+	b := conf.Block{}
+	mod := watch.Mod{}
+	vc := VarCmd{&b, &mod, map[string]string{}}
+	_, err := vc.Render("@nonexistent")
 	if err == nil {
 		t.Error("Expected error")
 	}

@@ -189,7 +189,7 @@ var parseTests = []struct {
 					Include: []string{"foo"},
 				},
 			},
-			Variables: map[string]string{
+			variables: map[string]string{
 				"@var": "bar",
 			},
 		},
@@ -202,7 +202,7 @@ var parseTests = []struct {
 					Include: []string{"foo"},
 				},
 			},
-			Variables: map[string]string{
+			variables: map[string]string{
 				"@var": "bar\nvoing",
 			},
 		},
@@ -215,7 +215,7 @@ var parseTests = []struct {
 					Include: []string{"foo"},
 				},
 			},
-			Variables: map[string]string{
+			variables: map[string]string{
 				"@var": "bar",
 			},
 		},
@@ -228,7 +228,7 @@ var parseTests = []struct {
 					Include: []string{"foo"},
 				},
 			},
-			Variables: map[string]string{
+			variables: map[string]string{
 				"@var":  "bar",
 				"@oink": "foo",
 			},

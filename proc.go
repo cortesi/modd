@@ -12,33 +12,17 @@ import (
 	"time"
 
 	"github.com/cortesi/modd/conf"
-	"github.com/cortesi/modd/filter"
 	"github.com/cortesi/modd/varcmd"
+	"github.com/cortesi/modd/watch"
 	"github.com/cortesi/termlog"
 )
 
 const moddVar = "@mods"
-const moddMarker = "|MODD|"
 
 // MinRestart is the minimum amount of time between daemon restarts
 const MinRestart = 1 * time.Second
 
 const lineLimit = 80
-
-// quotePath quotes a path for use on the command-line
-func quotePath(path string) string {
-	path = strings.Replace(path, "\"", "\\\"", -1)
-	return "\"" + path + "\""
-}
-
-// mkArgs prepares a list of paths for the command line
-func mkArgs(paths []string) string {
-	escaped := make([]string, len(paths))
-	for i, s := range paths {
-		escaped[i] = quotePath(s)
-	}
-	return strings.Join(escaped, " ")
-}
 
 // shortCommand shortens a command to a name we can use in a notification
 // header.
@@ -134,23 +118,10 @@ func RunProc(cmd string, log termlog.Stream) error {
 }
 
 // RunPreps runs all commands in sequence. Stops if any command returns an error.
-func RunPreps(b conf.Block, vars map[string]string, mod *Mod, log termlog.TermLog) error {
+func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.TermLog) error {
+	vcmd := varcmd.VarCmd{&b, mod, vars}
 	for _, p := range b.Preps {
-		if varcmd.HasVar(p.Command, moddVar) {
-			if mod == nil {
-				// First run - only do the expensive find once
-				if _, ok := vars[moddVar]; !ok {
-					modified, err := filter.Find(".", b.Include, b.Exclude)
-					if err != nil {
-						return err
-					}
-					vars[moddVar] = mkArgs(modified)
-				}
-			} else {
-				vars[moddVar] = mkArgs(mod.All())
-			}
-		}
-		cmd, err := varcmd.Render(p.Command, vars)
+		cmd, err := vcmd.Render(p.Command)
 		if err != nil {
 			return err
 		}
@@ -181,7 +152,8 @@ func (d *daemon) Run() {
 		lastStart = time.Now()
 		sh := getShell()
 
-		finalcmd, err := varcmd.Render(d.conf.Command, d.vars)
+		vcmd := varcmd.VarCmd{nil, nil, d.vars}
+		finalcmd, err := vcmd.Render(d.conf.Command)
 		if err != nil {
 			d.log.Shout("%s", err)
 			continue

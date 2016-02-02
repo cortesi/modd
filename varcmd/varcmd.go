@@ -3,35 +3,70 @@ package varcmd
 import (
 	"fmt"
 	"regexp"
+	"strings"
+
+	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/filter"
+	"github.com/cortesi/modd/watch"
 )
 
 var name = regexp.MustCompile(`@\w+`)
 
-// Vars returns a list of all variables in the string
-func Vars(cmd string) []string {
-	return name.FindAllString(cmd, -1)
+// quotePath quotes a path for use on the command-line
+func quotePath(path string) string {
+	path = strings.Replace(path, "\"", "\\\"", -1)
+	return "\"" + path + "\""
 }
 
-// HasVar checks if the command has a given variable
-func HasVar(cmd string, name string) bool {
-	for _, v := range Vars(cmd) {
-		if v == name {
-			return true
-		}
+// mkArgs prepares a list of paths for the command line
+func mkArgs(paths []string) string {
+	escaped := make([]string, len(paths))
+	for i, s := range paths {
+		escaped[i] = quotePath(s)
 	}
-	return false
+	return strings.Join(escaped, " ")
+}
+
+// VarCmd represents a set of variables for a specific block and mod set. It
+// should be re-created anew each time the block is executed.
+type VarCmd struct {
+	Block *conf.Block
+	Mod   *watch.Mod
+	Vars  map[string]string
+}
+
+// Get a variable by name
+func (v *VarCmd) get(name string) (string, error) {
+	if val, ok := v.Vars[name]; ok {
+		return val, nil
+	}
+	if name == "@mods" && v.Block != nil {
+		var modified []string
+		if v.Mod == nil {
+			var err error
+			modified, err = filter.Find(".", v.Block.Include, v.Block.Exclude)
+			if err != nil {
+				return "", err
+			}
+		} else {
+			modified = v.Mod.All()
+		}
+		v.Vars[name] = mkArgs(modified)
+		return v.Vars[name], nil
+	}
+	return "", fmt.Errorf("No such variable: %s", name)
 }
 
 // Render renders the command with a map of variables
-func Render(cmd string, vars map[string]string) (string, error) {
+func (v *VarCmd) Render(cmd string) (string, error) {
 	var err error
 	cmd = string(
 		name.ReplaceAllFunc(
 			[]byte(cmd),
 			func(key []byte) []byte {
 				ks := string(key)
-				val, ok := vars[ks]
-				if !ok {
+				val, errv := v.get(ks)
+				if errv != nil {
 					err = fmt.Errorf("No such variable: %s", ks)
 					return nil
 				}
