@@ -309,9 +309,9 @@ func Watch(paths []string, lullTime time.Duration, ch chan *Mod) (*Watcher, erro
 	}
 	go func() {
 		for {
-			ret := batch(lullTime, MaxLullWait, statExistenceChecker{}, evtch)
-			if ret != nil && !ret.Empty() {
-				ret, err := ret.normPaths(paths)
+			b := batch(lullTime, MaxLullWait, statExistenceChecker{}, evtch)
+			if b != nil && !b.Empty() {
+				ret, err := b.normPaths(paths)
 				if err != nil {
 					Logger.Shout("Error normalising paths: %s", err)
 				}

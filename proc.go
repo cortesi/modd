@@ -119,7 +119,7 @@ func RunProc(cmd string, log termlog.Stream) error {
 
 // RunPreps runs all commands in sequence. Stops if any command returns an error.
 func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.TermLog) error {
-	vcmd := varcmd.VarCmd{&b, mod, vars}
+	vcmd := varcmd.VarCmd{Block: &b, Mod: mod, Vars: vars}
 	for _, p := range b.Preps {
 		cmd, err := vcmd.Render(p.Command)
 		if err != nil {
@@ -152,7 +152,7 @@ func (d *daemon) Run() {
 		lastStart = time.Now()
 		sh := getShell()
 
-		vcmd := varcmd.VarCmd{nil, nil, d.vars}
+		vcmd := varcmd.VarCmd{Block: nil, Mod: nil, Vars: d.vars}
 		finalcmd, err := vcmd.Render(d.conf.Command)
 		if err != nil {
 			d.log.Shout("%s", err)

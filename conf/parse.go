@@ -155,7 +155,8 @@ func (p *parser) parse() (err error) {
 	p.config = &Config{}
 	for {
 		for {
-			k, v, err := p.parseVariable()
+			var k, v string
+			k, v, err = p.parseVariable()
 			if err != nil {
 				return err
 			}

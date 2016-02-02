@@ -133,13 +133,13 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 				log.Warn("Reloading config - error reading %s: %s", watchconf, err)
 				continue
 			}
-			cnf, err := conf.Parse(*file, string(ret))
+			newcnf, err := conf.Parse(*file, string(ret))
 			if err != nil {
 				log.Warn("Reloading config - error reading %s: %s", watchconf, err)
 				continue
 			}
 			log.Notice("Reloading config %s", watchconf)
-			return cnf
+			return newcnf
 		}
 		if mod == nil {
 			break

@@ -292,7 +292,7 @@ func TestLexErrors(t *testing.T) {
 			t.Errorf("%d: %q - Expected error value\n%s\ngot\n%s", i, tt.input, tt.error, itm.val)
 		}
 		if tt.pos != l.pos {
-			t.Errorf("%d: %q - Expected position %s, got %s", i, tt.input, tt.pos, l.pos)
+			t.Errorf("%d: %q - Expected position %d, got %d", i, tt.input, tt.pos, l.pos)
 		}
 	}
 }
