@@ -8,13 +8,6 @@ If you use modd, you should also look at
 Devd integrates with modd, allowing you to trigger in-browser livereload with
 modd.
 
-Example                                      | Description
--------------------------------------------- | -------
-[frontend.conf](./examples/frontend.conf)    | A front-end project using React + Browserify + Babel. Modd and devd replace many functions of Gulp/Grunt.
-[go.conf](./examples/go.conf)                | Run Go tests on change.
-[python.conf](./examples/python.conf)        | A Python + Redis project, with devd managing livereload.
-
-
 # Install
 
 Modd is a single binary with no external dependencies, released for OSX,
@@ -24,7 +17,7 @@ for your OS, and copy the binary to somewhere on your PATH.
 
 If you have a working Go installation, you can also say
 
-    go get github.com/cortesi/modd/cmd/modd
+    $ go get github.com/cortesi/modd/cmd/modd
 
 Note that modd requires *bash* to be on your PATH. On Windows, one easy way to
 accomplish this is to use [Babun](https://babun.github.io/).
@@ -43,12 +36,21 @@ Put this in a file called *modd.conf*:
 Now run modd like so:
 
 ```
-# modd
+$ modd
 ```
 
 The first time modd is run, it will run the tests of all Go modules. Whenever
 any file with the .go extension is modified, the "go test" command will be run
 only on the enclosing module.
+
+
+Example                                      | Description
+-------------------------------------------- | -------
+[frontend.conf](./examples/frontend.conf)    | A front-end project using React + Browserify + Babel. Modd and devd replace many functions of Gulp/Grunt.
+[go.conf](./examples/go.conf)                | Run Go tests on change.
+[python.conf](./examples/python.conf)        | A Python + Redis project, with devd managing livereload.
+
+
 
 
 # Leisurely start
@@ -86,7 +88,7 @@ non-test file is changed, and keeps a test instance running throughout.
 
 The **@dirmods** variable expands to a properly escaped list of all directories
 containing changed files. When modd is first run, this includes all directories
-containing matching files. So, this meanst that modd will run all tests on
+containing matching files. So, this means that modd will run all tests on
 startup, and then subsequently run the tests only for the affected module
 whenever there's a change. There's a corresponding **@mods** variable that contains all changed files.
 
@@ -228,8 +230,8 @@ Variable      | Meaning
 All file names in variables are relative to the current directory, and
 shell-escaped for safety.
 
-SO, given a config file like this, modd will run eslint on all .js files when
-started, and then after that only run eslint on files if they change:
+Given a config file like this, modd will run *eslint* on all .js files when
+started, and then after that only run *eslint* on files if they change:
 
 ```
 **/*.js {

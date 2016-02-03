@@ -3,7 +3,6 @@ package watch
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -117,7 +116,7 @@ func (mod Mod) All() []string {
 // Has checks if a given Mod includes a specified file
 func (mod Mod) Has(p string) bool {
 	for _, v := range mod.All() {
-		if path.Clean(p) == path.Clean(v) {
+		if filepath.Clean(p) == filepath.Clean(v) {
 			return true
 		}
 	}
@@ -295,14 +294,7 @@ func (w *Watcher) Stop() {
 func Watch(paths []string, lullTime time.Duration, ch chan *Mod) (*Watcher, error) {
 	evtch := make(chan notify.EventInfo, 4096)
 	for _, p := range paths {
-		stat, err := os.Stat(p)
-		if err != nil {
-			return nil, err
-		}
-		if stat.IsDir() {
-			p = path.Join(p, "...")
-		}
-		err = notify.Watch(p, evtch, notify.All)
+		err := notify.Watch(p, evtch, notify.All)
 		if err != nil {
 			return nil, err
 		}
