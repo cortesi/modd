@@ -89,6 +89,9 @@ func (c *Config) addVariable(key string, value string) error {
 	if c.variables == nil {
 		c.variables = map[string]string{}
 	}
+	if _, ok := c.variables[key]; ok {
+		return fmt.Errorf("variable %s shadows previous declaration", key)
+	}
 	c.variables[key] = value
 	return nil
 }
