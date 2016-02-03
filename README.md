@@ -17,14 +17,17 @@ Example                                      | Description
 
 # Install
 
-Modd is a single binary with no external dependencies, released for OSX, Linux,
-FreeBSD, NetBSD and OpenBSD. Go to the [releases
+Modd is a single binary with no external dependencies, released for OSX,
+Windows, Linux, FreeBSD, NetBSD and OpenBSD. Go to the [releases
 page](https://github.com/cortesi/modd/releases/latest), download the package
 for your OS, and copy the binary to somewhere on your PATH.
 
 If you have a working Go installation, you can also say
 
     go get github.com/cortesi/modd/cmd/modd
+
+Note that modd requires *bash* to be on your PATH. On Windows, one easy way to
+accomplish this is to use [Babun](https://babun.github.io/).
 
 
 # Quick start
