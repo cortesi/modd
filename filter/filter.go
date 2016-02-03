@@ -12,7 +12,7 @@ import (
 
 func matchAny(path string, patterns []string) (bool, error) {
 	for _, pattern := range patterns {
-		match, err := doublestar.Match(pattern, path)
+		match, err := doublestar.Match(pattern, filepath.ToSlash(path))
 		if err != nil {
 			return false, fmt.Errorf("Error matching pattern '%s': %s", pattern, err)
 		} else if match {
@@ -108,7 +108,7 @@ func Find(root string, includePatterns []string, excludePatterns []string) ([]st
 	bases := GetBasePaths([]string{}, includePatterns)
 	ret := []string{}
 	for _, b := range bases {
-		err := filepath.Walk(path.Join(root, b), func(p string, fi os.FileInfo, err error) error {
+		err := filepath.Walk(filepath.Join(root, b), func(p string, fi os.FileInfo, err error) error {
 			cleanpath, err := filepath.Rel(root, p)
 			if err != nil {
 				return nil

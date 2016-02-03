@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -138,9 +139,13 @@ var normPathTests = []struct {
 
 func TestNormPath(t *testing.T) {
 	for i, tst := range normPathTests {
+		expected := tst.expected
+		if runtime.GOOS == "windows" {
+			expected = filepath.FromSlash(expected)
+		}
 		ret, err := normPath([]string{tst.base}, tst.abspath)
-		if err != nil || ret != tst.expected {
-			t.Errorf("Test %d: expected %#v, got %#v", i, tst.expected, ret)
+		if err != nil || ret != expected {
+			t.Errorf("Test %d: expected %#v, got %#v", i, expected, ret)
 		}
 	}
 }

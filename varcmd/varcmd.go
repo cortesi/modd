@@ -2,7 +2,6 @@ package varcmd
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,7 +16,7 @@ var name = regexp.MustCompile(`@\w+`)
 func getDirs(paths []string) []string {
 	m := map[string]bool{}
 	for _, p := range paths {
-		p := path.Dir(p)
+		p := filepath.Dir(p)
 		m[p] = true
 	}
 	keys := []string{}
