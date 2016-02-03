@@ -1,7 +1,9 @@
 package filter
 
 import (
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -168,10 +170,16 @@ func TestFind(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(ret, tt.expected) {
+		expected := tt.expected
+		if runtime.GOOS == "windows" {
+			for i := range expected {
+				expected[i] = filepath.FromSlash(expected[i])
+			}
+		}
+		if !reflect.DeepEqual(ret, expected) {
 			t.Errorf(
 				"%d: %#v, %#v - Expected\n%#v\ngot:\n%#v",
-				i, tt.include, tt.exclude, tt.expected, ret,
+				i, tt.include, tt.exclude, expected, ret,
 			)
 		}
 	}

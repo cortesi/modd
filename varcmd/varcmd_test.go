@@ -1,6 +1,7 @@
 package varcmd
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/cortesi/modd/conf"
@@ -58,7 +59,12 @@ func TestVarCmd(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error")
 	}
-	if ret != `"./tdir/tfile" "./tdir"` {
+
+	expect := `"./tdir/tfile" "./tdir"`
+	if runtime.GOOS == "windows" {
+		expect = `".\tdir\tfile" ".\tdir"`
+	}
+	if ret != expect {
 		t.Errorf("Unexpected return: %s", ret)
 	}
 
@@ -71,7 +77,11 @@ func TestVarCmd(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error")
 	}
-	if ret != `"./foo" "./."` {
+	expected := `"./foo" "./."`
+	if runtime.GOOS == "windows" {
+		expected = `".\foo" ".\."`
+	}
+	if ret != expected {
 		t.Errorf("Unexpected return: %s", ret)
 	}
 }
