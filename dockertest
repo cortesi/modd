@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+import fnmatch
+import os
+import shutil
+import os.path
+from subprocess import check_call
+import tempfile
+
+ENV = os.environ.copy()
+ENV["GOOS"] = "linux"
+
+DOCKERFILE = """
+FROM alpine:latest
+    ADD .  /gotest
+    WORKDIR /gotest
+    CMD ["/bin/sh", "./run"]
+"""
+
+RUNFILE = """
+for f in ./tests/*
+do
+    echo "RUNNING $f"; $f; echo
+done
+"""
+
+
+def getmodules(path):
+    mods = set([])
+    for root, dirnames, filenames in os.walk(path):
+        for filename in fnmatch.filter(filenames, '*_test.go'):
+            name = "test" + root.strip(".").replace("/", "_")
+            mods.add((root, name))
+    return sorted(list(mods))
+
+
+if __name__ == "__main__":
+    dst = tempfile.mkdtemp()
+    print "creating docker dir at ", dst
+    open(os.path.join(dst, "Dockerfile"), "w").write(DOCKERFILE)
+    open(os.path.join(dst, "run"), "w").write(RUNFILE)
+    for path, name in getmodules("."):
+        tdst = os.path.join(dst, "tests", name)
+        print "compiling", path
+        check_call(["go", "test", "-c", "-o", tdst, path], env = ENV)
+    print "docker build"
+    check_call(["docker", "build", "-t", "gotest", dst])
+    print "docker run"
+    check_call(["docker", "run", "gotest"])
+    shutil.rmtree(dst)
