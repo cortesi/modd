@@ -109,6 +109,9 @@ func Find(root string, includePatterns []string, excludePatterns []string) ([]st
 	ret := []string{}
 	for _, b := range bases {
 		err := filepath.Walk(filepath.Join(root, b), func(p string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 			cleanpath, err := filepath.Rel(root, p)
 			if err != nil {
 				return nil
