@@ -164,14 +164,14 @@ func (p *parser) parse() (err error) {
 			var k, v string
 			k, v, err = p.parseVariable()
 			if err != nil {
-				return err
+				p.errorf("%s", err)
 			}
 			if k == "" && v == "" {
 				break
 			}
 			err = p.config.addVariable(k, v)
 			if err != nil {
-				return err
+				p.errorf("%s", err)
 			}
 		}
 		if p.peek().typ == itemEOF {

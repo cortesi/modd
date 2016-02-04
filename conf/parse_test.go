@@ -250,6 +250,7 @@ var parseErrorTests = []struct {
 	{"foo { prep +invalid: foo }", "test:1: unknown option: +invalid"},
 	{"@foo bar {}", "test:1: Expected ="},
 	{"@foo =", "test:1: unterminated variable assignment"},
+	{"@foo=bar\n@foo=bar {}", "test:2: variable @foo shadows previous declaration"},
 }
 
 func TestErrorsParse(t *testing.T) {

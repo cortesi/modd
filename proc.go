@@ -125,7 +125,7 @@ func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.
 		if err != nil {
 			return err
 		}
-		err = RunProc(cmd, log.Stream(niceHeader("prep: ", p.Command)))
+		err = RunProc(cmd, log.Stream(niceHeader("prep: ", cmd)))
 		if err != nil {
 			return err
 		}
@@ -137,7 +137,6 @@ type daemon struct {
 	conf conf.Daemon
 	log  termlog.Stream
 	cmd  *exec.Cmd
-	vars map[string]string
 	stop bool
 }
 
@@ -152,14 +151,7 @@ func (d *daemon) Run() {
 		lastStart = time.Now()
 		sh := getShell()
 
-		vcmd := varcmd.VarCmd{Block: nil, Mod: nil, Vars: d.vars}
-		finalcmd, err := vcmd.Render(d.conf.Command)
-		if err != nil {
-			d.log.Shout("%s", err)
-			continue
-		}
-
-		c := exec.Command(sh, "-c", finalcmd)
+		c := exec.Command(sh, "-c", d.conf.Command)
 		stdo, err := c.StdoutPipe()
 		if err != nil {
 			d.log.Shout("%s", err)
@@ -218,9 +210,15 @@ func (dp *DaemonPen) Start(daemons []conf.Daemon, vars map[string]string, log te
 	defer dp.Unlock()
 	d := make([]daemon, len(daemons))
 	for i, dmn := range daemons {
+		vcmd := varcmd.VarCmd{Block: nil, Mod: nil, Vars: vars}
+		finalcmd, err := vcmd.Render(dmn.Command)
+		if err != nil {
+			log.Shout("%s", err)
+			continue
+		}
+		dmn.Command = finalcmd
 		d[i] = daemon{
 			conf: dmn,
-			vars: vars,
 			log: log.Stream(
 				niceHeader("daemon: ", dmn.Command),
 			),
