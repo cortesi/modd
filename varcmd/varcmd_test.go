@@ -1,6 +1,9 @@
 package varcmd
 
 import (
+	"io/ioutil"
+	"os"
+	"path"
 	"runtime"
 	"testing"
 
@@ -51,13 +54,39 @@ func TestRender(t *testing.T) {
 	}
 }
 
+func mustRemoveAll(dir string) {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func TestVarCmd(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+	defer mustRemoveAll(tmpdir)
+	dst := path.Join(tmpdir, "tdir")
+	err = os.MkdirAll(dst, 0777)
+	if err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	err = ioutil.WriteFile(path.Join(dst, "tfile"), []byte("test"), 0777)
+	if err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	err = os.Chdir(tmpdir)
+	if err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+
 	b := conf.Block{}
 	b.Include = []string{"tdir/**"}
 	vc := VarCmd{&b, nil, map[string]string{}}
 	ret, err := vc.Render("@mods @dirmods")
 	if err != nil {
-		t.Fatal("unexpected error")
+		t.Fatalf("unexpected error: %s", err)
 	}
 
 	expect := `"./tdir/tfile" "./tdir"`
@@ -65,7 +94,7 @@ func TestVarCmd(t *testing.T) {
 		expect = `".\tdir\tfile" ".\tdir"`
 	}
 	if ret != expect {
-		t.Errorf("Unexpected return: %s", ret)
+		t.Errorf("Unexpected return: %#v", ret)
 	}
 
 	vc = VarCmd{

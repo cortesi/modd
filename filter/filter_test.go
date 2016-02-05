@@ -1,6 +1,9 @@
 package filter
 
 import (
+	"io/ioutil"
+	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -164,9 +167,41 @@ var findTests = []struct {
 	},
 }
 
+func mustRemoveAll(dir string) {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func TestFind(t *testing.T) {
+	d, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+	defer mustRemoveAll(d)
+	paths := []string{
+		"a/a.test1",
+		"a/b.test2",
+		"b/a.test1",
+		"b/b.test2",
+		"x",
+		"x.test1",
+	}
+	for _, p := range paths {
+		dst := path.Join(d, p)
+		err := os.MkdirAll(path.Dir(dst), 0777)
+		if err != nil {
+			t.Fatalf("Error creating test dir: %v", err)
+		}
+		err = ioutil.WriteFile(dst, []byte("test"), 0777)
+		if err != nil {
+			t.Fatalf("Error writing test file: %v", err)
+		}
+	}
+
 	for i, tt := range findTests {
-		ret, err := Find("./test/find", tt.include, tt.exclude)
+		ret, err := Find(d, tt.include, tt.exclude)
 		if err != nil {
 			t.Fatal(err)
 		}
