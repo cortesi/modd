@@ -108,3 +108,14 @@ func (c *Config) GetVariables() map[string]string {
 	}
 	return n
 }
+
+// CommonExcludes extends all blocks that require it with a common exclusion
+// set
+func (c *Config) CommonExcludes(excludes []string) {
+	for i, b := range c.Blocks {
+		if !b.NoCommonFilter {
+			b.Exclude = append(b.Exclude, excludes...)
+		}
+		c.Blocks[i] = b
+	}
+}

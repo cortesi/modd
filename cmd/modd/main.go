@@ -75,11 +75,7 @@ func prepsAndNotify(b conf.Block, vars map[string]string, lmod *watch.Mod, log t
 }
 
 func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
-	for i, b := range cnf.Blocks {
-		if !b.NoCommonFilter {
-			b.Exclude = append(b.Exclude, watch.CommonExcludes...)
-		}
-		cnf.Blocks[i] = b
+	for _, b := range cnf.Blocks {
 		_, err := prepsAndNotify(b, cnf.GetVariables(), nil, log)
 		if err != nil {
 			log.Shout("%s", err)
@@ -96,7 +92,6 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 	}
 
 	dworld.Start()
-
 	watchpaths := cnf.WatchPatterns()
 	if watchconf != "" {
 		watchpaths = append(watchpaths, watchconf)
@@ -185,6 +180,7 @@ func main() {
 	}
 
 	for {
+		cnf.CommonExcludes(watch.CommonExcludes)
 		cnf = run(log, cnf, watchfile)
 		if cnf == nil {
 			break
