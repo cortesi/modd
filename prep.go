@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/notify"
 	"github.com/cortesi/modd/varcmd"
 	"github.com/cortesi/modd/watch"
 	"github.com/cortesi/termlog"
@@ -68,7 +69,7 @@ func RunProc(cmd string, log termlog.Stream) error {
 }
 
 // RunPreps runs all commands in sequence. Stops if any command returns an error.
-func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.TermLog) error {
+func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.TermLog, notifiers []notify.Notifier) error {
 	vcmd := varcmd.VarCmd{Block: &b, Mod: mod, Vars: vars}
 	for _, p := range b.Preps {
 		cmd, err := vcmd.Render(p.Command)
@@ -77,7 +78,13 @@ func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.
 		}
 		err = RunProc(cmd, log.Stream(niceHeader("prep: ", cmd)))
 		if err != nil {
-			return err
+			if pe, ok := err.(ProcError); ok {
+				for _, n := range notifiers {
+					n.Push("modd error", pe.Output, "")
+				}
+			} else {
+				return err
+			}
 		}
 	}
 	return nil

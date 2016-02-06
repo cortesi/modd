@@ -1,6 +1,9 @@
 package notify
 
-import "os/exec"
+import (
+	"fmt"
+	"os/exec"
+)
 
 const prog = "modd"
 
@@ -15,6 +18,14 @@ func hasExecutable(name string) bool {
 // A Notifier notifies
 type Notifier interface {
 	Push(title string, content string, icon string)
+}
+
+// BeepNotifier just emits a beep on the terminal
+type BeepNotifier struct{}
+
+// Push implements Notifier
+func (*BeepNotifier) Push(string, string, string) {
+	fmt.Print("\a")
 }
 
 // GrowlNotifier is a notifier for Growl
@@ -41,8 +52,8 @@ func (LibnotifyNotifier) Push(title string, text string, iconPath string) {
 	go cmd.Run()
 }
 
-// NewNotifier finds a notifier for this platform
-func NewNotifier() Notifier {
+// PlatformNotifier finds a notifier for this platform
+func PlatformNotifier() Notifier {
 	if hasExecutable("growlnotify") {
 		return &GrowlNotifier{}
 	} else if hasExecutable("notify-send") {

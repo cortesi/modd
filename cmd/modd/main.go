@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"time"
 
 	"github.com/cortesi/modd"
 	"github.com/cortesi/modd/conf"
@@ -15,7 +14,6 @@ import (
 )
 
 const modfile = "./modd.conf"
-const lullTime = time.Millisecond * 100
 
 var file = kingpin.Flag(
 	"file",
@@ -50,105 +48,6 @@ var debug = kingpin.Flag("debug", "Debugging for modd development").
 	Default("false").
 	Bool()
 
-// Returns a (continue, error) tuple. If continue is true, execution of the
-// remainder of the block should proceed. If error is not nil, modd should
-// exit.
-func prepsAndNotify(b conf.Block, vars map[string]string, lmod *watch.Mod, log termlog.TermLog) (bool, error) {
-	err := modd.RunPreps(b, vars, lmod, log)
-	if pe, ok := err.(modd.ProcError); ok {
-		if *beep {
-			fmt.Print("\a")
-		}
-		if *doNotify {
-			n := notify.NewNotifier()
-			if n == nil {
-				log.Shout("Could not find a desktop notifier")
-			} else {
-				n.Push("modd error", pe.Output, "")
-			}
-		}
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
-	for _, b := range cnf.Blocks {
-		_, err := prepsAndNotify(b, cnf.GetVariables(), nil, log)
-		if err != nil {
-			log.Shout("%s", err)
-			return nil
-		}
-	}
-	dworld, err := modd.NewDaemonWorld(cnf, log)
-	if err != nil {
-		log.Shout("%s", err)
-		return nil
-	}
-	if *prep {
-		return nil
-	}
-
-	dworld.Start()
-	watchpaths := cnf.WatchPatterns()
-	if watchconf != "" {
-		watchpaths = append(watchpaths, watchconf)
-	}
-
-	modchan := make(chan *watch.Mod, 1024)
-	// FIXME: This takes a long time. We could start it in parallel with the
-	// first process run in a goroutine
-	watcher, err := watch.Watch(watchpaths, lullTime, modchan)
-	defer watcher.Stop()
-	if err != nil {
-		kingpin.Fatalf("Fatal error: %s", err)
-	}
-
-	for mod := range modchan {
-		if mod == nil {
-			break
-		}
-		if watchconf != "" && mod.Has(watchconf) {
-			ret, err := ioutil.ReadFile(watchconf)
-			if err != nil {
-				log.Warn("Reloading config - error reading %s: %s", watchconf, err)
-				continue
-			}
-			newcnf, err := conf.Parse(*file, string(ret))
-			if err != nil {
-				log.Warn("Reloading config - error reading %s: %s", watchconf, err)
-				continue
-			}
-			log.Notice("Reloading config %s", watchconf)
-			return newcnf
-		}
-		log.SayAs("debug", "Delta: \n%s", mod.String())
-		for i, b := range cnf.Blocks {
-			lmod, err := mod.Filter(b.Include, b.Exclude)
-			if err != nil {
-				log.Shout("Error filtering events: %s", err)
-				continue
-			}
-			if lmod.Empty() {
-				continue
-			}
-
-			proceed, err := prepsAndNotify(b, cnf.GetVariables(), lmod, log)
-			if err != nil {
-				log.Shout("%s", err)
-				return nil
-			}
-			if !proceed {
-				continue
-			}
-			dworld.DaemonPens[i].Restart()
-		}
-	}
-	return nil
-}
-
 func main() {
 	kingpin.Version(watch.Version)
 	kingpin.Parse()
@@ -179,11 +78,35 @@ func main() {
 		watchfile = ""
 	}
 
-	for {
-		cnf.CommonExcludes(watch.CommonExcludes)
-		cnf = run(log, cnf, watchfile)
-		if cnf == nil {
-			break
+	notifiers := []notify.Notifier{}
+	if *doNotify {
+		n := notify.PlatformNotifier()
+		if n == nil {
+			log.Shout("Could not find a desktop notifier")
+		} else {
+			notifiers = append(notifiers, n)
+		}
+	}
+	if *beep {
+		notifiers = append(notifiers, &notify.BeepNotifier{})
+	}
+
+	if *prep {
+		err := modd.PrepOnly(log, cnf, notifiers)
+		if err != nil {
+			log.Shout("%s", err)
+		}
+	} else {
+		for {
+			cnf.CommonExcludes(watch.CommonExcludes)
+			cnf, err = modd.Run(log, cnf, watchfile, notifiers)
+			if err != nil {
+				log.Shout("%s", err)
+				break
+			}
+			if cnf == nil {
+				break
+			}
 		}
 	}
 }
