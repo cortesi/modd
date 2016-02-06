@@ -3,6 +3,7 @@ package conf
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 
@@ -67,14 +68,17 @@ func (c *Config) Equals(other *Config) bool {
 	return true
 }
 
-// WatchPaths retreives the set of watched paths (with patterns removed) from
-// all blocks. The path set is de-duplicated.
-func (c *Config) WatchPaths() []string {
+// WatchPatterns retreives the set of watched paths (with patterns removed)
+// from all blocks. The path set is de-duplicated.
+func (c *Config) WatchPatterns() []string {
 	paths := []string{}
 	for _, b := range c.Blocks {
-		paths = filter.GetBasePaths(paths, b.Include)
+		paths = filter.AppendBaseDirs(paths, b.Include)
 	}
 	sort.Strings(paths)
+	for i, p := range paths {
+		paths[i] = p + string(filepath.Separator) + "..."
+	}
 	return paths
 }
 

@@ -113,7 +113,7 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 		os.Exit(0)
 	}
 
-	watchpaths := cnf.WatchPaths()
+	watchpaths := cnf.WatchPatterns()
 	if watchconf != "" {
 		watchpaths = append(watchpaths, watchconf)
 	}

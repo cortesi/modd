@@ -12,8 +12,8 @@ func TestWatchPaths(t *testing.T) {
 			{Include: []string{"a/bar", "a/oink", "foo", "b/foo"}},
 		},
 	}
-	expected := []string{"."}
-	got := c.WatchPaths()
+	expected := []string{"./..."}
+	got := c.WatchPatterns()
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Expected %#v, got %#v", expected, got)
 	}

@@ -55,13 +55,13 @@ func Files(files []string, includePatterns []string, excludePatterns []string) (
 	return ret, nil
 }
 
-// BasePath returns the base path for a match pattern
-func BasePath(pattern string) string {
+// BaseDir returns the base directory for a match pattern
+func BaseDir(pattern string) string {
 	split := strings.IndexAny(pattern, "*{}?[]")
 	if split >= 0 {
 		pattern = pattern[:split]
 	}
-	dir, _ := path.Split(pattern)
+	dir := path.Dir(pattern)
 	return path.Clean(dir)
 }
 
@@ -82,14 +82,14 @@ func isUnder(a, b string) bool {
 	return false
 }
 
-// GetBasePaths traverses a slice of patterns, and appends them to the
-// basepaths list. The result of the append operation is a minimal set - that
+// AppendBaseDirs traverses a slice of patterns, and appends them to the
+// bases list. The result of the append operation is a minimal set - that
 // is, paths that are redundant because an enclosing path is already included
 // are removed.
-func GetBasePaths(bases []string, patterns []string) []string {
+func AppendBaseDirs(bases []string, patterns []string) []string {
 Loop:
 	for _, s := range patterns {
-		s = BasePath(s)
+		s = BaseDir(s)
 		for i, e := range bases {
 			if isUnder(s, e) {
 				bases[i] = s
@@ -105,7 +105,7 @@ Loop:
 
 // Find all files under the root that match the specified patterns.
 func Find(root string, includePatterns []string, excludePatterns []string) ([]string, error) {
-	bases := GetBasePaths([]string{}, includePatterns)
+	bases := AppendBaseDirs([]string{}, includePatterns)
 	ret := []string{}
 	for _, b := range bases {
 		err := filepath.Walk(filepath.Join(root, b), func(p string, fi os.FileInfo, err error) error {

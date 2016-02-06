@@ -86,7 +86,7 @@ func TestFilterFiles(t *testing.T) {
 	}
 }
 
-var basePathTests = []struct {
+var BaseDirTests = []struct {
 	pattern  string
 	expected string
 }{
@@ -100,16 +100,16 @@ var basePathTests = []struct {
 	{"/voing/**", "/voing"},
 }
 
-func TestBasePath(t *testing.T) {
-	for i, tt := range basePathTests {
-		ret := BasePath(tt.pattern)
+func TestBaseDir(t *testing.T) {
+	for i, tt := range BaseDirTests {
+		ret := BaseDir(tt.pattern)
 		if ret != tt.expected {
 			t.Errorf("%d: %q - Expected %q, got %q", i, tt.pattern, tt.expected, ret)
 		}
 	}
 }
 
-var getBasePathTests = []struct {
+var getBaseDirTests = []struct {
 	patterns []string
 	expected []string
 }{
@@ -120,10 +120,10 @@ var getBasePathTests = []struct {
 	{[]string{"foo/**", "**", "/bar/**"}, []string{".", "/bar"}},
 }
 
-func TestGetBasePaths(t *testing.T) {
-	for i, tt := range getBasePathTests {
+func TestGetBaseDirs(t *testing.T) {
+	for i, tt := range getBaseDirTests {
 		bp := []string{}
-		bp = GetBasePaths(bp, tt.patterns)
+		bp = AppendBaseDirs(bp, tt.patterns)
 		if !reflect.DeepEqual(bp, tt.expected) {
 			t.Errorf("%d: %#v - Expected %#v, got %#v", i, tt.patterns, tt.expected, bp)
 		}
