@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/signal"
 	"time"
 
 	"github.com/cortesi/modd"
@@ -76,48 +75,34 @@ func prepsAndNotify(b conf.Block, vars map[string]string, lmod *watch.Mod, log t
 }
 
 func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
-	modchan := make(chan *watch.Mod, 1024)
-	if *ignores {
-		for _, patt := range watch.CommonExcludes {
-			fmt.Println(patt)
-		}
-		os.Exit(0)
-	}
-
-	daemonPens := make([]*modd.DaemonPen, len(cnf.Blocks))
 	for i, b := range cnf.Blocks {
 		if !b.NoCommonFilter {
 			b.Exclude = append(b.Exclude, watch.CommonExcludes...)
 		}
 		cnf.Blocks[i] = b
-
 		_, err := prepsAndNotify(b, cnf.GetVariables(), nil, log)
 		if err != nil {
 			log.Shout("%s", err)
 			return nil
 		}
-
-		d := modd.DaemonPen{}
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, os.Kill)
-		go func() {
-			d.Shutdown(<-c)
-			os.Exit(0)
-		}()
-		if !*prep {
-			d.Start(b.Daemons, cnf.GetVariables(), log)
-		}
-		daemonPens[i] = &d
+	}
+	dworld, err := modd.NewDaemonWorld(cnf, log)
+	if err != nil {
+		log.Shout("%s", err)
+		return nil
 	}
 	if *prep {
-		os.Exit(0)
+		return nil
 	}
+
+	dworld.Start()
 
 	watchpaths := cnf.WatchPatterns()
 	if watchconf != "" {
 		watchpaths = append(watchpaths, watchconf)
 	}
 
+	modchan := make(chan *watch.Mod, 1024)
 	// FIXME: This takes a long time. We could start it in parallel with the
 	// first process run in a goroutine
 	watcher, err := watch.Watch(watchpaths, lullTime, modchan)
@@ -127,6 +112,9 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 	}
 
 	for mod := range modchan {
+		if mod == nil {
+			break
+		}
 		if watchconf != "" && mod.Has(watchconf) {
 			ret, err := ioutil.ReadFile(watchconf)
 			if err != nil {
@@ -140,9 +128,6 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 			}
 			log.Notice("Reloading config %s", watchconf)
 			return newcnf
-		}
-		if mod == nil {
-			break
 		}
 		log.SayAs("debug", "Delta: \n%s", mod.String())
 		for i, b := range cnf.Blocks {
@@ -163,7 +148,7 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 			if !proceed {
 				continue
 			}
-			daemonPens[i].Restart()
+			dworld.DaemonPens[i].Restart()
 		}
 	}
 	return nil
@@ -172,6 +157,13 @@ func run(log termlog.TermLog, cnf *conf.Config, watchconf string) *conf.Config {
 func main() {
 	kingpin.Version(watch.Version)
 	kingpin.Parse()
+
+	if *ignores {
+		for _, patt := range watch.CommonExcludes {
+			fmt.Println(patt)
+		}
+		os.Exit(0)
+	}
 
 	log := termlog.NewLog()
 	if *debug {
