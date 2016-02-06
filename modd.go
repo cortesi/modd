@@ -11,7 +11,37 @@ import (
 	"github.com/cortesi/termlog"
 )
 
+// Version is the modd release version
+const Version = "0.1"
+
 const lullTime = time.Millisecond * 100
+
+// CommonExcludes is a list of commonly excluded files suitable for passing in
+// the excludes parameter to Watch - includes repo directories, temporary
+// files, and so forth.
+var CommonExcludes = []string{
+	// VCS
+	"**/.git/**",
+	"**/.hg/**",
+	"**/.svn/**",
+	"**/.bzr/**",
+
+	// OSX
+	"**/.DS_Store/**",
+
+	// Temporary files
+	"**.tmp",
+	"**~",
+	"**#",
+	"**.bak",
+	"**.swp",
+
+	// Python
+	"**.py[cod]",
+
+	// Node
+	"**/node_modules/**",
+}
 
 // PrepOnly runs all prep functions and exits
 func PrepOnly(log termlog.TermLog, cnf *conf.Config, notifiers []notify.Notifier) error {

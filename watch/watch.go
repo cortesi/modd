@@ -13,9 +13,6 @@ import (
 	"github.com/rjeczalik/notify"
 )
 
-// Version is the modd release version
-const Version = "0.1"
-
 // MaxLullWait is the maximum time to wait for a lull. This only kicks in if
 // we've had a constant stream of modifications blocking us.
 const MaxLullWait = time.Second * 8
@@ -312,31 +309,4 @@ func Watch(paths []string, lullTime time.Duration, ch chan *Mod) (*Watcher, erro
 		}
 	}()
 	return &Watcher{evtch}, nil
-}
-
-// CommonExcludes is a list of commonly excluded files suitable for passing in
-// the excludes parameter to Watch - includes repo directories, temporary
-// files, and so forth.
-var CommonExcludes = []string{
-	// VCS
-	"**/.git/**",
-	"**/.hg/**",
-	"**/.svn/**",
-	"**/.bzr/**",
-
-	// OSX
-	"**/.DS_Store/**",
-
-	// Temporary files
-	"**.tmp",
-	"**~",
-	"**#",
-	"**.bak",
-	"**.swp",
-
-	// Python
-	"**.py[cod]",
-
-	// Node
-	"**/node_modules/**",
 }

@@ -49,11 +49,11 @@ var debug = kingpin.Flag("debug", "Debugging for modd development").
 	Bool()
 
 func main() {
-	kingpin.Version(watch.Version)
+	kingpin.Version(modd.Version)
 	kingpin.Parse()
 
 	if *ignores {
-		for _, patt := range watch.CommonExcludes {
+		for _, patt := range modd.CommonExcludes {
 			fmt.Println(patt)
 		}
 		os.Exit(0)
@@ -98,7 +98,7 @@ func main() {
 		}
 	} else {
 		for {
-			cnf.CommonExcludes(watch.CommonExcludes)
+			cnf.CommonExcludes(modd.CommonExcludes)
 			cnf, err = modd.Run(log, cnf, watchfile, notifiers)
 			if err != nil {
 				log.Shout("%s", err)
