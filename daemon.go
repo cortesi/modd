@@ -3,7 +3,6 @@ package modd
 import (
 	"os"
 	"os/exec"
-	"os/signal"
 	"sync"
 	"time"
 
@@ -21,6 +20,7 @@ type daemon struct {
 	log  termlog.Stream
 	cmd  *exec.Cmd
 	stop bool
+	sync.Mutex
 }
 
 func (d *daemon) Run() {
@@ -32,7 +32,11 @@ func (d *daemon) Run() {
 			time.Sleep(MinRestart - since)
 		}
 		lastStart = time.Now()
-		sh := getShell()
+		sh, err := getShell()
+		if err != nil {
+			d.log.Shout("%s", err)
+			return
+		}
 
 		c := exec.Command(sh, "-c", d.conf.Command)
 		stdo, err := c.StdoutPipe()
@@ -49,14 +53,19 @@ func (d *daemon) Run() {
 		wg.Add(2)
 		go logOutput(&wg, stde, d.log.Warn)
 		go logOutput(&wg, stdo, d.log.Say)
+
+		d.Lock()
 		err = c.Start()
 		if err != nil {
 			d.log.Shout("%s", err)
+			d.Unlock()
 			continue
 		}
 		d.cmd = c
-		err = c.Wait()
+		d.Unlock()
+
 		wg.Wait()
+		err = c.Wait()
 		if err != nil {
 			d.log.Shout("%s", c.ProcessState.String())
 			continue
@@ -72,6 +81,8 @@ func (d *daemon) Restart() {
 }
 
 func (d *daemon) Shutdown(sig os.Signal) {
+	d.Lock()
+	defer d.Unlock()
 	d.stop = true
 	if d.cmd != nil {
 		d.cmd.Process.Signal(sig)
@@ -81,13 +92,13 @@ func (d *daemon) Shutdown(sig os.Signal) {
 
 // DaemonPen is a group of daemons in a single block, managed as a unit.
 type DaemonPen struct {
-	daemons []daemon
+	daemons []*daemon
 	sync.Mutex
 }
 
 // NewDaemonPen creates a new DaemonPen
 func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog) (*DaemonPen, error) {
-	d := make([]daemon, len(block.Daemons))
+	d := make([]*daemon, len(block.Daemons))
 	for i, dmn := range block.Daemons {
 		vcmd := varcmd.VarCmd{Block: nil, Mod: nil, Vars: vars}
 		finalcmd, err := vcmd.Render(dmn.Command)
@@ -95,7 +106,7 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 			return nil, err
 		}
 		dmn.Command = finalcmd
-		d[i] = daemon{
+		d[i] = &daemon{
 			conf: dmn,
 			log:  log.Stream(niceHeader("daemon: ", dmn.Command)),
 		}
@@ -149,12 +160,6 @@ func NewDaemonWorld(cnf *conf.Config, log termlog.TermLog) (*DaemonWorld, error)
 		}
 		daemonPens[i] = d
 
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, os.Kill)
-		go func() {
-			d.Shutdown(<-c)
-			os.Exit(0)
-		}()
 	}
 	return &DaemonWorld{daemonPens}, nil
 }
@@ -163,5 +168,12 @@ func NewDaemonWorld(cnf *conf.Config, log termlog.TermLog) (*DaemonWorld, error)
 func (dw *DaemonWorld) Start() {
 	for _, dp := range dw.DaemonPens {
 		dp.Start()
+	}
+}
+
+// Shutdown all daemons with signal s
+func (dw *DaemonWorld) Shutdown(s os.Signal) {
+	for _, dp := range dw.DaemonPens {
+		dp.Shutdown(s)
 	}
 }

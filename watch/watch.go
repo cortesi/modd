@@ -41,6 +41,7 @@ func isUnder(parent string, child string) bool {
 // are relative to the base path.
 func normPath(bases []string, abspath string) (string, error) {
 	for _, base := range bases {
+		base = filter.BaseDir(base)
 		absbase, err := filepath.Abs(base)
 		if isUnder(absbase, abspath) {
 			if err != nil {
@@ -76,8 +77,8 @@ type existenceChecker interface {
 type statExistenceChecker struct{}
 
 func (sc statExistenceChecker) Check(p string) bool {
-	_, err := os.Stat(p)
-	if err == nil {
+	fi, err := os.Stat(p)
+	if err == nil && !fi.IsDir() {
 		return true
 	}
 	return false

@@ -2,9 +2,10 @@ package modd
 
 import (
 	"io/ioutil"
+	"os"
+	"os/signal"
 	"time"
 
-	"github.com/alecthomas/kingpin"
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
 	"github.com/cortesi/modd/watch"
@@ -12,7 +13,7 @@ import (
 )
 
 // Version is the modd release version
-const Version = "0.1"
+const Version = "0.2"
 
 const lullTime = time.Millisecond * 100
 
@@ -54,8 +55,8 @@ func PrepOnly(log termlog.TermLog, cnf *conf.Config, notifiers []notify.Notifier
 	return nil
 }
 
-// Run is the top-level runner for modd
-func Run(log termlog.TermLog, cnf *conf.Config, watchconf string, notifiers []notify.Notifier) (*conf.Config, error) {
+// Gives control of chan to caller
+func runOnChan(modchan chan *watch.Mod, readyCallback func(), log termlog.TermLog, cnf *conf.Config, watchconf string, notifiers []notify.Notifier) (*conf.Config, error) {
 	err := PrepOnly(log, cnf, notifiers)
 	if err != nil {
 		return nil, err
@@ -66,20 +67,28 @@ func Run(log termlog.TermLog, cnf *conf.Config, watchconf string, notifiers []no
 		return nil, err
 	}
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill)
+	defer dworld.Shutdown(os.Kill)
+	go func() {
+		dworld.Shutdown(<-c)
+		os.Exit(0)
+	}()
+
 	dworld.Start()
 	watchpaths := cnf.WatchPatterns()
 	if watchconf != "" {
 		watchpaths = append(watchpaths, watchconf)
 	}
 
-	modchan := make(chan *watch.Mod, 1024)
 	// FIXME: This takes a long time. We could start it in parallel with the
 	// first process run in a goroutine
 	watcher, err := watch.Watch(watchpaths, lullTime, modchan)
-	defer watcher.Stop()
 	if err != nil {
-		kingpin.Fatalf("Fatal error: %s", err)
+		return nil, err
 	}
+	defer watcher.Stop()
+	go readyCallback()
 
 	for mod := range modchan {
 		if mod == nil {
@@ -117,4 +126,10 @@ func Run(log termlog.TermLog, cnf *conf.Config, watchconf string, notifiers []no
 		}
 	}
 	return nil, nil
+}
+
+// Run is the top-level runner for modd
+func Run(log termlog.TermLog, cnf *conf.Config, watchconf string, notifiers []notify.Notifier) (*conf.Config, error) {
+	modchan := make(chan *watch.Mod, 1024)
+	return runOnChan(modchan, func() {}, log, cnf, watchconf, notifiers)
 }

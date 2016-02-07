@@ -12,10 +12,6 @@ import (
 	"github.com/cortesi/termlog"
 )
 
-func getShell() string {
-	return "bash"
-}
-
 // ProcError is a process error, possibly containing command output
 type ProcError struct {
 	shorttext string
@@ -29,7 +25,10 @@ func (p ProcError) Error() string {
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd string, log termlog.Stream) error {
 	log.Header()
-	sh := getShell()
+	sh, error := getShell()
+	if error != nil {
+		return error
+	}
 	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()
 	if err != nil {
@@ -39,10 +38,14 @@ func RunProc(cmd string, log termlog.Stream) error {
 	if err != nil {
 		return err
 	}
-	wg := sync.WaitGroup{}
-	wg.Add(2)
 	buff := new(bytes.Buffer)
 	mut := sync.Mutex{}
+	err = c.Start()
+	if err != nil {
+		return err
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(2)
 	go logOutput(
 		&wg, stde,
 		func(s string, args ...interface{}) {
@@ -54,12 +57,8 @@ func RunProc(cmd string, log termlog.Stream) error {
 		},
 	)
 	go logOutput(&wg, stdo, log.Say)
-	err = c.Start()
-	if err != nil {
-		return err
-	}
-	err = c.Wait()
 	wg.Wait()
+	err = c.Wait()
 	if err != nil {
 		log.Shout("%s", c.ProcessState.String())
 		return ProcError{err.Error(), buff.String()}
