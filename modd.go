@@ -69,6 +69,7 @@ func runOnChan(modchan chan *watch.Mod, readyCallback func(), log termlog.TermLo
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill)
+	defer signal.Reset(os.Interrupt, os.Kill)
 	defer dworld.Shutdown(os.Kill)
 	go func() {
 		dworld.Shutdown(<-c)

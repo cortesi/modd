@@ -25,8 +25,11 @@ func mustRemoveAll(dir string) {
 	}
 }
 
-func touch(p string) error {
-	return ioutil.WriteFile(p, []byte("teststring"), 0777)
+func touch(t *testing.T, p string) {
+	err := ioutil.WriteFile(p, []byte("teststring"), 0777)
+	if err != nil {
+		t.Fatalf("touch: %s", err)
+	}
 }
 
 func events(p string) []string {
@@ -82,8 +85,9 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 	l := termlog.NewLog()
 	l.Color(false)
 
-	modchan := make(chan *watch.Mod)
+	modchan := make(chan *watch.Mod, 1024)
 	cback := func() {
+		time.Sleep(50 * time.Millisecond)
 		start := time.Now()
 		modfunc()
 		for {
@@ -113,28 +117,16 @@ func TestWatch(t *testing.T) {
 	_testWatch(
 		t,
 		func() {
-			err := touch(path.Join("a", "touched"))
-			if err != nil {
-				t.Fatalf("touch: %s", err)
-			}
+			touch(t, path.Join("a", "touched"))
 		},
 		"touched",
-		[]string{
-			":all: ./a/touched",
-			":a: ./a/touched",
-		},
+		[]string{":all: ./a/touched", ":a: ./a/touched"},
 	)
 	_testWatch(
 		t,
 		func() {
-			err := touch(path.Join("a", "touched"))
-			if err != nil {
-				t.Fatalf("touch: %s", err)
-			}
-			err = touch(path.Join("b", "touched"))
-			if err != nil {
-				t.Fatalf("touch: %s", err)
-			}
+			touch(t, path.Join("a", "touched"))
+			touch(t, path.Join("b", "touched"))
 		},
 		"touched",
 		[]string{
