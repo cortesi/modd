@@ -123,7 +123,11 @@ func runOnChan(modchan chan *watch.Mod, readyCallback func(), log termlog.TermLo
 			}
 			err = RunPreps(b, cnf.GetVariables(), lmod, log, notifiers)
 			if err != nil {
-				return nil, err
+				if _, ok := err.(ProcError); ok {
+					continue
+				} else {
+					return nil, err
+				}
 			}
 			dworld.DaemonPens[i].Restart()
 		}

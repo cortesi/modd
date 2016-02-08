@@ -81,9 +81,8 @@ func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.
 				for _, n := range notifiers {
 					n.Push("modd error", pe.Output, "")
 				}
-			} else {
-				return err
 			}
+			return err
 		}
 	}
 	return nil
