@@ -87,7 +87,9 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 
 	modchan := make(chan *watch.Mod, 1024)
 	cback := func() {
-		time.Sleep(50 * time.Millisecond)
+		// There's some race condition in rjeczalik/notify. If we don't wait a
+		// bit here, we sometimes don't receive notifications for our changes.
+		time.Sleep(200 * time.Millisecond)
 		start := time.Now()
 		modfunc()
 		for {

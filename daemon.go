@@ -67,13 +67,20 @@ func (d *daemon) Run() {
 		wg.Wait()
 		err = c.Wait()
 		if err != nil {
-			d.log.Shout("%s", c.ProcessState.String())
-			continue
+			if _, ok := err.(*exec.ExitError); ok {
+				d.log.Warn("exited: %s", c.ProcessState.String())
+			} else {
+				d.log.Shout("exited: %s", err)
+			}
+		} else {
+			d.log.Warn("exited: %s", c.ProcessState.String())
 		}
 	}
 }
 
 func (d *daemon) Restart() {
+	d.Lock()
+	defer d.Unlock()
 	if d.cmd != nil {
 		d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
 		d.cmd.Process.Signal(d.conf.RestartSignal)
@@ -86,7 +93,6 @@ func (d *daemon) Shutdown(sig os.Signal) {
 	d.stop = true
 	if d.cmd != nil {
 		d.cmd.Process.Signal(sig)
-		d.cmd.Wait()
 	}
 }
 

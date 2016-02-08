@@ -294,6 +294,7 @@ func Watch(paths []string, lullTime time.Duration, ch chan *Mod) (*Watcher, erro
 	for _, p := range paths {
 		err := notify.Watch(p, evtch, notify.All)
 		if err != nil {
+			notify.Stop(evtch)
 			return nil, err
 		}
 	}
