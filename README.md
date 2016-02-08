@@ -19,8 +19,8 @@ If you have a working Go installation, you can also say
 
     $ go get github.com/cortesi/modd/cmd/modd
 
-Note that modd requires *bash* to be on your PATH. On Windows, one easy way to
-accomplish this is to use [Babun](https://babun.github.io/).
+Note that modd requires *bash* or *sh* to be on your PATH. On Windows, one easy
+way to accomplish this is to use [Babun](https://babun.github.io/).
 
 
 # Quick start
@@ -185,8 +185,9 @@ Class      | Meaning
 # Commands
 
 Commands are shell scripts specified in-line in the *modd.conf* file. They are
-executed in **bash**, which is assumed to be on the user's path, and inherit
-the parent's environment. Single-line commands don't need to be quoted:
+executed in **bash** (or **sh** as a fallback), which is assumed to be on the
+user's path, and inherit the parent's environment. Single-line commands don't
+need to be quoted:
 
 ```
 prep: echo "i'm now rebuilding" | tee /tmp/output

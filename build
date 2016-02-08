@@ -8,7 +8,10 @@ import shutil
 import subprocess
 
 
+NAME = "modd"
 DSTDIR = "./tmp"
+
+
 ARCHS = [
     ("darwin", "amd64", "osx64", "tgz"),
     ("windows", "amd64", "windows64", "zip"),
@@ -33,13 +36,13 @@ def chdir(newdir):
 
 def version():
     print "Installing locally"
-    subprocess.call(["go", "install", "./cmd/modd"])
-    p = subprocess.Popen(["modd", "--version"], stderr=subprocess.PIPE)
+    subprocess.call(["go", "install", "./cmd/%s"%NAME])
+    p = subprocess.Popen([NAME, "--version"], stderr=subprocess.PIPE)
     return p.communicate()[1].strip()
 
 
-def build(vers, goos, goarch, name, archive):
-    dst = os.path.join(DSTDIR, "modd-%s-%s"%(vers, name))
+def build(vers, goos, goarch, suffix, archive):
+    dst = os.path.join(DSTDIR, "%s-%s-%s"%(NAME, vers, suffix))
     print "building to ", dst
     for f in glob.glob(dst + "*"):
         if os.path.isdir(f):
@@ -50,16 +53,22 @@ def build(vers, goos, goarch, name, archive):
     env = os.environ.copy()
     env["GOOS"] = goos
     env["GOARCH"] = goarch
+
+    if goos == "windows":
+        binname = NAME + ".exe"
+    else:
+        binname = NAME
+
     subprocess.call(
         [
             "go", "build",
-            "-o", os.path.join(dst, "modd"),
-            "./cmd/modd"
+            "-o", os.path.join(dst, binname),
+            "./cmd/%s"%NAME
         ],
         env = env
     )
 
-    pkgdst = os.path.join(DSTDIR, "packages", "modd-%s-%s"%(vers, name))
+    pkgdst = os.path.join(DSTDIR, "packages", "%s-%s-%s"%(NAME, vers, suffix))
     if archive == "tgz":
         print "\tmaking .tgz"
         subprocess.Popen(
@@ -75,21 +84,13 @@ def build(vers, goos, goarch, name, archive):
             stderr=subprocess.PIPE
         ).communicate()
 
+
 def main():
     v = version()
     print "Version is: ", v
-
-    subprocess.call(
-        [
-            "mkdir",
-            "-p",
-            os.path.join(DSTDIR, "packages")
-        ]
-    )
-
+    subprocess.call(["mkdir", "-p", os.path.join(DSTDIR, "packages")])
     for i in ARCHS:
         build(v, *i)
-
 
 
 main()
