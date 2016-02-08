@@ -1,9 +1,11 @@
 package modd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/cortesi/modd/conf"
@@ -79,14 +81,14 @@ func runOnChan(modchan chan *watch.Mod, readyCallback func(), log termlog.TermLo
 	dworld.Start()
 	watchpaths := cnf.WatchPatterns()
 	if watchconf != "" {
-		watchpaths = append(watchpaths, watchconf)
+		watchpaths = append(watchpaths, filepath.Dir(watchconf))
 	}
 
 	// FIXME: This takes a long time. We could start it in parallel with the
 	// first process run in a goroutine
 	watcher, err := watch.Watch(watchpaths, lullTime, modchan)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error watching: %s", err)
 	}
 	defer watcher.Stop()
 	go readyCallback()
