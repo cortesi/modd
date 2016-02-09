@@ -2,11 +2,11 @@ language: go
 
 go:
     - 1.5
-    - tip
 
 os:
     - linux
     - osx
+    - windows
 
 install:
     - go get -t -v ./...
