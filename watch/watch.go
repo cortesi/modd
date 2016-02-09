@@ -38,7 +38,8 @@ func isUnder(parent string, child string) bool {
 }
 
 // Notify events have absolute paths. We want to normalize these so that they
-// are relative to the base path.
+// are relative to the base path. If the matching base is absolute, so is the
+// returned path.
 func normPath(bases []string, abspath string) (string, error) {
 	for _, base := range bases {
 		base = filter.BaseDir(base)

@@ -3,7 +3,6 @@ package filter
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -61,8 +60,8 @@ func BaseDir(pattern string) string {
 	if split >= 0 {
 		pattern = pattern[:split]
 	}
-	dir := path.Dir(pattern)
-	return path.Clean(dir)
+	dir := filepath.Dir(pattern)
+	return filepath.Clean(dir)
 }
 
 // isUnder checks if directory b is under directory a. Note that arguments MUST

@@ -3,11 +3,11 @@ package filter
 import (
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"testing"
+
+	"github.com/cortesi/modd/utils"
 )
 
 var filterFilesTests = []struct {
@@ -103,7 +103,7 @@ var BaseDirTests = []struct {
 func TestBaseDir(t *testing.T) {
 	for i, tt := range BaseDirTests {
 		ret := BaseDir(tt.pattern)
-		if ret != tt.expected {
+		if filepath.ToSlash(ret) != filepath.ToSlash(tt.expected) {
 			t.Errorf("%d: %q - Expected %q, got %q", i, tt.pattern, tt.expected, ret)
 		}
 	}
@@ -124,6 +124,9 @@ func TestGetBaseDirs(t *testing.T) {
 	for i, tt := range getBaseDirTests {
 		bp := []string{}
 		bp = AppendBaseDirs(bp, tt.patterns)
+		for i := range bp {
+			bp[i] = filepath.ToSlash(bp[i])
+		}
 		if !reflect.DeepEqual(bp, tt.expected) {
 			t.Errorf("%d: %#v - Expected %#v, got %#v", i, tt.patterns, tt.expected, bp)
 		}
@@ -167,19 +170,8 @@ var findTests = []struct {
 	},
 }
 
-func mustRemoveAll(dir string) {
-	err := os.RemoveAll(dir)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func TestFind(t *testing.T) {
-	d, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("TempDir: %v", err)
-	}
-	defer mustRemoveAll(d)
+	defer utils.WithTempDir(t)()
 	paths := []string{
 		"a/a.test1",
 		"a/b.test2",
@@ -189,8 +181,8 @@ func TestFind(t *testing.T) {
 		"x.test1",
 	}
 	for _, p := range paths {
-		dst := path.Join(d, p)
-		err := os.MkdirAll(path.Dir(dst), 0777)
+		dst := filepath.Join(".", p)
+		err := os.MkdirAll(filepath.Dir(dst), 0777)
 		if err != nil {
 			t.Fatalf("Error creating test dir: %v", err)
 		}
@@ -201,15 +193,13 @@ func TestFind(t *testing.T) {
 	}
 
 	for i, tt := range findTests {
-		ret, err := Find(d, tt.include, tt.exclude)
+		ret, err := Find(".", tt.include, tt.exclude)
 		if err != nil {
 			t.Fatal(err)
 		}
 		expected := tt.expected
-		if runtime.GOOS == "windows" {
-			for i := range expected {
-				expected[i] = filepath.FromSlash(expected[i])
-			}
+		for i := range ret {
+			ret[i] = filepath.ToSlash(ret[i])
 		}
 		if !reflect.DeepEqual(ret, expected) {
 			t.Errorf(
