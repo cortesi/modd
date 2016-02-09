@@ -12,18 +12,12 @@ import (
 	"time"
 
 	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/utils"
 	"github.com/cortesi/modd/watch"
 	"github.com/cortesi/termlog"
 )
 
 const timeout = 2 * time.Second
-
-func mustRemoveAll(dir string) {
-	err := os.RemoveAll(dir)
-	if err != nil {
-		panic(err)
-	}
-}
 
 func touch(t *testing.T, p string) {
 	err := ioutil.WriteFile(p, []byte("teststring"), 0777)
@@ -46,17 +40,9 @@ func events(p string) []string {
 }
 
 func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string) {
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("TempDir: %v", err)
-	}
-	defer mustRemoveAll(tmpdir)
-	err = os.Chdir(tmpdir)
-	if err != nil {
-		t.Fatalf("Chdir: %v", err)
-	}
+	defer utils.WithTempDir(t)()
 
-	err = os.MkdirAll("a", 0777)
+	err := os.MkdirAll("a", 0777)
 	if err != nil {
 		t.Fatal(err)
 	}

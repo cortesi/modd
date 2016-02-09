@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/utils"
 	"github.com/cortesi/modd/watch"
 )
 
@@ -54,31 +55,17 @@ func TestRender(t *testing.T) {
 	}
 }
 
-func mustRemoveAll(dir string) {
-	err := os.RemoveAll(dir)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func TestVarCmd(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("TempDir: %v", err)
-	}
-	defer mustRemoveAll(tmpdir)
-	dst := path.Join(tmpdir, "tdir")
-	err = os.MkdirAll(dst, 0777)
+	defer utils.WithTempDir(t)()
+
+	dst := path.Join(".", "tdir")
+	err := os.MkdirAll(dst, 0777)
 	if err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	err = ioutil.WriteFile(path.Join(dst, "tfile"), []byte("test"), 0777)
 	if err != nil {
 		t.Fatalf("WriteFile: %v", err)
-	}
-	err = os.Chdir(tmpdir)
-	if err != nil {
-		t.Fatalf("Chdir: %v", err)
 	}
 
 	b := conf.Block{}

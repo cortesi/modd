@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+
+	"github.com/cortesi/modd/utils"
 )
 
 var filterFilesTests = []struct {
@@ -167,19 +169,8 @@ var findTests = []struct {
 	},
 }
 
-func mustRemoveAll(dir string) {
-	err := os.RemoveAll(dir)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func TestFind(t *testing.T) {
-	d, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("TempDir: %v", err)
-	}
-	defer mustRemoveAll(d)
+	defer utils.WithTempDir(t)()
 	paths := []string{
 		"a/a.test1",
 		"a/b.test2",
@@ -189,7 +180,7 @@ func TestFind(t *testing.T) {
 		"x.test1",
 	}
 	for _, p := range paths {
-		dst := path.Join(d, p)
+		dst := path.Join(".", p)
 		err := os.MkdirAll(path.Dir(dst), 0777)
 		if err != nil {
 			t.Fatalf("Error creating test dir: %v", err)
@@ -201,7 +192,7 @@ func TestFind(t *testing.T) {
 	}
 
 	for i, tt := range findTests {
-		ret, err := Find(d, tt.include, tt.exclude)
+		ret, err := Find(".", tt.include, tt.exclude)
 		if err != nil {
 			t.Fatal(err)
 		}
