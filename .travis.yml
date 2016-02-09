@@ -6,13 +6,11 @@ go:
 os:
     - linux
     - osx
-    - windows
 
 install:
     - go get -t -v ./...
 
 script:
-    - go build -v
     - go test ./...
 
 

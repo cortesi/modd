@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/cortesi/modd.svg?branch=master)](https://travis-ci.org/cortesi/modd)
 
 Modd is a developer tool that runs commands and manages daemons in response to
 filesystem changes.
