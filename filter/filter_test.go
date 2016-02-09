@@ -124,6 +124,9 @@ func TestGetBaseDirs(t *testing.T) {
 	for i, tt := range getBaseDirTests {
 		bp := []string{}
 		bp = AppendBaseDirs(bp, tt.patterns)
+		for i := range bp {
+			bp[i] = filepath.ToSlash(bp[i])
+		}
 		if !reflect.DeepEqual(bp, tt.expected) {
 			t.Errorf("%d: %#v - Expected %#v, got %#v", i, tt.patterns, tt.expected, bp)
 		}
