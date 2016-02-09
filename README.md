@@ -1,4 +1,3 @@
-[![Build Status](https://drone.io/github.com/cortesi/modd/status.png)](https://drone.io/github.com/cortesi/modd/latest)
 
 Modd is a developer tool that runs commands and manages daemons in response to
 filesystem changes.
@@ -19,8 +18,8 @@ If you have a working Go installation, you can also say
 
     $ go get github.com/cortesi/modd/cmd/modd
 
-Note that modd requires *bash* or *sh* to be on your PATH. On Windows, one easy
-way to accomplish this is to use [Babun](https://babun.github.io/).
+Note that modd requires either *bash* or *sh* to be on your PATH. On Windows,
+one easy way to accomplish this is to use [Babun](https://babun.github.io/).
 
 
 # Quick start
