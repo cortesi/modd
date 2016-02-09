@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"testing"
 
 	"github.com/cortesi/modd/utils"
@@ -196,10 +195,8 @@ func TestFind(t *testing.T) {
 			t.Fatal(err)
 		}
 		expected := tt.expected
-		if runtime.GOOS == "windows" {
-			for i := range expected {
-				expected[i] = filepath.FromSlash(expected[i])
-			}
+		for i := range ret {
+			ret[i] = filepath.ToSlash(ret[i])
 		}
 		if !reflect.DeepEqual(ret, expected) {
 			t.Errorf(
