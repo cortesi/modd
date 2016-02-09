@@ -15,6 +15,7 @@ script:
     - go build -v
     - go test ./...
 
+
 notifications:
     email:
         - aldo@corte.si
