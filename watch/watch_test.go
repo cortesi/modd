@@ -124,7 +124,7 @@ func abs(path string) string {
 	if err != nil {
 		panic("Could not get current working directory")
 	}
-	return filepath.Join(wd, path)
+	return filepath.ToSlash(filepath.Join(wd, path))
 }
 
 var normPathTests = []struct {

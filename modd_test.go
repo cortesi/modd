@@ -20,6 +20,7 @@ import (
 const timeout = 2 * time.Second
 
 func touch(t *testing.T, p string) {
+	p = filepath.FromSlash(p)
 	err := ioutil.WriteFile(p, []byte("teststring"), 0777)
 	if err != nil {
 		t.Fatalf("touch: %s", err)
@@ -104,17 +105,15 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 func TestWatch(t *testing.T) {
 	_testWatch(
 		t,
-		func() {
-			touch(t, filepath.Join("a", "touched"))
-		},
+		func() { touch(t, "a/touched") },
 		"touched",
 		[]string{":all: ./a/touched", ":a: ./a/touched"},
 	)
 	_testWatch(
 		t,
 		func() {
-			touch(t, filepath.Join("a", "touched"))
-			touch(t, filepath.Join("b", "touched"))
+			touch(t, "a/touched")
+			touch(t, "b/touched")
 		},
 		"touched",
 		[]string{
