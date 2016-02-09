@@ -104,7 +104,7 @@ var BaseDirTests = []struct {
 func TestBaseDir(t *testing.T) {
 	for i, tt := range BaseDirTests {
 		ret := BaseDir(tt.pattern)
-		if ret != tt.expected {
+		if filepath.ToSlash(ret) != filepath.ToSlash(tt.expected) {
 			t.Errorf("%d: %q - Expected %q, got %q", i, tt.pattern, tt.expected, ret)
 		}
 	}
