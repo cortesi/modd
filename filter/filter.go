@@ -102,11 +102,14 @@ Loop:
 	return bases
 }
 
-// Find all files under the root that match the specified patterns.
+// Find all files under the root that match the specified patterns. All
+// arguments and returned paths are slash-delimited.
 func Find(root string, includePatterns []string, excludePatterns []string) ([]string, error) {
+	root = filepath.FromSlash(root)
 	bases := AppendBaseDirs([]string{}, includePatterns)
 	ret := []string{}
 	for _, b := range bases {
+		b = filepath.FromSlash(b)
 		err := filepath.Walk(filepath.Join(root, b), func(p string, fi os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -115,6 +118,8 @@ func Find(root string, includePatterns []string, excludePatterns []string) ([]st
 			if err != nil {
 				return nil
 			}
+			cleanpath = filepath.ToSlash(cleanpath)
+
 			excluded, err := matchAny(cleanpath, excludePatterns)
 			if err != nil {
 				return nil

@@ -13,7 +13,6 @@ install:
 script:
     - go test ./...
 
-
 notifications:
     email:
         - aldo@corte.si

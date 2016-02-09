@@ -109,6 +109,9 @@ rendering that touch many files are likely to trigger commands only once.
 Patterns therefore match on a batch of changed files - when the first match in
 a batch is seen, the block is triggered.
 
+To make *modd.conf* files portable patterns are always matched against
+slash-delimited paths, even on Windows.
+
 ### Quotes
 
 File patterns can be naked or quoted strings. Quotes can be either single or

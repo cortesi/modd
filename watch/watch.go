@@ -40,6 +40,9 @@ func isUnder(parent string, child string) bool {
 // Notify events have absolute paths. We want to normalize these so that they
 // are relative to the base path. If the matching base is absolute, so is the
 // returned path.
+//
+// bases and abspath are in the OS-native separator format, the returned path
+// is slash-delimited.
 func normPath(bases []string, abspath string) (string, error) {
 	for _, base := range bases {
 		base = filter.BaseDir(base)
@@ -52,10 +55,10 @@ func normPath(bases []string, abspath string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			return filepath.Join(base, relpath), nil
+			return filepath.ToSlash(filepath.Join(base, relpath)), nil
 		}
 	}
-	return abspath, nil
+	return filepath.ToSlash(abspath), nil
 }
 
 func normPaths(bases []string, abspaths []string) ([]string, error) {
@@ -290,6 +293,8 @@ func (w *Watcher) Stop() {
 // stream of changes of duration lullTime. This lets us represent processes
 // that progressively affect multiple files, like rendering, as a single
 // changeset.
+//
+// All paths emitted are slash-delimited.
 func Watch(paths []string, lullTime time.Duration, ch chan *Mod) (*Watcher, error) {
 	evtch := make(chan notify.EventInfo, 4096)
 	for _, p := range paths {

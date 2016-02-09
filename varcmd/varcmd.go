@@ -26,10 +26,11 @@ func getDirs(paths []string) []string {
 	return keys
 }
 
-// quotePath quotes a path for use on the command-line
+// quotePath quotes a path for use on the command-line. The path must be in
+// slash-delimited format, and the quoted path will use the native OS separator.
 func quotePath(path string) string {
 	path = strings.Replace(path, "\"", "\\\"", -1)
-	return "\"" + path + "\""
+	return "\"" + filepath.FromSlash(path) + "\""
 }
 
 // mkArgs prepares a list of paths for the command line
@@ -61,6 +62,7 @@ func (v *VarCmd) get(name string) (string, error) {
 		var modified []string
 		if v.Mod == nil {
 			var err error
+			// FIXME: this is a bug - it doesn't cope with absolute root paths
 			modified, err = filter.Find(".", v.Block.Include, v.Block.Exclude)
 			if err != nil {
 				return "", err
