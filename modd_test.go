@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -105,7 +105,7 @@ func TestWatch(t *testing.T) {
 	_testWatch(
 		t,
 		func() {
-			touch(t, path.Join("a", "touched"))
+			touch(t, filepath.Join("a", "touched"))
 		},
 		"touched",
 		[]string{":all: ./a/touched", ":a: ./a/touched"},
@@ -113,8 +113,8 @@ func TestWatch(t *testing.T) {
 	_testWatch(
 		t,
 		func() {
-			touch(t, path.Join("a", "touched"))
-			touch(t, path.Join("b", "touched"))
+			touch(t, filepath.Join("a", "touched"))
+			touch(t, filepath.Join("b", "touched"))
 		},
 		"touched",
 		[]string{

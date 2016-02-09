@@ -3,7 +3,7 @@ package varcmd
 import (
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -58,12 +58,12 @@ func TestRender(t *testing.T) {
 func TestVarCmd(t *testing.T) {
 	defer utils.WithTempDir(t)()
 
-	dst := path.Join(".", "tdir")
+	dst := filepath.Join(".", "tdir")
 	err := os.MkdirAll(dst, 0777)
 	if err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	err = ioutil.WriteFile(path.Join(dst, "tfile"), []byte("test"), 0777)
+	err = ioutil.WriteFile(filepath.Join(dst, "tfile"), []byte("test"), 0777)
 	if err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}

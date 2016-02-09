@@ -3,7 +3,6 @@ package filter
 import (
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -180,8 +179,8 @@ func TestFind(t *testing.T) {
 		"x.test1",
 	}
 	for _, p := range paths {
-		dst := path.Join(".", p)
-		err := os.MkdirAll(path.Dir(dst), 0777)
+		dst := filepath.Join(".", p)
+		err := os.MkdirAll(filepath.Dir(dst), 0777)
 		if err != nil {
 			t.Fatalf("Error creating test dir: %v", err)
 		}
