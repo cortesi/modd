@@ -1,0 +1,20 @@
+language: go
+
+go:
+    - 1.5
+    - tip
+
+os:
+    - linux
+    - osx
+
+install:
+    - go get -t -v ./...
+
+script:
+    - go build -v
+    - go test ./...
+
+notifications:
+    email:
+        - aldo@corte.si
