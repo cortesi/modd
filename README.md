@@ -2,15 +2,24 @@
 [![Appveyor Build status](https://ci.appveyor.com/api/projects/status/1k7fk4j48oepvubo?svg=true)](https://ci.appveyor.com/project/cortesi/modd)
 
 
-
-
-Modd is a developer tool that runs commands and manages daemons in response to
+Modd is a developer tool that triggers commands and manages daemons in response to
 filesystem changes.
 
 If you use modd, you should also look at
 [devd](https://github.com/cortesi/devd), a compact HTTP daemon for developers.
 Devd integrates with modd, allowing you to trigger in-browser livereload with
 modd.
+
+The repo contains a set of example *modd.conf* files that you can look at for a
+quick idea of what modd can do:
+
+Example                                      | Description
+-------------------------------------------- | -------
+[frontend.conf](./examples/frontend.conf)    | A front-end project with React + Browserify + Babel. Modd and devd replace many functions of Gulp/Grunt.
+[go.conf](./examples/go.conf)                | Live unit tests for Go.
+[python.conf](./examples/python.conf)        | Python + Redis, with devd managing livereload.
+
+
 
 # Install
 
@@ -46,15 +55,6 @@ $ modd
 The first time modd is run, it will run the tests of all Go modules. Whenever
 any file with the .go extension is modified, the "go test" command will be run
 only on the enclosing module.
-
-
-Example                                      | Description
--------------------------------------------- | -------
-[frontend.conf](./examples/frontend.conf)    | A front-end project using React + Browserify + Babel. Modd and devd replace many functions of Gulp/Grunt.
-[go.conf](./examples/go.conf)                | Run Go tests on change.
-[python.conf](./examples/python.conf)        | A Python + Redis project, with devd managing livereload.
-
-
 
 
 # Leisurely start
@@ -113,8 +113,8 @@ rendering that touch many files are likely to trigger commands only once.
 Patterns therefore match on a batch of changed files - when the first match in
 a batch is seen, the block is triggered.
 
-To make *modd.conf* files portable patterns are always matched against
-slash-delimited paths, even on Windows.
+Patterns and the paths they match against are always in slash-delimited form,
+even on Windows.
 
 ### Quotes
 
@@ -236,7 +236,8 @@ Variable      | Meaning
 @dirmods      | On first run, all directories containing files matching the block patterns. On subsequent change, a list of all directories containing modified files.
 
 All file names in variables are relative to the current directory, and
-shell-escaped for safety.
+shell-escaped for safety. All paths are in slash-delimited form on all
+platforms.
 
 Given a config file like this, modd will run *eslint* on all .js files when
 started, and then after that only run *eslint* on files if they change:
