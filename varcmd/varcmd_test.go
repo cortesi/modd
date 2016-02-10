@@ -81,7 +81,7 @@ func TestVarCmd(t *testing.T) {
 		expect = `".\tdir\tfile" ".\tdir"`
 	}
 	if ret != expect {
-		t.Errorf("Unexpected return: %#v", ret)
+		t.Errorf("Expected: %#v, got %#v", expect, ret)
 	}
 
 	vc = VarCmd{
@@ -98,7 +98,7 @@ func TestVarCmd(t *testing.T) {
 		expected = `".\foo" ".\."`
 	}
 	if ret != expected {
-		t.Errorf("Unexpected return: %s", ret)
+		t.Errorf("Expected: %#v, got %#v", expect, ret)
 	}
 }
 
