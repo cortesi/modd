@@ -15,7 +15,7 @@ install:
   - go get -d ./...
 
 build_script:
-  - go test -v
+  - go test -v ./...
 
 test: off
 
