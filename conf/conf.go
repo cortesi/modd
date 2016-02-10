@@ -3,7 +3,6 @@ package conf
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 
@@ -77,7 +76,7 @@ func (c *Config) WatchPatterns() []string {
 	}
 	sort.Strings(paths)
 	for i, p := range paths {
-		paths[i] = p + string(filepath.Separator) + "..."
+		paths[i] = p + "/..."
 	}
 	return paths
 }

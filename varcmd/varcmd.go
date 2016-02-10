@@ -39,7 +39,7 @@ func mkArgs(paths []string) string {
 	for i, s := range paths {
 		// FIXME: We'll need to find a more portable way for Windows
 		escaped[i] = quotePath(
-			"." + string(filepath.Separator) + s,
+			"./" + s,
 		)
 	}
 	return strings.Join(escaped, " ")
