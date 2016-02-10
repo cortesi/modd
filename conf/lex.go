@@ -13,7 +13,7 @@ import (
 )
 
 const spaces = " \t"
-const whitespace = spaces + "\n"
+const whitespace = spaces + "\n\r"
 const wordRunes = "abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVXYZ_"
 const quotes = `'"`
 
