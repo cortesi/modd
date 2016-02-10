@@ -30,7 +30,7 @@ func getDirs(paths []string) []string {
 // slash-delimited format, and the quoted path will use the native OS separator.
 func quotePath(path string) string {
 	path = strings.Replace(path, "\"", "\\\"", -1)
-	return "\"" + filepath.FromSlash(path) + "\""
+	return "\"" + path + "\""
 }
 
 // mkArgs prepares a list of paths for the command line
