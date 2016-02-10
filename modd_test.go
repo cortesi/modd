@@ -104,8 +104,8 @@ func TestWatch(t *testing.T) {
 		func() { touch(t, "a/touched") },
 		"touched",
 		[]string{
-			fmt.Sprintf(":all: %s", filepath.FromSlash("./a/touched")),
-			fmt.Sprintf(":a: %s", filepath.FromSlash("./a/touched")),
+			":all: ./a/touched",
+			":a: ./a/touched",
 		},
 	)
 	_testWatch(
@@ -116,13 +116,9 @@ func TestWatch(t *testing.T) {
 		},
 		"touched",
 		[]string{
-			fmt.Sprintf(
-				":all: %s %s",
-				filepath.FromSlash("./a/touched"),
-				filepath.FromSlash("./b/touched"),
-			),
-			fmt.Sprintf(":a: %s", filepath.FromSlash("./a/touched")),
-			fmt.Sprintf(":b: %s", filepath.FromSlash("./b/touched")),
+			":all: ./a/touched ./b/touched",
+			":a: ./a/touched",
+			":b: ./b/touched",
 		},
 	)
 }
