@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"runtime"
 	"testing"
 
 	"github.com/cortesi/modd/conf"
@@ -77,9 +76,6 @@ func TestVarCmd(t *testing.T) {
 	}
 
 	expect := `"./tdir/tfile" "./tdir"`
-	if runtime.GOOS == "windows" {
-		expect = `".\tdir\tfile" ".\tdir"`
-	}
 	if ret != expect {
 		t.Errorf("Expected: %#v, got %#v", expect, ret)
 	}
@@ -94,11 +90,8 @@ func TestVarCmd(t *testing.T) {
 		t.Fatal("unexpected error")
 	}
 	expected := `"./foo" "./."`
-	if runtime.GOOS == "windows" {
-		expected = `".\foo" ".\."`
-	}
 	if ret != expected {
-		t.Errorf("Expected: %#v, got %#v", expect, ret)
+		t.Errorf("Expected: %#v, got %#v", expected, ret)
 	}
 }
 
