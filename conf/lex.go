@@ -13,7 +13,7 @@ import (
 )
 
 const spaces = " \t"
-const whitespace = spaces + "\n\r"
+const whitespace = spaces + "\n"
 const wordRunes = "abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVXYZ_"
 const quotes = `'"`
 
@@ -232,6 +232,7 @@ func (l *lexer) nextSignificantItem() item {
 
 // lex creates a new scanner for the input string.
 func lex(name, input string) *lexer {
+	input = strings.Replace(input, "\r\n", "\n", -1)
 	l := &lexer{
 		name:  name,
 		input: input,
