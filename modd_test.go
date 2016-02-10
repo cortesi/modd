@@ -1,7 +1,6 @@
 package modd
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -67,10 +66,7 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 		t.Fatal(err)
 	}
 
-	buff := new(bytes.Buffer)
-	termlog.SetOutput(buff)
-	l := termlog.NewLog()
-	l.Color(false)
+	lt := termlog.NewLogTest()
 
 	modchan := make(chan *watch.Mod, 1024)
 	cback := func() {
@@ -80,7 +76,7 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 		start := time.Now()
 		modfunc()
 		for {
-			if strings.Contains(buff.String(), trigger) {
+			if strings.Contains(lt.String(), trigger) {
 				break
 			}
 			if time.Now().Sub(start) > timeout {
@@ -91,11 +87,11 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 		}
 		modchan <- nil
 	}
-	_, err = runOnChan(modchan, cback, l, cnf, "", nil)
+	_, err = runOnChan(modchan, cback, lt.Log, cnf, "", nil)
 	if err != nil {
 		t.Fatalf("runOnChan: %s", err)
 	}
-	ret := events(buff.String())
+	ret := events(lt.String())
 
 	if !reflect.DeepEqual(ret, expected) {
 		t.Errorf("Expected\n%#v\nGot\n%#v", expected, ret)
