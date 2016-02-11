@@ -2,24 +2,12 @@ package modd
 
 import (
 	"bufio"
-	"fmt"
 	"io"
-	"os/exec"
 	"strings"
 	"sync"
 
 	"github.com/cortesi/termlog"
 )
-
-func getShell() (string, error) {
-	if _, err := exec.LookPath("bash"); err == nil {
-		return "bash", nil
-	}
-	if _, err := exec.LookPath("sh"); err == nil {
-		return "sh", nil
-	}
-	return "", fmt.Errorf("Could not find bash or sh on path.")
-}
 
 // shortCommand shortens a command to a name we can use in a notification
 // header.

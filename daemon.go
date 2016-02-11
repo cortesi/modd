@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/shell"
 	"github.com/cortesi/modd/varcmd"
 	"github.com/cortesi/termlog"
 )
@@ -16,10 +17,11 @@ const MinRestart = 1 * time.Second
 
 // A single daemon
 type daemon struct {
-	conf conf.Daemon
-	log  termlog.Stream
-	cmd  *exec.Cmd
-	stop bool
+	conf  conf.Daemon
+	log   termlog.Stream
+	cmd   *exec.Cmd
+	shell string
+	stop  bool
 	sync.Mutex
 }
 
@@ -32,13 +34,12 @@ func (d *daemon) Run() {
 			time.Sleep(MinRestart - since)
 		}
 		lastStart = time.Now()
-		sh, err := getShell()
+
+		c, err := shell.Command(d.shell, d.conf.Command)
 		if err != nil {
 			d.log.Shout("%s", err)
 			return
 		}
-
-		c := exec.Command(sh, "-c", d.conf.Command)
 		stdo, err := c.StdoutPipe()
 		if err != nil {
 			d.log.Shout("%s", err)
@@ -113,8 +114,9 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 		}
 		dmn.Command = finalcmd
 		d[i] = &daemon{
-			conf: dmn,
-			log:  log.Stream(niceHeader("daemon: ", dmn.Command)),
+			conf:  dmn,
+			log:   log.Stream(niceHeader("daemon: ", dmn.Command)),
+			shell: vars[shellVarName],
 		}
 	}
 	return &DaemonPen{daemons: d}, nil
