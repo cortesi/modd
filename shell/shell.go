@@ -4,13 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"sync"
 
 	"github.com/google/shlex"
 )
 
 // Default Inteface to use if none provided.
-var Default = "bash"
+var Default = "raw"
 
 // Interface to the shell.
 type Interface interface {
@@ -21,21 +20,15 @@ type Interface interface {
 	Command(line string) (*exec.Cmd, error)
 }
 
-var (
-	shellsLock sync.Mutex
-	shells     = make(map[string]Interface)
-)
+var shells = make(map[string]Interface)
 
 func init() {
-	Register(&Raw{})
-	Register(&Bash{})
+	register(&Raw{})
+	register(&Bash{})
 }
 
 // Register a new shell interface.
-func Register(i Interface) {
-	shellsLock.Lock()
-	defer shellsLock.Unlock()
-
+func register(i Interface) {
 	name := i.Name()
 	if _, has := shells[name]; has {
 		panic("shell interface " + name + " already exists")
@@ -43,12 +36,18 @@ func Register(i Interface) {
 	shells[name] = i
 }
 
+// Has returns if the method name exists or not.
+func Has(method string) bool {
+	if len(method) == 0 {
+		method = Default
+	}
+	_, has := shells[method]
+	return has
+}
+
 // Command returns a *Cmd. If method is empty then the default shell
 // interface method is used. The line should contain the exec line.
 func Command(method, line string) (*exec.Cmd, error) {
-	shellsLock.Lock()
-	defer shellsLock.Unlock()
-
 	if len(method) == 0 {
 		method = Default
 	}
