@@ -9,7 +9,7 @@ import (
 )
 
 // Default Inteface to use if none provided.
-var Default = "raw"
+var Default = "bash"
 
 // Interface to the shell.
 type Interface interface {

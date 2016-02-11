@@ -23,10 +23,9 @@ func (p ProcError) Error() string {
 }
 
 // RunProc runs a process to completion, sending output to log
-func RunProc(cmd string, log termlog.Stream) error {
+func RunProc(cmd, shellMethod string, log termlog.Stream) error {
 	log.Header()
 
-	shellMethod := "" // TODO (DT): set this from the config file.
 	c, err := shell.Command(shellMethod, cmd)
 	if err != nil {
 		return err
@@ -70,13 +69,14 @@ func RunProc(cmd string, log termlog.Stream) error {
 
 // RunPreps runs all commands in sequence. Stops if any command returns an error.
 func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.TermLog, notifiers []notify.Notifier) error {
+	shell := vars[shellVarName]
 	vcmd := varcmd.VarCmd{Block: &b, Mod: mod, Vars: vars}
 	for _, p := range b.Preps {
 		cmd, err := vcmd.Render(p.Command)
 		if err != nil {
 			return err
 		}
-		err = RunProc(cmd, log.Stream(niceHeader("prep: ", cmd)))
+		err = RunProc(cmd, shell, log.Stream(niceHeader("prep: ", cmd)))
 		if err != nil {
 			if pe, ok := err.(ProcError); ok {
 				for _, n := range notifiers {

@@ -17,10 +17,11 @@ const MinRestart = 1 * time.Second
 
 // A single daemon
 type daemon struct {
-	conf conf.Daemon
-	log  termlog.Stream
-	cmd  *exec.Cmd
-	stop bool
+	conf  conf.Daemon
+	log   termlog.Stream
+	cmd   *exec.Cmd
+	shell string
+	stop  bool
 	sync.Mutex
 }
 
@@ -34,8 +35,7 @@ func (d *daemon) Run() {
 		}
 		lastStart = time.Now()
 
-		shellMethod := "" // TODO (DT): set this from the config file.
-		c, err := shell.Command(shellMethod, d.conf.Command)
+		c, err := shell.Command(d.shell, d.conf.Command)
 		if err != nil {
 			d.log.Shout("%s", err)
 			return
@@ -114,8 +114,9 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 		}
 		dmn.Command = finalcmd
 		d[i] = &daemon{
-			conf: dmn,
-			log:  log.Stream(niceHeader("daemon: ", dmn.Command)),
+			conf:  dmn,
+			log:   log.Stream(niceHeader("daemon: ", dmn.Command)),
+			shell: vars[shellVarName],
 		}
 	}
 	return &DaemonPen{daemons: d}, nil

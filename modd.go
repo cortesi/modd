@@ -10,6 +10,7 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
+	"github.com/cortesi/modd/shell"
 	"github.com/cortesi/modd/watch"
 	"github.com/cortesi/termlog"
 )
@@ -18,6 +19,8 @@ import (
 const Version = "0.2"
 
 const lullTime = time.Millisecond * 100
+
+const shellVarName = "@shell"
 
 // CommonExcludes is a list of commonly excluded files suitable for passing in
 // the excludes parameter to Watch - includes repo directories, temporary
@@ -137,6 +140,10 @@ func runOnChan(modchan chan *watch.Mod, readyCallback func(), log termlog.TermLo
 
 // Run is the top-level runner for modd
 func Run(log termlog.TermLog, cnf *conf.Config, watchconf string, notifiers []notify.Notifier) (*conf.Config, error) {
+	shellMethod := cnf.GetVariables()[shellVarName]
+	if !shell.Has(shellMethod) {
+		return nil, fmt.Errorf("No shell interface %q", shellMethod)
+	}
 	modchan := make(chan *watch.Mod, 1024)
 	return runOnChan(modchan, func() {}, log, cnf, watchconf, notifiers)
 }
