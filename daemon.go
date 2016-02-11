@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cortesi/modd/conf"
+	"github.com/cortesi/modd/shell"
 	"github.com/cortesi/modd/varcmd"
 	"github.com/cortesi/termlog"
 )
@@ -32,13 +33,13 @@ func (d *daemon) Run() {
 			time.Sleep(MinRestart - since)
 		}
 		lastStart = time.Now()
-		sh, err := getShell()
+
+		shellMethod := "" // TODO (DT): set this from the config file.
+		c, err := shell.Command(shellMethod, d.conf.Command)
 		if err != nil {
 			d.log.Shout("%s", err)
 			return
 		}
-
-		c := exec.Command(sh, "-c", d.conf.Command)
 		stdo, err := c.StdoutPipe()
 		if err != nil {
 			d.log.Shout("%s", err)

@@ -2,11 +2,11 @@ package modd
 
 import (
 	"bytes"
-	"os/exec"
 	"sync"
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
+	"github.com/cortesi/modd/shell"
 	"github.com/cortesi/modd/varcmd"
 	"github.com/cortesi/modd/watch"
 	"github.com/cortesi/termlog"
@@ -25,11 +25,12 @@ func (p ProcError) Error() string {
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd string, log termlog.Stream) error {
 	log.Header()
-	sh, error := getShell()
-	if error != nil {
-		return error
+
+	shellMethod := "" // TODO (DT): set this from the config file.
+	c, err := shell.Command(shellMethod, cmd)
+	if err != nil {
+		return err
 	}
-	c := exec.Command(sh, "-c", cmd)
 	stdo, err := c.StdoutPipe()
 	if err != nil {
 		return err
