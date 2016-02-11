@@ -23,7 +23,7 @@ type Interface interface {
 var shells = make(map[string]Interface)
 
 func init() {
-	register(&Raw{})
+	register(&Exec{})
 	register(&Bash{})
 }
 
@@ -60,13 +60,13 @@ func Command(method, line string) (*exec.Cmd, error) {
 }
 
 // No shell, just execute the command raw.
-type Raw struct{}
+type Exec struct{}
 
-func (r *Raw) Name() string {
-	return "raw"
+func (r *Exec) Name() string {
+	return "exec"
 }
 
-func (r *Raw) Command(line string) (*exec.Cmd, error) {
+func (r *Exec) Command(line string) (*exec.Cmd, error) {
 	ss, err := shlex.Split(line)
 	if err != nil {
 		return nil, err
