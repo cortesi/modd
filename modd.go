@@ -41,6 +41,8 @@ var CommonExcludes = []string{
 	"**#",
 	"**.bak",
 	"**.swp",
+	"**.___jb_old___",
+	"**.___jb_bak___",
 
 	// Python
 	"**.py[cod]",
