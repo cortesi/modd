@@ -32,8 +32,9 @@ If you have a working Go installation, you can also say
 
     $ go get github.com/cortesi/modd/cmd/modd
 
-Note that modd requires either *bash* or *sh* to be on your PATH. On Windows,
-one easy way to accomplish this is to use [Babun](https://babun.github.io/).
+Note that by default modd uses either *bash* or *sh*. To use them they must be on your PATH.
+To avoid using "bash" set `@shell = exec` in your "modd.conf" file.
+On Windows, one easy way to install bash is to use [Babun](https://babun.github.io/).
 
 
 # Quick start
@@ -56,6 +57,13 @@ The first time modd is run, it will run the tests of all Go modules. Whenever
 any file with the .go extension is modified, the "go test" command will be run
 only on the enclosing module.
 
+To avoid shelling out to bash the following will execute "go test" directly.
+```
+@shell = exec
+**/*.go {
+    prep: go test @dirmods
+}
+```
 
 # Leisurely start
 
@@ -192,7 +200,9 @@ Class      | Meaning
 # Commands
 
 Commands are shell scripts specified in-line in the *modd.conf* file. They are
-executed in **bash** (or **sh** as a fallback), which is assumed to be on the
+executed in **bash** (or **sh** as a fallback) by default. Bash can be bypassed
+and the commands executed directly by setting `@shell = exec`. If bash is used
+it is assumed to be on the
 user's path, and inherit the parent's environment. Single-line commands don't
 need to be quoted:
 
@@ -319,6 +329,15 @@ You can use variables in commands like so:
 }
 ```
 
+There is a special "@shell" variable that when set determines how commands are
+executed. Valid values are:
+```
+# Execute commands directly from go.
+@shell = exec
+
+# Pass commands on to bash or sh for execution.
+@shell = bash
+```
 
 # Desktop Notifications
 
