@@ -12,8 +12,14 @@ import (
 	"github.com/cortesi/termlog"
 )
 
-// MinRestart is the minimum amount of time between daemon restarts
-const MinRestart = 1 * time.Second
+const (
+	// MinRestart is the minimum amount of time between daemon restarts
+	MinRestart = 1 * time.Second
+	// MulRestart is the exponential backoff multiplier applied when the daemon exits uncleanly
+	MulRestart = 2
+	// MaxRestart is the maximum amount of time between daemon restarts
+	MaxRestart = 5 * time.Second
+)
 
 // A single daemon
 type daemon struct {
@@ -27,11 +33,12 @@ type daemon struct {
 
 func (d *daemon) Run() {
 	var lastStart time.Time
+	delay := MinRestart
 	for d.stop != true {
 		d.log.Notice(">> starting...")
 		since := time.Now().Sub(lastStart)
-		if since < MinRestart {
-			time.Sleep(MinRestart - since)
+		if since < delay {
+			time.Sleep(delay - since)
 		}
 		lastStart = time.Now()
 
@@ -73,8 +80,15 @@ func (d *daemon) Run() {
 			} else {
 				d.log.Shout("exited: %s", err)
 			}
+			// unclean restart; increase backoff
+			delay *= MulRestart
+			if delay > MaxRestart {
+				delay = MaxRestart
+			}
 		} else {
 			d.log.Warn("exited: %s", c.ProcessState.String())
+			// clean restart; reset backoff
+			delay = MinRestart
 		}
 	}
 }
