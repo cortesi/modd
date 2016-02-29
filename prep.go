@@ -49,7 +49,7 @@ func RunProc(cmd, shellMethod string, log termlog.Stream) error {
 	go logOutput(
 		&wg, stde,
 		func(s string, args ...interface{}) {
-			log.Warn(s)
+			log.Warn(s, args...)
 
 			mut.Lock()
 			defer mut.Unlock()

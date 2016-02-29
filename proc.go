@@ -42,6 +42,6 @@ func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interfa
 		if err != nil {
 			return
 		}
-		out(string(line))
+		out("%s", string(line))
 	}
 }
