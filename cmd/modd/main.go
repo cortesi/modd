@@ -49,6 +49,7 @@ var debug = kingpin.Flag("debug", "Debugging for modd development").
 	Bool()
 
 func main() {
+	kingpin.CommandLine.HelpFlag.Short('h')
 	kingpin.Version(modd.Version)
 	kingpin.Parse()
 
