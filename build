@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+import click
 import contextlib
 import fnmatch
 import glob
@@ -12,6 +13,7 @@ NAME = "modd"
 DSTDIR = "./tmp"
 
 
+# (os, architecture, suffix, archive)
 ARCHS = [
     ("darwin", "amd64", "osx64", "tgz"),
     ("windows", "amd64", "windows64", "zip"),
@@ -42,55 +44,63 @@ def version():
 
 
 def build(vers, goos, goarch, suffix, archive):
-    dst = os.path.join(DSTDIR, "%s-%s-%s"%(NAME, vers, suffix))
-    print "building to ", dst
-    for f in glob.glob(dst + "*"):
-        if os.path.isdir(f):
-            shutil.rmtree(f)
-        else:
-            os.unlink(f)
-    os.makedirs(dst)
+    basename = "%s-%s-%s"%(NAME, vers, suffix)
+    fname = basename + "." + archive
+    dstdir = os.path.join(DSTDIR, basename)
+    pkgdst = os.path.abspath(os.path.join(DSTDIR, "packages", fname))
+    binname = NAME
+    if goos == "windows":
+        binname = binname + ".exe"
+
+    print "building to ", dstdir
+    if os.path.exists(dstdir):
+        shutil.rmtree(dstdir)
+    os.makedirs(dstdir)
+
     env = os.environ.copy()
     env["GOOS"] = goos
     env["GOARCH"] = goarch
 
-    if goos == "windows":
-        binname = NAME + ".exe"
-    else:
-        binname = NAME
-
     subprocess.call(
         [
             "go", "build",
-            "-o", os.path.join(dst, binname),
+            "-o", os.path.join(dstdir, binname),
             "./cmd/%s"%NAME
         ],
         env = env
     )
 
-    pkgdst = os.path.join(DSTDIR, "packages", "%s-%s-%s"%(NAME, vers, suffix))
-    if archive == "tgz":
-        print "\tmaking .tgz"
-        subprocess.Popen(
-            ["tar", "-czvf", pkgdst + ".tgz", dst],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        ).communicate()
-    elif archive == "zip":
-        print "\tmaking .zip"
-        subprocess.Popen(
-            ["zip", "-r", pkgdst + ".zip", dst],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        ).communicate()
+    with chdir(DSTDIR):
+        if archive == "tgz":
+            print "\tmaking .tgz"
+            subprocess.Popen(
+                ["tar", "-czvf", pkgdst, basename],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            ).communicate()
+        elif archive == "zip":
+            print "\tmaking .zip"
+            subprocess.Popen(
+                ["zip", "-r", pkgdst, basename],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            ).communicate()
 
 
-def main():
+@click.command()
+@click.option("--arch", default=None, help="Build just this architecture")
+def main(arch):
     v = version()
     print "Version is: ", v
     subprocess.call(["mkdir", "-p", os.path.join(DSTDIR, "packages")])
-    for i in ARCHS:
+
+    archs = ARCHS
+    if arch:
+        archs = [i for i in ARCHS if arch in i]
+
+    for i in archs:
         build(v, *i)
 
 
-main()
+if __name__ == "__main__":
+    main()
