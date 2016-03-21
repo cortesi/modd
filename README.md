@@ -364,3 +364,12 @@ Libnotify is a general notification framework available on most Unix-like
 systems. Modd uses the **notify-send** command to send notifications using
 libnotify. You'll need to use your system package manager to install
 **libnotify**.
+
+
+# Development
+
+The scripts used to build this package for distribution can be found
+[here](https://github.com/cortesi/godist). External packages are vendored using
+[gvt](https://github.com/FiloSottile/gvt), and I use
+[deplist](https://github.com/cespare/deplist) to make sure all dependencies are
+covered.
