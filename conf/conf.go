@@ -17,7 +17,8 @@ type Daemon struct {
 
 // A Prep runs and terminates
 type Prep struct {
-	Command string
+	Command  string
+	Onchange bool // Should prep skip initial run
 }
 
 // Block is a match pattern and a set of specifications
@@ -34,14 +35,19 @@ func (b *Block) addPrep(command string, options []string) error {
 	if b.Preps == nil {
 		b.Preps = []Prep{}
 	}
-	prep := Prep{command}
+
+	var onchange = false
 	for _, v := range options {
 		switch v {
-		// No prep options for the moment
+		case "+onchange":
+			onchange = true
 		default:
 			return fmt.Errorf("unknown option: %s", v)
 		}
 	}
+
+	prep := Prep{command, onchange}
+
 	b.Preps = append(b.Preps, prep)
 	return nil
 }

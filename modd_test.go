@@ -46,12 +46,17 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	err = os.MkdirAll("b", 0777)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	touch(t, "a/initial")
+
 	confTxt := `
         ** {
+            prep +onchange: echo ":skipit:" @mods
             prep: echo ":all:" @mods
         }
         a/** {
@@ -97,6 +102,7 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 	if err != nil {
 		t.Fatalf("runOnChan: %s", err)
 	}
+
 	ret := events(lt.String())
 
 	if !reflect.DeepEqual(ret, expected) {
@@ -110,6 +116,9 @@ func TestWatch(t *testing.T) {
 		func() { touch(t, "a/touched") },
 		"touched",
 		[]string{
+			":all: ./a/initial",
+			":a: ./a/initial",
+			":skipit: ./a/touched",
 			":all: ./a/touched",
 			":a: ./a/touched",
 		},
@@ -122,6 +131,9 @@ func TestWatch(t *testing.T) {
 		},
 		"touched",
 		[]string{
+			":all: ./a/initial",
+			":a: ./a/initial",
+			":skipit: ./a/touched ./b/touched",
 			":all: ./a/touched ./b/touched",
 			":a: ./a/touched",
 			":b: ./b/touched",
