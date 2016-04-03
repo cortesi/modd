@@ -85,6 +85,13 @@ func (mr *ModRunner) ReadConfig() error {
 	if err != nil {
 		return fmt.Errorf("Error reading config file %s: %s", mr.ConfPath, err)
 	}
+
+	shellMethod := newcnf.GetVariables()[shellVarName]
+	if !shell.Has(shellMethod) {
+		return fmt.Errorf("No shell interface %q", shellMethod)
+	}
+
+	// FIXME: this needs to be configurable
 	newcnf.CommonExcludes(CommonExcludes)
 	mr.Config = newcnf
 	return nil
@@ -143,12 +150,12 @@ func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) er
 		}
 
 		if mr.ConfReload && mod.Has(mr.ConfPath) {
+			mr.Log.Notice("Reloading config %s", mr.ConfPath)
 			err := mr.ReadConfig()
 			if err != nil {
-				mr.Log.Warn("Reloading config - error reading %s: %s", mr.ConfPath, err)
+				mr.Log.Warn("%s", err)
 				continue
 			} else {
-				mr.Log.Notice("Reloaded config %s", mr.ConfPath)
 				return nil
 			}
 		}
@@ -180,10 +187,6 @@ func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) er
 // Run is the top-level runner for modd
 func (mr *ModRunner) Run() error {
 	for {
-		shellMethod := mr.Config.GetVariables()[shellVarName]
-		if !shell.Has(shellMethod) {
-			return fmt.Errorf("No shell interface %q", shellMethod)
-		}
 		modchan := make(chan *watch.Mod, 1024)
 		err := mr.runOnChan(modchan, func() {})
 		if err != nil {
