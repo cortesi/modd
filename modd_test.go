@@ -87,7 +87,13 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 		}
 		modchan <- nil
 	}
-	_, err = runOnChan(modchan, cback, lt.Log, cnf, "", nil)
+
+	mr := ModRunner{
+		Log:    lt.Log,
+		Config: cnf,
+	}
+
+	err = mr.runOnChan(modchan, cback)
 	if err != nil {
 		t.Fatalf("runOnChan: %s", err)
 	}

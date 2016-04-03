@@ -2,11 +2,9 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/cortesi/modd"
-	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
 	"github.com/cortesi/modd/watch"
 	"github.com/cortesi/termlog"
@@ -66,19 +64,6 @@ func main() {
 		watch.Logger = log
 	}
 
-	ret, err := ioutil.ReadFile(*file)
-	if err != nil {
-		kingpin.Fatalf("%s", err)
-	}
-	cnf, err := conf.Parse(*file, string(ret))
-	if err != nil {
-		kingpin.Fatalf("%s", err)
-	}
-	watchfile := *file
-	if *noconf {
-		watchfile = ""
-	}
-
 	notifiers := []notify.Notifier{}
 	if *doNotify {
 		n := notify.PlatformNotifier()
@@ -92,22 +77,21 @@ func main() {
 		notifiers = append(notifiers, &notify.BeepNotifier{})
 	}
 
+	mr, err := modd.NewModRunner(*file, log, notifiers, !(*noconf))
+	if err != nil {
+		log.Shout("%s", err)
+		return
+	}
+
 	if *prep {
-		err := modd.PrepOnly(log, cnf, notifiers)
+		err := mr.PrepOnly()
 		if err != nil {
 			log.Shout("%s", err)
 		}
 	} else {
-		for {
-			cnf.CommonExcludes(modd.CommonExcludes)
-			cnf, err = modd.Run(log, cnf, watchfile, notifiers)
-			if err != nil {
-				log.Shout("%s", err)
-				break
-			}
-			if cnf == nil {
-				break
-			}
+		err = mr.Run()
+		if err != nil {
+			log.Shout("%s", err)
 		}
 	}
 }
