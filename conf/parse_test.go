@@ -137,6 +137,17 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"foo {\nprep +onchange: command\n}",
+		&Config{
+			Blocks: []Block{
+				{
+					Include: []string{"foo"},
+					Preps:   []Prep{Prep{Command: "command", Onchange: true}},
+				},
+			},
+		},
+	},
+	{
 		"foo {\nprep: 'command\n-one\n-two'}",
 		&Config{
 			Blocks: []Block{
@@ -164,7 +175,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo", "bar"},
-					Preps:   []Prep{{"command"}},
+					Preps:   []Prep{{"command", false}},
 				},
 			},
 		},

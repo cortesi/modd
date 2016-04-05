@@ -84,7 +84,7 @@ func main() {
 	}
 
 	if *prep {
-		err := mr.PrepOnly()
+		err := mr.PrepOnly(true)
 		if err != nil {
 			log.Shout("%s", err)
 		}

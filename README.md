@@ -258,6 +258,16 @@ started, and then after that only run *eslint* on files if they change:
 }
 ```
 
+By default, prep commands are executed on the initial run of modd. The `+onchange` option
+can be used to delay a prep command to detected change.
+
+```
+*.go {
+	# only trigger on file changes
+	prep +onchange: go test
+}
+```
+
 
 ### Daemon commands
 

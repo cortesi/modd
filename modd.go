@@ -98,9 +98,9 @@ func (mr *ModRunner) ReadConfig() error {
 }
 
 // PrepOnly runs all prep functions and exits
-func (mr *ModRunner) PrepOnly() error {
+func (mr *ModRunner) PrepOnly(initial bool) error {
 	for _, b := range mr.Config.Blocks {
-		err := RunPreps(b, mr.Config.GetVariables(), nil, mr.Log, mr.Notifiers)
+		err := RunPreps(b, mr.Config.GetVariables(), nil, mr.Log, mr.Notifiers, initial)
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func (mr *ModRunner) PrepOnly() error {
 
 // Gives control of chan to caller
 func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) error {
-	err := mr.PrepOnly()
+	err := mr.PrepOnly(true)
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) er
 			if lmod.Empty() {
 				continue
 			}
-			err = RunPreps(b, mr.Config.GetVariables(), lmod, mr.Log, mr.Notifiers)
+			err = RunPreps(b, mr.Config.GetVariables(), lmod, mr.Log, mr.Notifiers, false)
 			if err != nil {
 				if _, ok := err.(ProcError); ok {
 					continue
