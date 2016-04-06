@@ -24,6 +24,7 @@ func touch(t *testing.T, p string) {
 	if err != nil {
 		t.Fatalf("touch: %s", err)
 	}
+	ioutil.ReadFile(p)
 }
 
 func events(p string) []string {
@@ -53,6 +54,10 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 	}
 
 	touch(t, "a/initial")
+	// There's some race condition in rjeczalik/notify. If we don't wait a bit
+	// here, we sometimes receive notifications for the change above even
+	// though we haven't started the watcher.
+	time.Sleep(200 * time.Millisecond)
 
 	confTxt := `
         ** {
@@ -75,9 +80,6 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 
 	modchan := make(chan *watch.Mod, 1024)
 	cback := func() {
-		// There's some race condition in rjeczalik/notify. If we don't wait a
-		// bit here, we sometimes don't receive notifications for our changes.
-		time.Sleep(200 * time.Millisecond)
 		start := time.Now()
 		modfunc()
 		for {

@@ -23,11 +23,12 @@ const (
 
 // A single daemon
 type daemon struct {
-	conf  conf.Daemon
-	log   termlog.Stream
-	cmd   *exec.Cmd
-	shell string
-	stop  bool
+	conf    conf.Daemon
+	log     termlog.Stream
+	cmd     *exec.Cmd
+	shell   string
+	stop    bool
+	started bool
 	sync.Mutex
 }
 
@@ -93,12 +94,18 @@ func (d *daemon) Run() {
 	}
 }
 
+// Restart the daemon, or start it if it's not yet running
 func (d *daemon) Restart() {
 	d.Lock()
 	defer d.Unlock()
-	if d.cmd != nil {
-		d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
-		d.cmd.Process.Signal(d.conf.RestartSignal)
+	if !d.started {
+		go d.Run()
+		d.started = true
+	} else {
+		if d.cmd != nil {
+			d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
+			d.cmd.Process.Signal(d.conf.RestartSignal)
+		}
 	}
 }
 
@@ -136,16 +143,7 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 	return &DaemonPen{daemons: d}, nil
 }
 
-// Start starts set of daemons, each specified by a command
-func (dp *DaemonPen) Start() {
-	dp.Lock()
-	defer dp.Unlock()
-	for i := range dp.daemons {
-		go dp.daemons[i].Run()
-	}
-}
-
-// Restart all daemons in the pen
+// Restart all daemons in the pen, or start them if they're not running yet.
 func (dp *DaemonPen) Restart() {
 	dp.Lock()
 	defer dp.Unlock()
@@ -184,13 +182,6 @@ func NewDaemonWorld(cnf *conf.Config, log termlog.TermLog) (*DaemonWorld, error)
 
 	}
 	return &DaemonWorld{daemonPens}, nil
-}
-
-// Start all daemon pens
-func (dw *DaemonWorld) Start() {
-	for _, dp := range dw.DaemonPens {
-		dp.Start()
-	}
 }
 
 // Shutdown all daemons with signal s

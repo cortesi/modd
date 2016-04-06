@@ -108,28 +108,47 @@ func (mr *ModRunner) PrepOnly(initial bool) error {
 	return nil
 }
 
+func (mr *ModRunner) trigger(mod *watch.Mod, dworld *DaemonWorld) {
+	for i, b := range mr.Config.Blocks {
+		lmod := mod
+		if lmod != nil {
+			var err error
+			lmod, err = mod.Filter(b.Include, b.Exclude)
+			if err != nil {
+				mr.Log.Shout("Error filtering events: %s", err)
+				continue
+			}
+			if lmod.Empty() {
+				continue
+			}
+		}
+		err := RunPreps(b, mr.Config.GetVariables(), lmod, mr.Log, mr.Notifiers, mod == nil)
+		if err != nil {
+			if _, ok := err.(ProcError); !ok {
+				mr.Log.Shout("Error running prep: %s", err)
+			}
+			continue
+		}
+		dworld.DaemonPens[i].Restart()
+	}
+}
+
 // Gives control of chan to caller
 func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) error {
-	err := mr.PrepOnly(true)
-	if err != nil {
-		return err
-	}
-
 	dworld, err := NewDaemonWorld(mr.Config, mr.Log)
 	if err != nil {
 		return err
 	}
+	defer dworld.Shutdown(os.Kill)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill)
 	defer signal.Reset(os.Interrupt, os.Kill)
-	defer dworld.Shutdown(os.Kill)
 	go func() {
 		dworld.Shutdown(<-c)
 		os.Exit(0)
 	}()
 
-	dworld.Start()
 	watchpaths := mr.Config.WatchPatterns()
 	if mr.ConfReload {
 		watchpaths = append(watchpaths, filepath.Dir(mr.ConfPath))
@@ -142,8 +161,9 @@ func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) er
 		return fmt.Errorf("Error watching: %s", err)
 	}
 	defer watcher.Stop()
-	go readyCallback()
 
+	mr.trigger(nil, dworld)
+	go readyCallback()
 	for mod := range modchan {
 		if mod == nil {
 			break
@@ -161,25 +181,7 @@ func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) er
 		}
 
 		mr.Log.SayAs("debug", "Delta: \n%s", mod.String())
-		for i, b := range mr.Config.Blocks {
-			lmod, err := mod.Filter(b.Include, b.Exclude)
-			if err != nil {
-				mr.Log.Shout("Error filtering events: %s", err)
-				continue
-			}
-			if lmod.Empty() {
-				continue
-			}
-			err = RunPreps(b, mr.Config.GetVariables(), lmod, mr.Log, mr.Notifiers, false)
-			if err != nil {
-				if _, ok := err.(ProcError); ok {
-					continue
-				} else {
-					return err
-				}
-			}
-			dworld.DaemonPens[i].Restart()
-		}
+		mr.trigger(mod, dworld)
 	}
 	return nil
 }

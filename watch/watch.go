@@ -127,7 +127,7 @@ func (mod Mod) Has(p string) bool {
 
 // Empty checks if this mod set is empty
 func (mod Mod) Empty() bool {
-	if len(mod.Changed) > 0 || len(mod.Deleted) > 0 || len(mod.Added) > 0 {
+	if (len(mod.Changed) + len(mod.Deleted) + len(mod.Added)) > 0 {
 		return false
 	}
 	return true
