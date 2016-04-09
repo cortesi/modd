@@ -32,9 +32,10 @@ If you have a working Go installation, you can also say
 
     $ go get github.com/cortesi/modd/cmd/modd
 
-Note that by default modd uses either *bash* or *sh*. To use them they must be on your PATH.
-To avoid using "bash" set `@shell = exec` in your "modd.conf" file.
-On Windows, one easy way to install bash is to use [Babun](https://babun.github.io/).
+Note that by default modd uses either *bash* or *sh*. To use them they must be
+on your PATH. To avoid using "bash" set `@shell = exec` in your "modd.conf"
+file. On Windows, one easy way to install bash is to use
+[Babun](https://babun.github.io/).
 
 
 # Quick start
@@ -261,8 +262,9 @@ started, and then after that only run *eslint* on files if they change:
 }
 ```
 
-By default, prep commands are executed on the initial run of modd. The `+onchange` option
-can be used to delay a prep command to detected change.
+By default, prep commands are executed on the initial run of modd. The
+`+onchange` option can be used to skip the initial run, and only execute when
+there is a detected change.
 
 ```
 *.go {
