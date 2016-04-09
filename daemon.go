@@ -23,7 +23,9 @@ const (
 
 // A single daemon
 type daemon struct {
-	conf    conf.Daemon
+	conf  conf.Daemon
+	indir string
+
 	log     termlog.Stream
 	cmd     *exec.Cmd
 	shell   string
@@ -48,6 +50,7 @@ func (d *daemon) Run() {
 			d.log.Shout("%s", err)
 			return
 		}
+		c.Dir = d.indir
 		stdo, err := c.StdoutPipe()
 		if err != nil {
 			d.log.Shout("%s", err)
@@ -134,10 +137,21 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 			return nil, err
 		}
 		dmn.Command = finalcmd
+		var indir string
+		if block.InDir != "" {
+			indir = block.InDir
+		} else {
+			indir, err = os.Getwd()
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		d[i] = &daemon{
 			conf:  dmn,
 			log:   log.Stream(niceHeader("daemon: ", dmn.Command)),
 			shell: vars[shellVarName],
+			indir: indir,
 		}
 	}
 	return &DaemonPen{daemons: d}, nil
