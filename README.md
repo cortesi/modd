@@ -197,7 +197,10 @@ Class      | Meaning
 `[^class]` | any character which does *not* match the class
 
 
-# Commands
+# Blocks
+
+Each file match pattern specification has an associated block, which is
+enclosed in curly brackets. Blocks contain commands and block-scoped options.
 
 Commands are shell scripts specified in-line in the *modd.conf* file. They are
 executed in **bash** (or **sh** as a fallback) by default. Bash can be bypassed
@@ -288,7 +291,7 @@ The following signals are supported: **sighup**, **sigterm**, **sigint**,
 **sigkill**, **sigquit**, **sigusr1**, **sigusr2**, **sigwinch**.
 
 
-### Log headers
+### Controlling log headers
 
 Modd outputs a short header on the terminal to show which command is
 responsible for output. This header is calculated from the first non-whitespace
@@ -312,6 +315,22 @@ control the log display name.
             --longoption 1 \
             --longoption 2
     "
+}
+```
+
+### Options
+
+The only block option at the moment is **indir**, which controls the execution
+directory of a block. Modd will change to this directory before executing
+commands and daemons, and change back to the previous directory afterwards.
+
+The directory specification follows the same conventions as commands, and can
+be enclosed in quotes to span multiple lines.
+
+```
+{
+    indir: ./my/directory
+    prep: ls
 }
 ```
 

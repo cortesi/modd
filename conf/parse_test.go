@@ -233,6 +233,14 @@ var parseTests = []struct {
 			},
 		},
 	},
+	{
+		"{ indir: foo\n }",
+		&Config{
+			Blocks: []Block{
+				{InDir: "foo"},
+			},
+		},
+	},
 }
 
 func TestParse(t *testing.T) {
@@ -262,6 +270,8 @@ var parseErrorTests = []struct {
 	{"@foo bar {}", "test:1: Expected ="},
 	{"@foo =", "test:1: unterminated variable assignment"},
 	{"@foo=bar\n@foo=bar {}", "test:2: variable @foo shadows previous declaration"},
+	{"{indir +foo: bar\n}", "test:1: indir takes no options"},
+	{"{indir: bar\nindir: voing\n}", "test:2: indir can only be used once per block"},
 }
 
 func TestErrorsParse(t *testing.T) {

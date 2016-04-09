@@ -30,6 +30,7 @@ const (
 	itemDaemon
 	itemError // error occurred; value is text of error
 	itemEOF
+	itemInDir
 	itemLeftParen
 	itemQuotedString
 	itemPrep
@@ -55,6 +56,8 @@ func (i itemType) String() string {
 		return "="
 	case itemEOF:
 		return "eof"
+	case itemInDir:
+		return "indir"
 	case itemLeftParen:
 		return "lparen"
 	case itemPrep:
@@ -422,6 +425,9 @@ func lexInside(l *lexer) stateFn {
 			switch l.current() {
 			case "daemon":
 				l.emit(itemDaemon)
+				return lexOptions
+			case "indir":
+				l.emit(itemInDir)
 				return lexOptions
 			case "prep":
 				l.emit(itemPrep)

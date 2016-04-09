@@ -247,6 +247,15 @@ var lexTests = []struct {
 			{itemBareString, "foo"},
 		},
 	},
+	{
+		"{\nindir: foo\n}\n", []itm{
+			{itemLeftParen, "{"},
+			{itemInDir, "indir"},
+			{itemColon, ":"},
+			{itemBareString, "foo\n"},
+			{itemRightParen, "}"},
+		},
+	},
 }
 
 func TestLex(t *testing.T) {

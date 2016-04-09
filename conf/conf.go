@@ -26,6 +26,7 @@ type Block struct {
 	Include        []string
 	Exclude        []string
 	NoCommonFilter bool
+	InDir          string
 
 	Daemons []Daemon
 	Preps   []Prep

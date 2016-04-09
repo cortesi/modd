@@ -205,7 +205,7 @@ func (p *parser) parseVariable() (string, string, error) {
 	return name, val, nil
 }
 
-func prepCommand(itm item) string {
+func prepValue(itm item) string {
 	val := itm.val
 	if itm.typ == itemQuotedString {
 		val = unquote(val)
@@ -224,11 +224,22 @@ Loop:
 	for {
 		nxt = p.next()
 		switch nxt.typ {
+		case itemInDir:
+			options := p.collectValues(itemBareString)
+			if len(options) > 0 {
+				p.errorf("indir takes no options")
+			}
+			p.mustNext(itemColon)
+			dir := prepValue(p.mustNext(itemBareString, itemQuotedString))
+			if block.InDir != "" {
+				p.errorf("indir can only be used once per block")
+			}
+			block.InDir = dir
 		case itemDaemon:
 			options := p.collectValues(itemBareString)
 			p.mustNext(itemColon)
 			err := block.addDaemon(
-				prepCommand(p.mustNext(itemBareString, itemQuotedString)),
+				prepValue(p.mustNext(itemBareString, itemQuotedString)),
 				options,
 			)
 			if err != nil {
@@ -238,7 +249,7 @@ Loop:
 			options := p.collectValues(itemBareString)
 			p.mustNext(itemColon)
 			err := block.addPrep(
-				prepCommand(p.mustNext(itemBareString, itemQuotedString)),
+				prepValue(p.mustNext(itemBareString, itemQuotedString)),
 				options,
 			)
 			if err != nil {

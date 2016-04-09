@@ -91,7 +91,6 @@ func (mr *ModRunner) ReadConfig() error {
 		return fmt.Errorf("No shell interface %q", shellMethod)
 	}
 
-	// FIXME: this needs to be configurable
 	newcnf.CommonExcludes(CommonExcludes)
 	mr.Config = newcnf
 	return nil
@@ -108,6 +107,45 @@ func (mr *ModRunner) PrepOnly(initial bool) error {
 	return nil
 }
 
+func (mr *ModRunner) runBlock(b conf.Block, mod *watch.Mod, dpen *DaemonPen) {
+	if b.InDir != "" {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			mr.Log.Shout("Error getting current working directory: %s", err)
+			return
+		}
+		err = os.Chdir(b.InDir)
+		if err != nil {
+			mr.Log.Shout(
+				"Error changing to indir directory \"%s\": %s",
+				b.InDir,
+				err,
+			)
+			return
+		}
+		defer func() {
+			err := os.Chdir(currentDir)
+			if err != nil {
+				mr.Log.Shout("Error returning to original directory: %s", err)
+			}
+		}()
+	}
+	err := RunPreps(
+		b,
+		mr.Config.GetVariables(),
+		mod, mr.Log,
+		mr.Notifiers,
+		mod == nil,
+	)
+	if err != nil {
+		if _, ok := err.(ProcError); !ok {
+			mr.Log.Shout("Error running prep: %s", err)
+		}
+		return
+	}
+	dpen.Restart()
+}
+
 func (mr *ModRunner) trigger(mod *watch.Mod, dworld *DaemonWorld) {
 	for i, b := range mr.Config.Blocks {
 		lmod := mod
@@ -122,14 +160,7 @@ func (mr *ModRunner) trigger(mod *watch.Mod, dworld *DaemonWorld) {
 				continue
 			}
 		}
-		err := RunPreps(b, mr.Config.GetVariables(), lmod, mr.Log, mr.Notifiers, mod == nil)
-		if err != nil {
-			if _, ok := err.(ProcError); !ok {
-				mr.Log.Shout("Error running prep: %s", err)
-			}
-			continue
-		}
-		dworld.DaemonPens[i].Restart()
+		mr.runBlock(b, lmod, dworld.DaemonPens[i])
 	}
 }
 
