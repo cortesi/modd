@@ -4,7 +4,7 @@
 		{
 			"importpath": "github.com/alecthomas/template",
 			"repository": "https://github.com/alecthomas/template",
-			"revision": "14fd436dd20c3cc65242a9f396b61bfc8a3926fc",
+			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",
 			"branch": "master",
 			"notests": true
 		},
@@ -67,7 +67,7 @@
 		{
 			"importpath": "golang.org/x/crypto/ssh/terminal",
 			"repository": "https://go.googlesource.com/crypto",
-			"revision": "c197bcf24cde29d3f73c7b4ac6fd41f4384e8af6",
+			"revision": "d68c3ecb62c850b645dc072a8d78006286bf81ca",
 			"branch": "master",
 			"path": "/ssh/terminal",
 			"notests": true
@@ -75,7 +75,7 @@
 		{
 			"importpath": "golang.org/x/net/context",
 			"repository": "https://go.googlesource.com/net",
-			"revision": "9d8ef8d73b53840886e4a772c72f2b7d396cb37c",
+			"revision": "fb93926129b8ec0056f2f458b1f519654814edf0",
 			"branch": "master",
 			"path": "/context",
 			"notests": true
