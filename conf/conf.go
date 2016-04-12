@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/cortesi/modd/filter"
+	"github.com/cortesi/moddwatch/filter"
 )
 
 // A Daemon is a persistent process that is kept running

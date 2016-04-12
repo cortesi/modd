@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/cortesi/modd/conf"
-	"github.com/cortesi/modd/filter"
 	"github.com/cortesi/moddwatch"
+	"github.com/cortesi/moddwatch/filter"
 )
 
 var name = regexp.MustCompile(`@\w+`)
