@@ -8,7 +8,7 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/filter"
-	"github.com/cortesi/modd/watch"
+	"github.com/cortesi/moddwatch"
 )
 
 var name = regexp.MustCompile(`@\w+`)
@@ -49,7 +49,7 @@ func mkArgs(paths []string) string {
 // should be re-created anew each time the block is executed.
 type VarCmd struct {
 	Block *conf.Block
-	Mod   *watch.Mod
+	Mod   *moddwatch.Mod
 	Vars  map[string]string
 }
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/utils"
-	"github.com/cortesi/modd/watch"
+	"github.com/cortesi/moddwatch"
 )
 
 var quotePathTests = []struct {
@@ -42,7 +42,7 @@ var renderTests = []struct {
 func TestRender(t *testing.T) {
 	for _, tt := range renderTests {
 		b := conf.Block{}
-		mod := watch.Mod{}
+		mod := moddwatch.Mod{}
 		vc := VarCmd{&b, &mod, tt.vars}
 		ret, err := vc.Render(tt.in)
 		if err != nil {
@@ -82,7 +82,7 @@ func TestVarCmd(t *testing.T) {
 
 	vc = VarCmd{
 		&b,
-		&watch.Mod{Changed: []string{"foo"}},
+		&moddwatch.Mod{Changed: []string{"foo"}},
 		map[string]string{},
 	}
 	ret, err = vc.Render("@mods @dirmods")
@@ -97,7 +97,7 @@ func TestVarCmd(t *testing.T) {
 
 func TestRenderErrors(t *testing.T) {
 	b := conf.Block{}
-	mod := watch.Mod{}
+	mod := moddwatch.Mod{}
 	vc := VarCmd{&b, &mod, map[string]string{}}
 	_, err := vc.Render("@nonexistent")
 	if err == nil {

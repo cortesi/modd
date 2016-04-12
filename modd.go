@@ -11,7 +11,7 @@ import (
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
 	"github.com/cortesi/modd/shell"
-	"github.com/cortesi/modd/watch"
+	"github.com/cortesi/moddwatch"
 	"github.com/cortesi/termlog"
 )
 
@@ -107,7 +107,7 @@ func (mr *ModRunner) PrepOnly(initial bool) error {
 	return nil
 }
 
-func (mr *ModRunner) runBlock(b conf.Block, mod *watch.Mod, dpen *DaemonPen) {
+func (mr *ModRunner) runBlock(b conf.Block, mod *moddwatch.Mod, dpen *DaemonPen) {
 	if b.InDir != "" {
 		currentDir, err := os.Getwd()
 		if err != nil {
@@ -146,7 +146,7 @@ func (mr *ModRunner) runBlock(b conf.Block, mod *watch.Mod, dpen *DaemonPen) {
 	dpen.Restart()
 }
 
-func (mr *ModRunner) trigger(mod *watch.Mod, dworld *DaemonWorld) {
+func (mr *ModRunner) trigger(mod *moddwatch.Mod, dworld *DaemonWorld) {
 	for i, b := range mr.Config.Blocks {
 		lmod := mod
 		if lmod != nil {
@@ -165,7 +165,7 @@ func (mr *ModRunner) trigger(mod *watch.Mod, dworld *DaemonWorld) {
 }
 
 // Gives control of chan to caller
-func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) error {
+func (mr *ModRunner) runOnChan(modchan chan *moddwatch.Mod, readyCallback func()) error {
 	dworld, err := NewDaemonWorld(mr.Config, mr.Log)
 	if err != nil {
 		return err
@@ -187,7 +187,7 @@ func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) er
 
 	// FIXME: This takes a long time. We could start it in parallel with the
 	// first process run in a goroutine
-	watcher, err := watch.Watch(watchpaths, lullTime, modchan)
+	watcher, err := moddwatch.Watch(watchpaths, lullTime, modchan)
 	if err != nil {
 		return fmt.Errorf("Error watching: %s", err)
 	}
@@ -220,7 +220,7 @@ func (mr *ModRunner) runOnChan(modchan chan *watch.Mod, readyCallback func()) er
 // Run is the top-level runner for modd
 func (mr *ModRunner) Run() error {
 	for {
-		modchan := make(chan *watch.Mod, 1024)
+		modchan := make(chan *moddwatch.Mod, 1024)
 		err := mr.runOnChan(modchan, func() {})
 		if err != nil {
 			return err

@@ -12,7 +12,7 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/utils"
-	"github.com/cortesi/modd/watch"
+	"github.com/cortesi/moddwatch"
 	"github.com/cortesi/termlog"
 )
 
@@ -78,7 +78,7 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 
 	lt := termlog.NewLogTest()
 
-	modchan := make(chan *watch.Mod, 1024)
+	modchan := make(chan *moddwatch.Mod, 1024)
 	cback := func() {
 		start := time.Now()
 		modfunc()

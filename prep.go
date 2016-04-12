@@ -8,7 +8,7 @@ import (
 	"github.com/cortesi/modd/notify"
 	"github.com/cortesi/modd/shell"
 	"github.com/cortesi/modd/varcmd"
-	"github.com/cortesi/modd/watch"
+	"github.com/cortesi/moddwatch"
 	"github.com/cortesi/termlog"
 )
 
@@ -68,7 +68,7 @@ func RunProc(cmd, shellMethod string, log termlog.Stream) error {
 }
 
 // RunPreps runs all commands in sequence. Stops if any command returns an error.
-func RunPreps(b conf.Block, vars map[string]string, mod *watch.Mod, log termlog.TermLog, notifiers []notify.Notifier, initial bool) error {
+func RunPreps(b conf.Block, vars map[string]string, mod *moddwatch.Mod, log termlog.TermLog, notifiers []notify.Notifier, initial bool) error {
 	shell := vars[shellVarName]
 	vcmd := varcmd.VarCmd{Block: &b, Mod: mod, Vars: vars}
 	for _, p := range b.Preps {
