@@ -16,13 +16,6 @@
 			"notests": true
 		},
 		{
-			"importpath": "github.com/bmatcuk/doublestar",
-			"repository": "https://github.com/bmatcuk/doublestar",
-			"revision": "ec3b4af762f792cb93bf2518ff9ac408dbdc2b4e",
-			"branch": "master",
-			"notests": true
-		},
-		{
 			"importpath": "github.com/fatih/color",
 			"repository": "https://github.com/fatih/color",
 			"revision": "533cd7fd8a85905f67a1753afb4deddc85ea174f",
@@ -47,13 +40,6 @@
 			"importpath": "github.com/mattn/go-isatty",
 			"repository": "https://github.com/mattn/go-isatty",
 			"revision": "56b76bdf51f7708750eac80fa38b952bb9f32639",
-			"branch": "master",
-			"notests": true
-		},
-		{
-			"importpath": "github.com/rjeczalik/notify",
-			"repository": "https://github.com/rjeczalik/notify",
-			"revision": "5dd6205716539662f8f14ab513552b41eab69d5d",
 			"branch": "master",
 			"notests": true
 		},
