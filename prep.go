@@ -2,6 +2,7 @@ package modd
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 
 	"github.com/cortesi/modd/conf"
@@ -53,7 +54,7 @@ func RunProc(cmd, shellMethod string, log termlog.Stream) error {
 
 			mut.Lock()
 			defer mut.Unlock()
-			buff.WriteString(s + "\n")
+			fmt.Fprintf(buff, "%s\n", args...)
 		},
 	)
 	go logOutput(&wg, stdo, log.Say)
