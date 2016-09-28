@@ -1,4 +1,10 @@
 
+# v0.4 - 28 September 2016
+
+* Add an "indir" block option to control the execution directory for a block.
+* Fix some formatting issues in notifications (thanks @stereosteve)
+
+
 # v0.3 - 8 April 2016
 
 * Modd no longer exits when there are script errors on first run. Instead,
