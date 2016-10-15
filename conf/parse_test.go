@@ -6,14 +6,17 @@ import (
 )
 
 var parseTests = []struct {
+	path     string
 	input    string
 	expected *Config
 }{
 	{
 		"",
+		"",
 		&Config{},
 	},
 	{
+		"",
 		"{}",
 		&Config{
 			Blocks: []Block{
@@ -22,6 +25,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"foo {}",
 		&Config{
 			Blocks: []Block{
@@ -32,6 +36,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"foo bar {}",
 		&Config{
 			Blocks: []Block{
@@ -42,6 +47,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"!foo {}",
 		&Config{
 			Blocks: []Block{
@@ -52,6 +58,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		`!"foo" {}`,
 		&Config{
 			Blocks: []Block{
@@ -62,6 +69,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		`!"foo" !'bar' !voing {}`,
 		&Config{
 			Blocks: []Block{
@@ -70,6 +78,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		`foo +noignore {}`,
 		&Config{
 			Blocks: []Block{
@@ -81,6 +90,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"'foo bar' voing {}",
 		&Config{
 			Blocks: []Block{
@@ -91,6 +101,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"foo {\ndaemon: command\n}",
 		&Config{
 			Blocks: []Block{
@@ -102,6 +113,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"{\ndaemon +sighup: c\n}",
 		&Config{
 			Blocks: []Block{
@@ -110,22 +122,27 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"{\ndaemon +sigterm: c\n}",
 		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGTERM}}}}},
 	},
 	{
+		"",
 		"{\ndaemon +sigint: c\n}",
 		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGINT}}}}},
 	},
 	{
+		"",
 		"{\ndaemon +sigkill: c\n}",
 		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGKILL}}}}},
 	},
 	{
+		"",
 		"{\ndaemon +sigquit: c\n}",
 		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGQUIT}}}}},
 	},
 	{
+		"",
 		"foo {\nprep: command\n}",
 		&Config{
 			Blocks: []Block{
@@ -137,6 +154,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"foo {\nprep +onchange: command\n}",
 		&Config{
 			Blocks: []Block{
@@ -148,6 +166,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"foo {\nprep: 'command\n-one\n-two'}",
 		&Config{
 			Blocks: []Block{
@@ -159,6 +178,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"foo #comment\nbar\n#comment\n{\n#comment\nprep: command\n}",
 		&Config{
 			Blocks: []Block{
@@ -170,6 +190,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"foo #comment\n#comment\nbar { #comment \nprep: command\n}",
 		&Config{
 			Blocks: []Block{
@@ -181,6 +202,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"@var=bar\nfoo {}",
 		&Config{
 			Blocks: []Block{
@@ -194,6 +216,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"@var='bar\nvoing'\nfoo {}",
 		&Config{
 			Blocks: []Block{
@@ -207,6 +230,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"foo {}\n@var=bar\n",
 		&Config{
 			Blocks: []Block{
@@ -220,6 +244,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"@oink=foo\nfoo {}\n@var=bar\n",
 		&Config{
 			Blocks: []Block{
@@ -234,6 +259,7 @@ var parseTests = []struct {
 		},
 	},
 	{
+		"",
 		"{ indir: foo\n }",
 		&Config{
 			Blocks: []Block{
@@ -241,11 +267,32 @@ var parseTests = []struct {
 			},
 		},
 	},
+	{
+		"./path/to/modd.conf",
+		"",
+		&Config{
+			variables: map[string]string{
+				"@confdir": "path/to",
+			},
+		},
+	},
+	{
+		"./path/to/modd.conf",
+		"{ indir: @confdir/foo\n }",
+		&Config{
+			Blocks: []Block{
+				{InDir: "path/to/foo"},
+			},
+			variables: map[string]string{
+				"@confdir": "path/to",
+			},
+		},
+	},
 }
 
 func TestParse(t *testing.T) {
 	for i, tt := range parseTests {
-		ret, err := Parse("test", tt.input)
+		ret, err := Parse(tt.path, tt.input)
 		if err != nil {
 			t.Fatalf("%q - %s", tt.input, err)
 		}
