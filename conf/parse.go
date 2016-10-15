@@ -8,9 +8,12 @@ package conf
 
 import (
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
+
+const confVarName = "@confdir"
 
 type parser struct {
 	name   string
@@ -159,6 +162,12 @@ func (p *parser) parse() (err error) {
 	defer p.recover(&err)
 	p.lex = lex(p.name, p.text)
 	p.config = &Config{}
+
+	// Store path to conf in variable if not empty
+	if p.name != "" {
+		p.config.addVariable(confVarName, filepath.Dir(p.name))
+	}
+
 	for {
 		for {
 			var k, v string
@@ -234,6 +243,8 @@ Loop:
 			if block.InDir != "" {
 				p.errorf("indir can only be used once per block")
 			}
+			// Replace @confdir here instead of at command runtime
+			dir = strings.Replace(dir, confVarName, p.config.variables[confVarName], -1)
 			block.InDir = dir
 		case itemDaemon:
 			options := p.collectValues(itemBareString)
