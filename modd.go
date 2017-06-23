@@ -61,7 +61,7 @@ type ModRunner struct {
 }
 
 // NewModRunner constructs a new ModRunner
-func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notifier, confreload bool) (*ModRunner, error) {
+func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notifier, confreload, pipesignals bool) (*ModRunner, error) {
 	mr := &ModRunner{
 		Log:        log,
 		ConfPath:   confPath,
@@ -71,6 +71,15 @@ func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notif
 	err := mr.ReadConfig()
 	if err != nil {
 		return nil, err
+	}
+	// On Windows, daemon config structs are created with the assumption that
+	// the pipesignals feature will be used in cases where the alternative is
+	// the signal silently failing. If the feature has been explicitly disabled
+	// using the command-line flag, correct that assumption.
+	for _, blockcnf := range mr.Config.Blocks {
+		for _, daemoncnf := range blockcnf.Daemons {
+			daemoncnf.PipeRestartSignal = daemoncnf.PipeRestartSignal && pipesignals
+		}
 	}
 	return mr, nil
 }

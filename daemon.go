@@ -1,6 +1,7 @@
 package modd
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -28,6 +29,7 @@ type daemon struct {
 
 	log     termlog.Stream
 	cmd     *exec.Cmd
+	stdin   io.Writer
 	shell   string
 	stop    bool
 	started bool
@@ -51,6 +53,13 @@ func (d *daemon) Run() {
 			return
 		}
 		c.Dir = d.indir
+		if d.conf.PipeRestartSignal {
+			d.stdin, err = c.StdinPipe()
+			if err != nil {
+				d.log.Shout("%s", err)
+				continue
+			}
+		}
 		stdo, err := c.StdoutPipe()
 		if err != nil {
 			d.log.Shout("%s", err)
@@ -106,8 +115,13 @@ func (d *daemon) Restart() {
 		d.started = true
 	} else {
 		if d.cmd != nil {
-			d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
-			d.cmd.Process.Signal(d.conf.RestartSignal)
+			if d.conf.PipeRestartSignal {
+				d.log.Notice(">> piping signal %s", d.conf.RestartSignal)
+				d.stdin.Write([]byte(d.conf.RestartSignal.String() + "\n"))
+			} else {
+				d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
+				d.cmd.Process.Signal(d.conf.RestartSignal)
+			}
 		}
 	}
 }

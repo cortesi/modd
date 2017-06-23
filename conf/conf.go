@@ -11,8 +11,9 @@ import (
 
 // A Daemon is a persistent process that is kept running
 type Daemon struct {
-	Command       string
-	RestartSignal os.Signal
+	Command           string
+	RestartSignal     os.Signal
+	PipeRestartSignal bool
 }
 
 // A Prep runs and terminates

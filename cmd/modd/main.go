@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/cortesi/modd"
 	"github.com/cortesi/modd/notify"
@@ -46,9 +47,20 @@ var debug = kingpin.Flag("debug", "Debugging for modd development").
 	Default("false").
 	Bool()
 
+var pipesignals = new(bool)
+
 func main() {
 	kingpin.CommandLine.HelpFlag.Short('h')
 	kingpin.Version(modd.Version)
+
+	if runtime.GOOS == "windows" {
+		pipesignals = kingpin.Flag(
+			"pipesignals",
+			"For signals that don't exist on Windows, write their name to the stdin of daemons instead").
+			Default("true").
+			Bool()
+	}
+
 	kingpin.Parse()
 
 	if *ignores {
@@ -77,7 +89,7 @@ func main() {
 		notifiers = append(notifiers, &notify.BeepNotifier{})
 	}
 
-	mr, err := modd.NewModRunner(*file, log, notifiers, !(*noconf))
+	mr, err := modd.NewModRunner(*file, log, notifiers, !(*noconf), *pipesignals)
 	if err != nil {
 		log.Shout("%s", err)
 		return

@@ -12,8 +12,9 @@ func (b *Block) addDaemon(command string, options []string) error {
 		b.Daemons = []Daemon{}
 	}
 	d := Daemon{
-		Command:       command,
-		RestartSignal: syscall.SIGHUP,
+		Command:           command,
+		RestartSignal:     syscall.SIGHUP,
+		PipeRestartSignal: true,
 	}
 	for _, v := range options {
 		switch v {
@@ -25,6 +26,10 @@ func (b *Block) addDaemon(command string, options []string) error {
 			d.RestartSignal = syscall.SIGINT
 		case "+sigkill":
 			d.RestartSignal = syscall.SIGKILL
+			// Although Windows doesn't have signals, Go does recognise the
+			// intention of SIGKILL and uses a native API to terminate the
+			// target process.
+			d.PipeRestartSignal = false
 		case "+sigquit":
 			d.RestartSignal = syscall.SIGQUIT
 		default:
