@@ -76,9 +76,10 @@ func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notif
 	// the pipesignals feature will be used in cases where the alternative is
 	// the signal silently failing. If the feature has been explicitly disabled
 	// using the command-line flag, correct that assumption.
-	for _, blockcnf := range mr.Config.Blocks {
-		for _, daemoncnf := range blockcnf.Daemons {
-			daemoncnf.PipeRestartSignal = daemoncnf.PipeRestartSignal && pipesignals
+	for ib, blockcnf := range mr.Config.Blocks {
+		for id, daemoncnf := range blockcnf.Daemons {
+			defaultVal := daemoncnf.PipeRestartSignal
+			mr.Config.Blocks[ib].Daemons[id].PipeRestartSignal = defaultVal && pipesignals
 		}
 	}
 	return mr, nil
