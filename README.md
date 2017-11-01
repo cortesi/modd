@@ -123,7 +123,10 @@ Patterns therefore match on a batch of changed files - when the first match in
 a batch is seen, the block is triggered.
 
 Patterns and the paths they match against are always in slash-delimited form,
-even on Windows.
+even on Windows. Paths are cleaned and normalised to be relative to the current
+directory before being matched, with redundant components removed. This means
+that a pattern like `./*.js` will never match, because inbound paths will not
+have a leading `./` component.
 
 ### Quotes
 
