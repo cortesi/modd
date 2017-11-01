@@ -17,13 +17,13 @@
   branch = "master"
   name = "github.com/bmatcuk/doublestar"
   packages = ["."]
-  revision = "4f612bd6c10e2ef68e2ea50aabc50c3681bbac86"
+  revision = "dd6a6f0a8cdfaaa88b08cf26cf1bc7d69003ee13"
 
 [[projects]]
   branch = "master"
   name = "github.com/cortesi/moddwatch"
   packages = [".","filter"]
-  revision = "a149019f9ed6f16033de28f66d8c1247593a0104"
+  revision = "240471ee3dbcb471822bdbd1d583857869dec519"
 
 [[projects]]
   branch = "master"
@@ -32,10 +32,10 @@
   revision = "2ed14eb6ce62ec5bcc3fd25885a1d13d53f34fd1"
 
 [[projects]]
-  branch = "master"
   name = "github.com/fatih/color"
   packages = ["."]
-  revision = "76d423163af754ff6423d2d9be0057fbf03c57c2"
+  revision = "570b54cabe6b8eb0bc2dfce68d964677d63b5260"
+  version = "v1.5.0"
 
 [[projects]]
   branch = "master"
@@ -44,44 +44,50 @@
   revision = "6f45313302b9c56850fc17f99e40caebce98c716"
 
 [[projects]]
-  branch = "master"
+  name = "github.com/mattn/go-colorable"
+  packages = ["."]
+  revision = "167de6bfdfba052fa6b2d3664c8f5272e23c9072"
+  version = "v0.0.9"
+
+[[projects]]
   name = "github.com/mattn/go-isatty"
   packages = ["."]
-  revision = "7fcbc72f853b92b5720db4a6b8482be612daef24"
+  revision = "0360b2af4f38e8d38c7fce2a9f4e702702d73a39"
+  version = "v0.0.3"
 
 [[projects]]
   branch = "master"
   name = "github.com/rjeczalik/notify"
   packages = ["."]
-  revision = "5dd6205716539662f8f14ab513552b41eab69d5d"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/shiena/ansicolor"
-  packages = ["."]
-  revision = "d445752f6f66f9cd987722f109149f6799cdf1de"
+  revision = "767eb674ef14b09119b2fff3601e64558d530c47"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "c8b9e6388ef638d5a8a9d865c634befdc46a6784"
+  revision = "bd6f299fb381e4c3393d1c4b1f0b94f5e77650c8"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
-  revision = "a6577fac2d73be281a500b310739095313165611"
+  revision = "c73622c77280266305273cb545f54516ced95b93"
 
 [[projects]]
   branch = "master"
+  name = "golang.org/x/sys"
+  packages = ["unix","windows"]
+  revision = "95c6576299259db960f6c5b9b69ea52422860fce"
+
+[[projects]]
   name = "gopkg.in/alecthomas/kingpin.v2"
   packages = ["."]
-  revision = "e9044be3ab2a8e11d4e1f418d12f0790d57e8d70"
+  revision = "1087e65c9441605df944fb12c33f0fe7072d18ca"
+  version = "v2.2.5"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8599573ea1f4e34079ac42e2b3194191e3f2e2a16c34bd2f472f1c311714924b"
+  inputs-digest = "7f06c6286436edc49f72a374e3f1c73449f961327654792e65952438872fdb19"
   solver-name = "gps-cdcl"
   solver-version = 1

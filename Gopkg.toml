@@ -79,5 +79,4 @@
   name = "github.com/google/shlex"
 
 [[constraint]]
-  branch = "master"
   name = "gopkg.in/alecthomas/kingpin.v2"
