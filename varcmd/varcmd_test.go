@@ -35,6 +35,10 @@ var renderTests = []struct {
 	vars map[string]string
 }{
 	{"@foo", "bar", map[string]string{"@foo": "bar"}},
+	{`\@foo`, `@foo`, map[string]string{"@foo": "bar"}},
+	{`\\@foo`, `\bar`, map[string]string{"@foo": "bar"}},
+	{`\\\@foo`, `\@foo`, map[string]string{"@foo": "bar"}},
+	{`\\\\@foo`, `\\bar`, map[string]string{"@foo": "bar"}},
 	{"@foo@foo", "barbar", map[string]string{"@foo": "bar"}},
 	{"@foo@bar", "barvoing", map[string]string{"@foo": "bar", "@bar": "voing"}},
 }
@@ -46,7 +50,7 @@ func TestRender(t *testing.T) {
 		vc := VarCmd{&b, &mod, tt.vars}
 		ret, err := vc.Render(tt.in)
 		if err != nil {
-			t.Error("Unexpected error")
+			t.Errorf("Unexpected error: %s", err)
 		}
 		if ret != tt.out {
 			t.Errorf("expected %q, got %q", tt.out, ret)

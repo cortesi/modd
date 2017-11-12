@@ -103,7 +103,8 @@ The **@dirmods** variable expands to a properly escaped list of all directories
 containing changed files. When modd is first run, this includes all directories
 containing matching files. So, this means that modd will run all tests on
 startup, and then subsequently run the tests only for the affected module
-whenever there's a change. There's a corresponding **@mods** variable that contains all changed files.
+whenever there's a change. There's a corresponding **@mods** variable that
+contains all changed files.
 
 Note the *+sigterm* flag to the daemon command. When devd receives a SIGHUP
 (the default signal sent by modd), it triggers a browser livereload, rather
@@ -239,6 +240,19 @@ prep: "
 "
 ```
 
+Within commands, the `@` character is treated specially, since it is the marker
+for variable replacement. You can include a verbatim `@` symbol b escapeing it
+with a backslash, and backslashes preceding the `@` symbol can themselves be
+escaped recursively.
+
+```
+@foo = bar
+{
+    prep: echo "@foo"   # bar
+    prep: echo "\@foo"  # @foo
+    prep: echo "\\@foo" # \bar
+}
+```
 
 ### Prep commands
 

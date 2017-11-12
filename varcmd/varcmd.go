@@ -11,7 +11,7 @@ import (
 	"github.com/cortesi/moddwatch/filter"
 )
 
-var name = regexp.MustCompile(`@\w+`)
+var name = regexp.MustCompile(`(\\*)@\w+`)
 
 func getDirs(paths []string) []string {
 	m := map[string]bool{}
@@ -77,6 +77,8 @@ func (v *VarCmd) get(name string) (string, error) {
 	return "", fmt.Errorf("No such variable: %s", name)
 }
 
+const esc = '\\'
+
 // Render renders the command with a map of variables
 func (v *VarCmd) Render(cmd string) (string, error) {
 	var err error
@@ -84,12 +86,23 @@ func (v *VarCmd) Render(cmd string) (string, error) {
 		name.ReplaceAllFunc(
 			[]byte(cmd),
 			func(key []byte) []byte {
-				ks := string(key)
+				cnt := 0
+				for _, c := range key {
+					if c != esc {
+						break
+					}
+					cnt++
+				}
+				ks := strings.TrimLeft(string(key), string(esc))
+				if cnt%2 != 0 {
+					return []byte(strings.Repeat(string(esc), (cnt-1)/2) + ks)
+				}
 				val, errv := v.get(ks)
 				if errv != nil {
 					err = fmt.Errorf("No such variable: %s", ks)
 					return nil
 				}
+				val = strings.Repeat(string(esc), cnt/2) + val
 				return []byte(val)
 			},
 		),
