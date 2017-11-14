@@ -72,14 +72,16 @@ func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notif
 	if err != nil {
 		return nil, err
 	}
-	// On Windows, daemon config structs are created with the assumption that
-	// the pipesignals feature will be used in cases where the alternative is
-	// the signal silently failing. If the feature has been explicitly disabled
-	// using the command-line flag, correct that assumption.
-	for ib, blockcnf := range mr.Config.Blocks {
-		for id, daemoncnf := range blockcnf.Daemons {
-			defaultVal := daemoncnf.PipeRestartSignal
-			mr.Config.Blocks[ib].Daemons[id].PipeRestartSignal = defaultVal && pipesignals
+	// When the daemon config structs were constructed, their
+	// .PipeRestartSignal boolean fields were enabled in cases where their
+	// chosen restart signals would otherwise fail silently. If the 'pipe
+	// signals' feature has been explicitly disabled by command-line flag then
+	// those smart defaults need to be cleared.
+	if !pipesignals {
+		for i := 0; i < len(mr.Config.Blocks); i++ {
+			for j := 0; j < len(mr.Config.Blocks[i].Daemons); j++ {
+				mr.Config.Blocks[i].Daemons[j].PipeRestartSignal = false
+			}
 		}
 	}
 	return mr, nil
