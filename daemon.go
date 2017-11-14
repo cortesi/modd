@@ -127,11 +127,11 @@ func (d *daemon) Restart() {
 	} else {
 		if d.cmd != nil {
 			if d.conf.PipeRestartSignal {
-				d.log.Notice(">> piping signal %s", d.conf.RestartSignal)
 				sigStr := d.conf.RestartSignal.String()
 				if s, ok := pipeSignalTenseCorrections[sigStr]; ok {
 					sigStr = s
 				}
+				d.log.Notice(">> piping signal \"%s\"", sigStr)
 				fmt.Fprintln(d.stdin, sigStr)
 			} else {
 				d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
