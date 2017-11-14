@@ -1,6 +1,7 @@
 package modd
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -106,6 +107,16 @@ func (d *daemon) Run() {
 	}
 }
 
+// Go's standard library uses a mix of word tenses for the string
+// representation of signals. For our 'piped signals' feature, the strings we
+// write on the pipe should be present-tense because they are conceptually
+// requests.
+var pipedSignalTenseCorrections = map[string]string{
+	"aborted":    "abort",
+	"killed":     "kill",
+	"terminated": "terminate",
+}
+
 // Restart the daemon, or start it if it's not yet running
 func (d *daemon) Restart() {
 	d.Lock()
@@ -117,7 +128,11 @@ func (d *daemon) Restart() {
 		if d.cmd != nil {
 			if d.conf.PipeRestartSignal {
 				d.log.Notice(">> piping signal %s", d.conf.RestartSignal)
-				d.stdin.Write([]byte(d.conf.RestartSignal.String() + "\n"))
+				sigStr := d.conf.RestartSignal.String()
+				if s, ok := pipedSignalTenseCorrections[sigStr]; ok {
+					sigStr = s
+				}
+				fmt.Fprintln(d.stdin, sigStr)
 			} else {
 				d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
 				d.cmd.Process.Signal(d.conf.RestartSignal)
