@@ -62,7 +62,7 @@ any file with the .go extension is modified, the "go test" command will be run
 only on the enclosing module.
 
 
-# Leisurely start
+# Details
 
 On startup, modd looks for a file called *modd.conf* in the current directory.
 This file has a simple but powerful syntax - one or more blocks of commands,
@@ -120,12 +120,15 @@ batch of changed files - when the first match in a batch is seen, the block is
 triggered.
 
 Patterns and the paths they match against are always in slash-delimited form,
-even on Windows. Paths are cleaned and normalised to be relative to the current
-directory before being matched, with redundant components removed. This means
-that a pattern like `./*.js` will never match, because inbound paths will not
-have a leading `./` component - use `*.js` instead.
+even on Windows. Paths are cleaned and normalised being matched, with redundant
+components removed. If the path is within the current working directory, the
+normalised path is relative to the current working directory, otherwise it is
+absolute. One subtlety is that this means that a pattern like `./*.js` will
+never match, because inbound paths will not have a leading `./` component - just
+use `*.js` instead.
 
-### Quotes
+
+## Quotes
 
 File patterns can be naked or quoted strings. Quotes can be either single or
 double quotes, and the corresponding quote mark can be escaped with a backslash
@@ -135,7 +138,7 @@ within the string:
 "**/foo\"bar"
 ```
 
-### Negation
+## Negation
 
 Patterns can be negated with a leading **!**. For quoted patterns, the
 exclamation mark goes outside of the quotes. So, this matches all files
@@ -150,7 +153,7 @@ Negations are applied after all positive patterns - that is, modd collects all
 files matching the positive patterns, then removes files matching the negation
 patterns.
 
-### Default ignore list
+## Default ignore list
 
 Common nuisance files like VCS directories, swap files, and so forth are
 ignored by default. You can list the set of ignored patterns using the **-i**
@@ -163,10 +166,10 @@ special **+noignore** flag, like so:
 }
 ```
 
-### Empty match pattern
+## Empty match pattern
 
 If no match pattern is specified, prep commands run once only at startup, and
-daemons are restarted if they exit, but won't ever be explicitly signaled to
+daemons are restarted if they exit, but won't ever be explicitly signalled to
 restart by modd.
 
 ```
@@ -175,13 +178,10 @@ restart by modd.
 }
 ```
 
-### Symlinks
+## Symlinks
 
-To avoid loops and ambiguities, modd does not implicitly traverse symlinks
-within monitored directories. If you want a symlink to be monitored for changes,
-specify it explicitly in a watch pattern. So, to monitor a directory ***mydir***
-as well as an inner symlinked directory ***symlinkdir***, specify a pattern like
-this:
+Modd does not implicitly traverse symlinks. To monitor a symlink, it must be
+specified as the base of an include pattern, like this:
 
 ```
 mydir mydir/symlinkdir/** {
@@ -189,8 +189,14 @@ mydir mydir/symlinkdir/** {
 }
 ```
 
+Behind the scenes, we resolve the symlinked directory as if it was specified
+directly by the user. This means that if the symlink destination lies outside of
+the current working directory, the resulting paths for matches, exclusions and
+commands will be absolute.
 
-### Syntax
+
+
+## Syntax
 
 File patterns support the following syntax:
 
@@ -225,7 +231,7 @@ user's path, and inherit the parent's environment. Single-line commands don't
 need to be quoted:
 
 ```
-prep: echo "i'm now rebuilding" | tee /tmp/output
+prep: echo "I'm now rebuilding" | tee /tmp/output
 ```
 
 Newlines can be escaped with a backslash for multi-line commands:
@@ -251,7 +257,7 @@ prep: "
 ```
 
 Within commands, the `@` character is treated specially, since it is the marker
-for variable replacement. You can include a verbatim `@` symbol b escapeing it
+for variable replacement. You can include a verbatim `@` symbol b escaping it
 with a backslash, and backslashes preceding the `@` symbol can themselves be
 escaped recursively.
 
@@ -264,7 +270,7 @@ escaped recursively.
 }
 ```
 
-### Prep commands
+## Prep commands
 
 All prep commands in a block are run in order before any daemons are restarted.
 If any prep command exits with an error, execution stops.
@@ -301,7 +307,7 @@ there is a detected change.
 ```
 
 
-### Daemon commands
+## Daemon commands
 
 Daemons are executed on startup, and are restarted by modd whenever they exit.
 When a block containing a daemon command is triggered, modd sends a signal to
@@ -320,7 +326,7 @@ The following signals are supported: **sighup**, **sigterm**, **sigint**,
 **sigkill**, **sigquit**, **sigusr1**, **sigusr2**, **sigwinch**.
 
 
-### Controlling log headers
+## Controlling log headers
 
 Modd outputs a short header on the terminal to show which command is
 responsible for output. This header is calculated from the first non-whitespace
@@ -347,7 +353,7 @@ control the log display name.
 }
 ```
 
-### Options
+## Options
 
 The only block option at the moment is **indir**, which controls the execution
 directory of a block. Modd will change to this directory before executing
@@ -402,7 +408,7 @@ executed. Valid values are:
 When the **-n** flag is specified, modd sends anything sent to *stderr* from
 any prep command that exits abnormally to a desktop notifier. Since modd
 commands are shell scripts, you can redirect or manipulate output to entirely
-customize what gets sent to notifiers as needed.
+customise what gets sent to notifiers as needed.
 
 At the moment, we support [Growl](http://growl.info/) on OSX, and
 [libnotify](https://launchpad.net/ubuntu/+source/libnotify) on Linux and other
