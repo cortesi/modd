@@ -25,17 +25,20 @@ Example                                      | Description
 
 Modd is a single binary with no external dependencies, released for OSX,
 Windows, Linux, FreeBSD, NetBSD and OpenBSD. Go to the [releases
-page](https://github.com/cortesi/modd/releases/latest), download the package
-for your OS, and copy the binary to somewhere on your PATH.
+page](https://github.com/cortesi/modd/releases/latest), download the package for
+your OS, and copy the binary to somewhere on your PATH.
 
 If you have a working Go installation, you can also say
 
     $ go get github.com/cortesi/modd/cmd/modd
 
-Note that by default modd uses either *bash* or *sh*. To use them they must be
-on your PATH. To avoid using "bash" set `@shell = exec` in your "modd.conf"
-file. On Windows, one easy way to install bash is to use
-[Babun](https://babun.github.io/).
+On OSX, you can install modd with homebrew:
+
+    $ brew install modd
+
+By default modd interprets commands with *bash* or *sh*, one of which must be on
+your PATH. To avoid using a shell, you can set `@shell = exec` in your
+"modd.conf" file.
 
 
 # Quick start
@@ -58,13 +61,6 @@ The first time modd is run, it will run the tests of all Go modules. Whenever
 any file with the .go extension is modified, the "go test" command will be run
 only on the enclosing module.
 
-To avoid shelling out to bash the following will execute "go test" directly.
-```
-@shell = exec
-**/*.go {
-    prep: go test @dirmods
-}
-```
 
 # Leisurely start
 
@@ -117,17 +113,17 @@ modd.
 
 # File watch patterns
 
-Modd's change detection algorithm batches up changes until there is a lull in
-filesystem activity - this means that coherent processes like compilation and
-rendering that touch many files are likely to trigger commands only once.
-Patterns therefore match on a batch of changed files - when the first match in
-a batch is seen, the block is triggered.
+Modd's batches up changes until there is a lull in filesystem activity - this
+means that coherent processes like compilation and rendering that touch many
+files are likely to trigger commands only once. Patterns therefore match on a
+batch of changed files - when the first match in a batch is seen, the block is
+triggered.
 
 Patterns and the paths they match against are always in slash-delimited form,
 even on Windows. Paths are cleaned and normalised to be relative to the current
 directory before being matched, with redundant components removed. This means
 that a pattern like `./*.js` will never match, because inbound paths will not
-have a leading `./` component.
+have a leading `./` component - use `*.js` instead.
 
 ### Quotes
 
@@ -176,6 +172,20 @@ restart by modd.
 ```
 {
     prep: echo hello
+}
+```
+
+### Symlinks
+
+To avoid loops and ambiguities, modd does not implicitly traverse symlinks
+within monitored directories. If you want a symlink to be monitored for changes,
+specify it explicitly in a watch pattern. So, to monitor a directory ***mydir***
+as well as an inner symlinked directory ***symlinkdir***, specify a pattern like
+this:
+
+```
+mydir mydir/symlinkdir/** {
+    prep: echo changed
 }
 ```
 

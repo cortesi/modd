@@ -8,7 +8,6 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/moddwatch"
-	"github.com/cortesi/moddwatch/filter"
 )
 
 var name = regexp.MustCompile(`(\\*)@\w+`)
@@ -28,6 +27,7 @@ func getDirs(paths []string) []string {
 
 // quotePath quotes a path for use on the command-line. The path must be in
 // slash-delimited format, and the quoted path will use the native OS separator.
+// FIXME: This is actually dependent on the shell used.
 func quotePath(path string) string {
 	path = strings.Replace(path, "\"", "\\\"", -1)
 	return "\"" + path + "\""
@@ -37,10 +37,7 @@ func quotePath(path string) string {
 func mkArgs(paths []string) string {
 	escaped := make([]string, len(paths))
 	for i, s := range paths {
-		// FIXME: We'll need to find a more portable way for Windows
-		escaped[i] = quotePath(
-			"./" + s,
-		)
+		escaped[i] = quotePath(s)
 	}
 	return strings.Join(escaped, " ")
 }
@@ -48,9 +45,9 @@ func mkArgs(paths []string) string {
 // VarCmd represents a set of variables for a specific block and mod set. It
 // should be re-created anew each time the block is executed.
 type VarCmd struct {
-	Block *conf.Block
-	Mod   *moddwatch.Mod
-	Vars  map[string]string
+	Block    *conf.Block
+	Modified []string
+	Vars     map[string]string
 }
 
 // Get a variable by name
@@ -60,15 +57,14 @@ func (v *VarCmd) get(name string) (string, error) {
 	}
 	if (name == "@mods" || name == "@dirmods") && v.Block != nil {
 		var modified []string
-		if v.Mod == nil {
+		if v.Modified == nil {
 			var err error
-			// FIXME: this is a bug - it doesn't cope with absolute root paths
-			modified, err = filter.Find(".", v.Block.Include, v.Block.Exclude)
+			modified, err = moddwatch.List(".", v.Block.Include, v.Block.Exclude)
 			if err != nil {
 				return "", err
 			}
 		} else {
-			modified = v.Mod.All()
+			modified = v.Modified
 		}
 		v.Vars["@mods"] = mkArgs(modified)
 		v.Vars["@dirmods"] = mkArgs(getDirs(modified))

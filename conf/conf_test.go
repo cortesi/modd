@@ -9,11 +9,11 @@ func TestWatchPaths(t *testing.T) {
 	c := Config{
 		Blocks: []Block{
 			{Include: []string{"a/foo", "a/bar"}},
-			{Include: []string{"a/bar", "a/oink", "foo", "b/foo"}},
+			{Include: []string{"a/bar", "b/foo"}},
 		},
 	}
-	expected := []string{"./..."}
-	got := c.WatchPatterns()
+	expected := []string{"a/bar", "a/foo", "b/foo"}
+	got := c.IncludePatterns()
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("Expected %#v, got %#v", expected, got)
 	}

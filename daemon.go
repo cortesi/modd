@@ -131,7 +131,7 @@ type DaemonPen struct {
 func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog) (*DaemonPen, error) {
 	d := make([]*daemon, len(block.Daemons))
 	for i, dmn := range block.Daemons {
-		vcmd := varcmd.VarCmd{Block: nil, Mod: nil, Vars: vars}
+		vcmd := varcmd.VarCmd{Block: nil, Modified: nil, Vars: vars}
 		finalcmd, err := vcmd.Render(dmn.Command)
 		if err != nil {
 			return nil, err

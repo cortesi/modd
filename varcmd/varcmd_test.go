@@ -8,7 +8,6 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/utils"
-	"github.com/cortesi/moddwatch"
 )
 
 var quotePathTests = []struct {
@@ -46,8 +45,7 @@ var renderTests = []struct {
 func TestRender(t *testing.T) {
 	for _, tt := range renderTests {
 		b := conf.Block{}
-		mod := moddwatch.Mod{}
-		vc := VarCmd{&b, &mod, tt.vars}
+		vc := VarCmd{&b, nil, tt.vars}
 		ret, err := vc.Render(tt.in)
 		if err != nil {
 			t.Errorf("Unexpected error: %s", err)
@@ -79,21 +77,21 @@ func TestVarCmd(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	expect := `"./tdir/tfile" "./tdir"`
+	expect := `"tdir/tfile" "tdir"`
 	if ret != expect {
 		t.Errorf("Expected: %#v, got %#v", expect, ret)
 	}
 
 	vc = VarCmd{
 		&b,
-		&moddwatch.Mod{Changed: []string{"foo"}},
+		[]string{"foo"},
 		map[string]string{},
 	}
 	ret, err = vc.Render("@mods @dirmods")
 	if err != nil {
 		t.Fatal("unexpected error")
 	}
-	expected := `"./foo" "./."`
+	expected := `"foo" "."`
 	if ret != expected {
 		t.Errorf("Expected: %#v, got %#v", expected, ret)
 	}
@@ -101,8 +99,7 @@ func TestVarCmd(t *testing.T) {
 
 func TestRenderErrors(t *testing.T) {
 	b := conf.Block{}
-	mod := moddwatch.Mod{}
-	vc := VarCmd{&b, &mod, map[string]string{}}
+	vc := VarCmd{&b, nil, map[string]string{}}
 	_, err := vc.Render("@nonexistent")
 	if err == nil {
 		t.Error("Expected error")
