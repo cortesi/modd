@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cortesi/moddwatch/filter"
@@ -44,7 +45,7 @@ func normPaths(root string, abspaths []string) ([]string, error) {
 				return nil, err
 			}
 		}
-		ret[i] = norm
+		ret[i] = filepath.ToSlash(norm)
 	}
 	return ret, nil
 }
@@ -107,6 +108,34 @@ func (mod Mod) Empty() bool {
 		return false
 	}
 	return true
+}
+
+func joinLists(a []string, b []string) []string {
+	m := map[string]bool{}
+	for _, v := range a {
+		m[v] = true
+	}
+	for _, v := range b {
+		m[v] = true
+	}
+	ret := make([]string, len(m))
+	i := 0
+	for k := range m {
+		ret[i] = k
+		i++
+	}
+	sort.Strings(ret)
+	return ret
+}
+
+// Join two Mods together, resulting in a new structure where each modification
+// list is sorted alphabetically.
+func (mod Mod) Join(b Mod) Mod {
+	return Mod{
+		Changed: joinLists(mod.Changed, b.Changed),
+		Deleted: joinLists(mod.Deleted, b.Deleted),
+		Added:   joinLists(mod.Added, b.Added),
+	}
 }
 
 // Filter applies a filter, returning a new Mod structure
@@ -217,7 +246,7 @@ func mkmod(exists existenceChecker, added fset, removed fset, changed fset, rena
 //
 // In the face of all this, all we can do is layer on a set of heuristics to
 // try to get intuitive results.
-func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecker, ch chan notify.EventInfo) Mod {
+func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecker, ch chan notify.EventInfo) *Mod {
 	added := make(map[string]bool)
 	removed := make(map[string]bool)
 	changed := make(map[string]bool)
@@ -227,6 +256,9 @@ func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecke
 	for {
 		select {
 		case evt := <-ch:
+			if evt == nil {
+				return nil
+			}
 			hadLullMod = true
 			switch evt.Event() {
 			case notify.Create:
@@ -241,23 +273,42 @@ func batch(lullTime time.Duration, maxTime time.Duration, exists existenceChecke
 		case <-time.After(lullTime):
 			// Have we had a lull?
 			if hadLullMod == false {
-				return mkmod(exists, added, removed, changed, renamed)
+				m := mkmod(exists, added, removed, changed, renamed)
+				return &m
 			}
 			hadLullMod = false
 		case <-time.After(maxTime):
-			return mkmod(exists, added, removed, changed, renamed)
+			m := mkmod(exists, added, removed, changed, renamed)
+			return &m
 		}
 	}
 }
 
 // Watcher is a handle that allows a Watch to be terminated
 type Watcher struct {
-	evtch chan notify.EventInfo
+	evtch  chan notify.EventInfo
+	modch  chan *Mod
+	closed bool
+
+	sync.Mutex
 }
 
-// Stop watching
+func (w *Watcher) send(m *Mod) {
+	w.Lock()
+	defer w.Unlock()
+	w.modch <- m
+}
+
+// Stop watching, and close the channel passed to watch. This function can
+// safely be called concurrently.
 func (w *Watcher) Stop() {
-	notify.Stop(w.evtch)
+	w.Lock()
+	defer w.Unlock()
+	if !w.closed {
+		notify.Stop(w.evtch)
+		close(w.modch)
+		w.closed = true
+	}
 }
 
 // Given a set of include patterns relative to a root, which directories do we
@@ -335,10 +386,13 @@ func Watch(
 			return nil, err
 		}
 	}
+	w := &Watcher{evtch: evtch, modch: ch}
 	go func() {
 		for {
 			b := batch(lullTime, MaxLullWait, statExistenceChecker{}, evtch)
-			if !b.Empty() {
+			if b == nil {
+				return
+			} else if !b.Empty() {
 				b, err := b.normPaths(root)
 				if err != nil {
 					// FIXME: Do something more decisive
@@ -350,12 +404,12 @@ func Watch(
 					continue
 				}
 				if !b.Empty() {
-					ch <- b
+					w.send(b)
 				}
 			}
 		}
 	}()
-	return &Watcher{evtch}, nil
+	return w, nil
 }
 
 // List all files under the root that match the specified patterns. The file
