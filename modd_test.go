@@ -49,7 +49,7 @@ func events(p string) []string {
 func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string) {
 	defer utils.WithTempDir(t)()
 
-	err := os.MkdirAll("a", 0777)
+	err := os.MkdirAll("a/inner", 0777)
 	if err != nil {
 		t.Fatal(err)
 	}
