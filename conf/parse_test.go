@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"runtime"
 	"syscall"
 	"testing"
 )
@@ -96,7 +97,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo"},
-					Daemons: []Daemon{{"command", syscall.SIGHUP}},
+					Daemons: []Daemon{{"command", syscall.SIGHUP, windows}},
 				},
 			},
 		},
@@ -105,25 +106,25 @@ var parseTests = []struct {
 		"{\ndaemon +sighup: c\n}",
 		&Config{
 			Blocks: []Block{
-				{Daemons: []Daemon{{"c", syscall.SIGHUP}}},
+				{Daemons: []Daemon{{"c", syscall.SIGHUP, windows}}},
 			},
 		},
 	},
 	{
 		"{\ndaemon +sigterm: c\n}",
-		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGTERM}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGTERM, windows}}}}},
 	},
 	{
 		"{\ndaemon +sigint: c\n}",
-		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGINT}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGINT, windows}}}}},
 	},
 	{
 		"{\ndaemon +sigkill: c\n}",
-		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGKILL}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGKILL, false}}}}},
 	},
 	{
 		"{\ndaemon +sigquit: c\n}",
-		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGQUIT}}}}},
+		&Config{Blocks: []Block{{Daemons: []Daemon{{"c", syscall.SIGQUIT, windows}}}}},
 	},
 	{
 		"foo {\nprep: command\n}",
@@ -242,6 +243,8 @@ var parseTests = []struct {
 		},
 	},
 }
+
+var windows = runtime.GOOS == "windows"
 
 func TestParse(t *testing.T) {
 	for i, tt := range parseTests {
