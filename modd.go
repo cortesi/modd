@@ -16,7 +16,7 @@ import (
 )
 
 // Version is the modd release version
-const Version = "0.4"
+const Version = "0.5"
 
 const lullTime = time.Millisecond * 100
 
@@ -163,12 +163,12 @@ func (mr *ModRunner) runBlock(b conf.Block, mod *moddwatch.Mod, dpen *DaemonPen)
 	dpen.Restart()
 }
 
-func (mr *ModRunner) trigger(mod *moddwatch.Mod, dworld *DaemonWorld) {
+func (mr *ModRunner) trigger(root string, mod *moddwatch.Mod, dworld *DaemonWorld) {
 	for i, b := range mr.Config.Blocks {
 		lmod := mod
 		if lmod != nil {
 			var err error
-			lmod, err = mod.Filter(b.Include, b.Exclude)
+			lmod, err = mod.Filter(root, b.Include, b.Exclude)
 			if err != nil {
 				mr.Log.Shout("Error filtering events: %s", err)
 				continue
@@ -197,26 +197,30 @@ func (mr *ModRunner) runOnChan(modchan chan *moddwatch.Mod, readyCallback func()
 		os.Exit(0)
 	}()
 
-	watchpaths := mr.Config.WatchPatterns()
+	ipatts := mr.Config.IncludePatterns()
 	if mr.ConfReload {
-		watchpaths = append(watchpaths, filepath.Dir(mr.ConfPath))
+		ipatts = append(ipatts, filepath.Dir(mr.ConfPath))
 	}
 
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
 	// FIXME: This takes a long time. We could start it in parallel with the
 	// first process run in a goroutine
-	watcher, err := moddwatch.Watch(watchpaths, lullTime, modchan)
+	watcher, err := moddwatch.Watch(currentDir, ipatts, []string{}, lullTime, modchan)
+
 	if err != nil {
 		return fmt.Errorf("Error watching: %s", err)
 	}
 	defer watcher.Stop()
 
-	mr.trigger(nil, dworld)
+	mr.trigger(currentDir, nil, dworld)
 	go readyCallback()
 	for mod := range modchan {
 		if mod == nil {
 			break
 		}
-
 		if mr.ConfReload && mod.Has(mr.ConfPath) {
 			mr.Log.Notice("Reloading config %s", mr.ConfPath)
 			err := mr.ReadConfig()
@@ -227,9 +231,8 @@ func (mr *ModRunner) runOnChan(modchan chan *moddwatch.Mod, readyCallback func()
 				return nil
 			}
 		}
-
 		mr.Log.SayAs("debug", "Delta: \n%s", mod.String())
-		mr.trigger(mod, dworld)
+		mr.trigger(currentDir, mod, dworld)
 	}
 	return nil
 }

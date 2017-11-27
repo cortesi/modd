@@ -69,9 +69,20 @@ func RunProc(cmd, shellMethod string, log termlog.Stream) error {
 }
 
 // RunPreps runs all commands in sequence. Stops if any command returns an error.
-func RunPreps(b conf.Block, vars map[string]string, mod *moddwatch.Mod, log termlog.TermLog, notifiers []notify.Notifier, initial bool) error {
+func RunPreps(
+	b conf.Block,
+	vars map[string]string,
+	mod *moddwatch.Mod,
+	log termlog.TermLog,
+	notifiers []notify.Notifier,
+	initial bool,
+) error {
 	shell := vars[shellVarName]
-	vcmd := varcmd.VarCmd{Block: &b, Mod: mod, Vars: vars}
+	var modified []string
+	if mod != nil {
+		modified = mod.All()
+	}
+	vcmd := varcmd.VarCmd{Block: &b, Modified: modified, Vars: vars}
 	for _, p := range b.Preps {
 		cmd, err := vcmd.Render(p.Command)
 		if initial && p.Onchange {

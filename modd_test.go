@@ -18,11 +18,17 @@ import (
 
 const timeout = 2 * time.Second
 
-func touch(t *testing.T, p string) {
+func touch(p string) {
 	p = filepath.FromSlash(p)
-	err := ioutil.WriteFile(p, []byte("teststring"), 0777)
+	d := filepath.Dir(p)
+	err := os.MkdirAll(d, 0777)
 	if err != nil {
-		t.Fatalf("touch: %s", err)
+		panic(err)
+	}
+
+	err = ioutil.WriteFile(p, []byte("teststring"), 0777)
+	if err != nil {
+		panic(err)
 	}
 	ioutil.ReadFile(p)
 }
@@ -43,7 +49,7 @@ func events(p string) []string {
 func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string) {
 	defer utils.WithTempDir(t)()
 
-	err := os.MkdirAll("a", 0777)
+	err := os.MkdirAll("a/inner", 0777)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +59,7 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 		t.Fatal(err)
 	}
 
-	touch(t, "a/initial")
+	touch("a/initial")
 	// There's some race condition in rjeczalik/notify. If we don't wait a bit
 	// here, we sometimes receive notifications for the change above even
 	// though we haven't started the watcher.
@@ -64,11 +70,14 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
             prep +onchange: echo ":skipit:" @mods
             prep: echo ":all:" @mods
         }
-        a/** {
+        a/* {
             prep: echo ":a:" @mods
         }
-        b/** {
+        b/* {
             prep: echo ":b:" @mods
+        }
+        a/**/*.xxx {
+            prep: echo ":c:" @mods
         }
     `
 	cnf, err := conf.Parse("test", confTxt)
@@ -115,30 +124,44 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 func TestWatch(t *testing.T) {
 	_testWatch(
 		t,
-		func() { touch(t, "a/touched") },
+		func() { touch("a/touched") },
 		"touched",
 		[]string{
-			":all: ./a/initial",
-			":a: ./a/initial",
-			":skipit: ./a/touched",
-			":all: ./a/touched",
-			":a: ./a/touched",
+			":all: a/initial",
+			":a: a/initial",
+			":skipit: a/touched",
+			":all: a/touched",
+			":a: a/touched",
 		},
 	)
 	_testWatch(
 		t,
 		func() {
-			touch(t, "a/touched")
-			touch(t, "b/touched")
+			touch("a/touched")
+			touch("b/touched")
 		},
 		"touched",
 		[]string{
-			":all: ./a/initial",
-			":a: ./a/initial",
-			":skipit: ./a/touched ./b/touched",
-			":all: ./a/touched ./b/touched",
-			":a: ./a/touched",
-			":b: ./b/touched",
+			":all: a/initial",
+			":a: a/initial",
+			":skipit: a/touched b/touched",
+			":all: a/touched b/touched",
+			":a: a/touched",
+			":b: b/touched",
+		},
+	)
+	_testWatch(
+		t,
+		func() {
+			touch("a/inner/touched.xxx")
+		},
+		"touched",
+		[]string{
+			":all: a/initial",
+			":a: a/initial",
+			":skipit: a/inner/touched.xxx",
+			":all: a/inner/touched.xxx",
+			":c: a/inner/touched.xxx",
 		},
 	)
 }

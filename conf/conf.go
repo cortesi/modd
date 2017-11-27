@@ -5,8 +5,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-
-	"github.com/cortesi/moddwatch/filter"
 )
 
 // A Daemon is a persistent process that is kept running
@@ -75,17 +73,21 @@ func (c *Config) Equals(other *Config) bool {
 	return true
 }
 
-// WatchPatterns retreives the set of watched paths (with patterns removed)
-// from all blocks. The path set is de-duplicated.
-func (c *Config) WatchPatterns() []string {
-	paths := []string{}
+// IncludePatterns retrieves all include patterns from all blocks.
+func (c *Config) IncludePatterns() []string {
+	pmap := map[string]bool{}
 	for _, b := range c.Blocks {
-		paths = filter.AppendBaseDirs(paths, b.Include)
+		for _, p := range b.Include {
+			pmap[p] = true
+		}
+	}
+	paths := make([]string, len(pmap))
+	i := 0
+	for k := range pmap {
+		paths[i] = k
+		i++
 	}
 	sort.Strings(paths)
-	for i, p := range paths {
-		paths[i] = p + "/..."
-	}
 	return paths
 }
 

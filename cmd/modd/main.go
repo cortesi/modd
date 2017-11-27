@@ -7,7 +7,6 @@ import (
 
 	"github.com/cortesi/modd"
 	"github.com/cortesi/modd/notify"
-	"github.com/cortesi/moddwatch"
 	"github.com/cortesi/termlog"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -74,7 +73,6 @@ func main() {
 	log := termlog.NewLog()
 	if *debug {
 		log.Enable("debug")
-		moddwatch.Logger = log
 	}
 
 	notifiers := []notify.Notifier{}

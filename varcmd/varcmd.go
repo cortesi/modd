@@ -8,10 +8,9 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/moddwatch"
-	"github.com/cortesi/moddwatch/filter"
 )
 
-var name = regexp.MustCompile(`@\w+`)
+var name = regexp.MustCompile(`(\\*)@\w+`)
 
 func getDirs(paths []string) []string {
 	m := map[string]bool{}
@@ -28,6 +27,7 @@ func getDirs(paths []string) []string {
 
 // quotePath quotes a path for use on the command-line. The path must be in
 // slash-delimited format, and the quoted path will use the native OS separator.
+// FIXME: This is actually dependent on the shell used.
 func quotePath(path string) string {
 	path = strings.Replace(path, "\"", "\\\"", -1)
 	return "\"" + path + "\""
@@ -37,10 +37,7 @@ func quotePath(path string) string {
 func mkArgs(paths []string) string {
 	escaped := make([]string, len(paths))
 	for i, s := range paths {
-		// FIXME: We'll need to find a more portable way for Windows
-		escaped[i] = quotePath(
-			"./" + s,
-		)
+		escaped[i] = quotePath(s)
 	}
 	return strings.Join(escaped, " ")
 }
@@ -48,9 +45,9 @@ func mkArgs(paths []string) string {
 // VarCmd represents a set of variables for a specific block and mod set. It
 // should be re-created anew each time the block is executed.
 type VarCmd struct {
-	Block *conf.Block
-	Mod   *moddwatch.Mod
-	Vars  map[string]string
+	Block    *conf.Block
+	Modified []string
+	Vars     map[string]string
 }
 
 // Get a variable by name
@@ -60,15 +57,14 @@ func (v *VarCmd) get(name string) (string, error) {
 	}
 	if (name == "@mods" || name == "@dirmods") && v.Block != nil {
 		var modified []string
-		if v.Mod == nil {
+		if v.Modified == nil {
 			var err error
-			// FIXME: this is a bug - it doesn't cope with absolute root paths
-			modified, err = filter.Find(".", v.Block.Include, v.Block.Exclude)
+			modified, err = moddwatch.List(".", v.Block.Include, v.Block.Exclude)
 			if err != nil {
 				return "", err
 			}
 		} else {
-			modified = v.Mod.All()
+			modified = v.Modified
 		}
 		v.Vars["@mods"] = mkArgs(modified)
 		v.Vars["@dirmods"] = mkArgs(getDirs(modified))
@@ -77,6 +73,8 @@ func (v *VarCmd) get(name string) (string, error) {
 	return "", fmt.Errorf("No such variable: %s", name)
 }
 
+const esc = '\\'
+
 // Render renders the command with a map of variables
 func (v *VarCmd) Render(cmd string) (string, error) {
 	var err error
@@ -84,12 +82,23 @@ func (v *VarCmd) Render(cmd string) (string, error) {
 		name.ReplaceAllFunc(
 			[]byte(cmd),
 			func(key []byte) []byte {
-				ks := string(key)
+				cnt := 0
+				for _, c := range key {
+					if c != esc {
+						break
+					}
+					cnt++
+				}
+				ks := strings.TrimLeft(string(key), string(esc))
+				if cnt%2 != 0 {
+					return []byte(strings.Repeat(string(esc), (cnt-1)/2) + ks)
+				}
 				val, errv := v.get(ks)
 				if errv != nil {
 					err = fmt.Errorf("No such variable: %s", ks)
 					return nil
 				}
+				val = strings.Repeat(string(esc), cnt/2) + val
 				return []byte(val)
 			},
 		),

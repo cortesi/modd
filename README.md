@@ -25,17 +25,20 @@ Example                                      | Description
 
 Modd is a single binary with no external dependencies, released for OSX,
 Windows, Linux, FreeBSD, NetBSD and OpenBSD. Go to the [releases
-page](https://github.com/cortesi/modd/releases/latest), download the package
-for your OS, and copy the binary to somewhere on your PATH.
+page](https://github.com/cortesi/modd/releases/latest), download the package for
+your OS, and copy the binary to somewhere on your PATH.
 
 If you have a working Go installation, you can also say
 
     $ go get github.com/cortesi/modd/cmd/modd
 
-Note that by default modd uses either *bash* or *sh*. To use them they must be
-on your PATH. To avoid using "bash" set `@shell = exec` in your "modd.conf"
-file. On Windows, one easy way to install bash is to use
-[Babun](https://babun.github.io/).
+On OSX, you can install modd with homebrew:
+
+    $ brew install modd
+
+By default modd interprets commands with *bash* or *sh*, one of which must be on
+your PATH. To avoid using a shell, you can set `@shell = exec` in your
+"modd.conf" file.
 
 
 # Quick start
@@ -58,15 +61,8 @@ The first time modd is run, it will run the tests of all Go modules. Whenever
 any file with the .go extension is modified, the "go test" command will be run
 only on the enclosing module.
 
-To avoid shelling out to bash the following will execute "go test" directly.
-```
-@shell = exec
-**/*.go {
-    prep: go test @dirmods
-}
-```
 
-# Leisurely start
+# Details
 
 On startup, modd looks for a file called *modd.conf* in the current directory.
 This file has a simple but powerful syntax - one or more blocks of commands,
@@ -103,7 +99,8 @@ The **@dirmods** variable expands to a properly escaped list of all directories
 containing changed files. When modd is first run, this includes all directories
 containing matching files. So, this means that modd will run all tests on
 startup, and then subsequently run the tests only for the affected module
-whenever there's a change. There's a corresponding **@mods** variable that contains all changed files.
+whenever there's a change. There's a corresponding **@mods** variable that
+contains all changed files.
 
 Note the *+sigterm* flag to the daemon command. When devd receives a SIGHUP
 (the default signal sent by modd), it triggers a browser livereload, rather
@@ -116,16 +113,22 @@ modd.
 
 # File watch patterns
 
-Modd's change detection algorithm batches up changes until there is a lull in
-filesystem activity - this means that coherent processes like compilation and
-rendering that touch many files are likely to trigger commands only once.
-Patterns therefore match on a batch of changed files - when the first match in
-a batch is seen, the block is triggered.
+Modd's batches up changes until there is a lull in filesystem activity - this
+means that coherent processes like compilation and rendering that touch many
+files are likely to trigger commands only once. Patterns therefore match on a
+batch of changed files - when the first match in a batch is seen, the block is
+triggered.
 
 Patterns and the paths they match against are always in slash-delimited form,
-even on Windows.
+even on Windows. Paths are cleaned and normalised being matched, with redundant
+components removed. If the path is within the current working directory, the
+normalised path is relative to the current working directory, otherwise it is
+absolute. One subtlety is that this means that a pattern like `./*.js` will
+never match, because inbound paths will not have a leading `./` component - just
+use `*.js` instead.
 
-### Quotes
+
+## Quotes
 
 File patterns can be naked or quoted strings. Quotes can be either single or
 double quotes, and the corresponding quote mark can be escaped with a backslash
@@ -135,7 +138,7 @@ within the string:
 "**/foo\"bar"
 ```
 
-### Negation
+## Negation
 
 Patterns can be negated with a leading **!**. For quoted patterns, the
 exclamation mark goes outside of the quotes. So, this matches all files
@@ -150,7 +153,7 @@ Negations are applied after all positive patterns - that is, modd collects all
 files matching the positive patterns, then removes files matching the negation
 patterns.
 
-### Default ignore list
+## Default ignore list
 
 Common nuisance files like VCS directories, swap files, and so forth are
 ignored by default. You can list the set of ignored patterns using the **-i**
@@ -163,10 +166,10 @@ special **+noignore** flag, like so:
 }
 ```
 
-### Empty match pattern
+## Empty match pattern
 
 If no match pattern is specified, prep commands run once only at startup, and
-daemons are restarted if they exit, but won't ever be explicitly signaled to
+daemons are restarted if they exit, but won't ever be explicitly signalled to
 restart by modd.
 
 ```
@@ -175,8 +178,25 @@ restart by modd.
 }
 ```
 
+## Symlinks
 
-### Syntax
+Modd does not implicitly traverse symlinks. To monitor a symlink, it must be
+specified as the base of an include pattern, like this:
+
+```
+mydir mydir/symlinkdir/** {
+    prep: echo changed
+}
+```
+
+Behind the scenes, we resolve the symlinked directory as if it was specified
+directly by the user. This means that if the symlink destination lies outside of
+the current working directory, the resulting paths for matches, exclusions and
+commands will be absolute.
+
+
+
+## Syntax
 
 File patterns support the following syntax:
 
@@ -211,7 +231,7 @@ user's path, and inherit the parent's environment. Single-line commands don't
 need to be quoted:
 
 ```
-prep: echo "i'm now rebuilding" | tee /tmp/output
+prep: echo "I'm now rebuilding" | tee /tmp/output
 ```
 
 Newlines can be escaped with a backslash for multi-line commands:
@@ -236,8 +256,21 @@ prep: "
 "
 ```
 
+Within commands, the `@` character is treated specially, since it is the marker
+for variable replacement. You can include a verbatim `@` symbol b escaping it
+with a backslash, and backslashes preceding the `@` symbol can themselves be
+escaped recursively.
 
-### Prep commands
+```
+@foo = bar
+{
+    prep: echo "@foo"   # bar
+    prep: echo "\@foo"  # @foo
+    prep: echo "\\@foo" # \bar
+}
+```
+
+## Prep commands
 
 All prep commands in a block are run in order before any daemons are restarted.
 If any prep command exits with an error, execution stops.
@@ -274,7 +307,7 @@ there is a detected change.
 ```
 
 
-### Daemon commands
+## Daemon commands
 
 Daemons are executed on startup, and are restarted by modd whenever they exit.
 When a block containing a daemon command is triggered, modd sends a signal to
@@ -293,7 +326,7 @@ The following signals are supported: **sighup**, **sigterm**, **sigint**,
 **sigkill**, **sigquit**, **sigusr1**, **sigusr2**, **sigwinch**.
 
 
-### Controlling log headers
+## Controlling log headers
 
 Modd outputs a short header on the terminal to show which command is
 responsible for output. This header is calculated from the first non-whitespace
@@ -320,7 +353,7 @@ control the log display name.
 }
 ```
 
-### Options
+## Options
 
 The only block option at the moment is **indir**, which controls the execution
 directory of a block. Modd will change to this directory before executing
@@ -375,7 +408,7 @@ executed. Valid values are:
 When the **-n** flag is specified, modd sends anything sent to *stderr* from
 any prep command that exits abnormally to a desktop notifier. Since modd
 commands are shell scripts, you can redirect or manipulate output to entirely
-customize what gets sent to notifiers as needed.
+customise what gets sent to notifiers as needed.
 
 At the moment, we support [Growl](http://growl.info/) on OSX, and
 [libnotify](https://launchpad.net/ubuntu/+source/libnotify) on Linux and other
@@ -401,6 +434,4 @@ libnotify. You'll need to use your system package manager to install
 
 The scripts used to build this package for distribution can be found
 [here](https://github.com/cortesi/godist). External packages are vendored using
-[gvt](https://github.com/FiloSottile/gvt), and I use
-[deplist](https://github.com/cespare/deplist) to make sure all dependencies are
-covered.
+[dep](https://github.com/golang/dep).
