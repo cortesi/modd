@@ -72,17 +72,8 @@ func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notif
 	if err != nil {
 		return nil, err
 	}
-	// When the daemon config structs were constructed, their
-	// .PipeRestartSignal boolean fields were enabled in cases where their
-	// chosen restart signals would otherwise fail silently. If the 'pipe
-	// signals' feature has been explicitly disabled by command-line flag then
-	// those smart defaults need to be cleared.
 	if !pipesignals {
-		for i := 0; i < len(mr.Config.Blocks); i++ {
-			for j := 0; j < len(mr.Config.Blocks[i].Daemons); j++ {
-				mr.Config.Blocks[i].Daemons[j].PipeRestartSignal = false
-			}
-		}
+		mr.disablePipeSignals()
 	}
 	return mr, nil
 }
@@ -106,6 +97,20 @@ func (mr *ModRunner) ReadConfig() error {
 	newcnf.CommonExcludes(CommonExcludes)
 	mr.Config = newcnf
 	return nil
+}
+
+// disablePipeSignals disables the PipeRestartSignal flag in all daemon config
+// structs. When those structs were constructed, that flag was enabled in cases
+// where the combination of the running host OS and the specific signal chosen
+// would result in that signal silently failing to do anything. If the entire
+// 'pipe signals' feature is to be disabled, then those smart defaults need to
+// be cleared by calling this method.
+func (mr *ModRunner) disablePipeSignals() {
+	for i := 0; i < len(mr.Config.Blocks); i++ {
+		for j := 0; j < len(mr.Config.Blocks[i].Daemons); j++ {
+			mr.Config.Blocks[i].Daemons[j].PipeRestartSignal = false
+		}
+	}
 }
 
 // PrepOnly runs all prep functions and exits

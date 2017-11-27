@@ -57,7 +57,8 @@ func main() {
 		pipesignals = kingpin.Flag(
 			"pipesignals",
 			"For signals that don't exist on Windows, write their name to the stdin of daemons instead").
-			Default("true").
+			// TODO(DH): Should it be enabled by default?
+			Default("false").
 			Bool()
 	}
 
