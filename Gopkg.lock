@@ -29,13 +29,13 @@
   branch = "master"
   name = "github.com/cortesi/termlog"
   packages = ["."]
-  revision = "adf1be62b220ba7ac0b70a8facdd0b5bffb9b13b"
+  revision = "87cefd5ac843f65364f70a1fd2477bb6437690e8"
 
 [[projects]]
+  branch = "master"
   name = "github.com/fatih/color"
   packages = ["."]
-  revision = "570b54cabe6b8eb0bc2dfce68d964677d63b5260"
-  version = "v1.5.0"
+  revision = "5df930a27be2502f99b292b7cc09ebad4d0891f4"
 
 [[projects]]
   branch = "master"
@@ -65,19 +65,19 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "9f005a07e0d31d45e6656d241bb5c0f2efd4bc94"
+  revision = "94eea52f7b742c7cbe0b03b22f0c4c8631ece122"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
-  revision = "9dfe39835686865bff950a07b394c12a98ddc811"
+  revision = "a8b9294777976932365dabb6640cf1468d95c70f"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows"]
-  revision = "bf42f188b9bc6f2cf5b8ee5a912ef1aedd0eba4c"
+  revision = "8b4580aae2a0dd0c231a45d3ccb8434ff533b840"
 
 [[projects]]
   name = "gopkg.in/alecthomas/kingpin.v2"
