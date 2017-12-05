@@ -26,8 +26,14 @@ func touch(p string) {
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(p, []byte("teststring"), 0777)
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
+		panic(err)
+	}
+	if _, err := f.Write([]byte("teststring")); err != nil {
+		panic(err)
+	}
+	if err := f.Close(); err != nil {
 		panic(err)
 	}
 	ioutil.ReadFile(p)
@@ -78,6 +84,12 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
         }
         a/**/*.xxx {
             prep: echo ":c:" @mods
+        }
+        a/direct {
+            prep: echo ":d:" @mods
+        }
+        direct {
+            prep: echo ":e:" @mods
         }
     `
 	cnf, err := conf.Parse("test", confTxt)
@@ -162,6 +174,35 @@ func TestWatch(t *testing.T) {
 			":skipit: a/inner/touched.xxx",
 			":all: a/inner/touched.xxx",
 			":c: a/inner/touched.xxx",
+		},
+	)
+	_testWatch(
+		t,
+		func() {
+			touch("a/direct")
+		},
+		"touched",
+		[]string{
+			":all: a/initial",
+			":a: a/initial",
+			":skipit: a/direct",
+			":all: a/direct",
+			":a: a/direct",
+			":d: a/direct",
+		},
+	)
+	_testWatch(
+		t,
+		func() {
+			touch("direct")
+		},
+		"touched",
+		[]string{
+			":all: a/initial",
+			":a: a/initial",
+			":skipit: direct",
+			":all: direct",
+			":e: direct",
 		},
 	)
 }
