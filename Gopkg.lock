@@ -23,7 +23,7 @@
   branch = "master"
   name = "github.com/cortesi/moddwatch"
   packages = [".","filter"]
-  revision = "bf02ebb642595215f68b2c8ca5d51b1fc7a00107"
+  revision = "7c91438d2aa765c66fa38f05fc0c57eec9112156"
 
 [[projects]]
   branch = "master"

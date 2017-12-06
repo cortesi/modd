@@ -313,6 +313,21 @@ func (w *Watcher) Stop() {
 	}
 }
 
+// Find the nearest enclosing directory
+func enclosingDir(path string) string {
+	for {
+		if stat, err := os.Lstat(path); err == nil {
+			if stat.IsDir() {
+				return path
+			}
+		}
+		if path == "" {
+			return ""
+		}
+		path = filepath.Dir(path)
+	}
+}
+
 // Given a set of include patterns relative to a root, which directories do we
 // need to monitor for changes? Returns a modified set of includes ready to pass
 // to a post filter, and a set of base directories
@@ -327,7 +342,7 @@ func baseDirs(root string, includePatterns []string) ([]string, []string) {
 		}
 		if stat, err := os.Lstat(bdir); err == nil {
 			if stat.Mode()&os.ModeSymlink != 0 {
-				// Case 1: The file exists and is a symlink,so  we rebase the
+				// Case 1: The file exists and is a symlink, so we rebase the
 				// include patterns and the base directory
 				lnk, err := os.Readlink(bdir)
 				if err != nil {
@@ -339,22 +354,18 @@ func baseDirs(root string, includePatterns []string) ([]string, []string) {
 					bdir = filepath.Join(bdir, lnk)
 				}
 				newincludes[i] = bdir + "/" + trailer
-			}
-			// Case 2: Implicit here - the file exists and is nota symlink, so
-			// we leave bdir unmodified.
-		} else {
-			// Case 3: The file doesn't exist. We search up the directory tree
-			// until we find a path that does exist so we can watch it.
-			for {
-				bdir = filepath.Dir(bdir)
-				if _, err := os.Lstat(bdir); err == nil {
-					break
-				}
+			} else {
+				// Case 2: The file exists and is nota symlink, so we leave bdir
+				// unmodified.
+				bdir = enclosingDir(bdir)
 				if bdir == "" {
-					// We haven't found an existing directory. We just watch the
-					// current dir.
 					bdir = root
 				}
+			}
+		} else {
+			bdir = enclosingDir(bdir)
+			if bdir == "" {
+				bdir = root
 			}
 		}
 		bases[i] = bdir

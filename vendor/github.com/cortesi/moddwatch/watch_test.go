@@ -652,17 +652,23 @@ func TestWatch(t *testing.T) {
 	t.Run(
 		"deepdirect",
 		func(t *testing.T) {
-			_testWatch(
-				t,
-				func() {
-					touch("a/deep/directory/direct")
-				},
-				[]string{"a/initial", "a/deep/directory/direct"},
-				[]string{},
-				Mod{
-					Added: []string{"a/deep/directory/direct"},
-				},
-			)
+			// On Linux, We can't currently pick up changes within directories
+			// created after the watch started. See here for more:
+			//
+			// https://github.com/cortesi/modd/issues/44
+			if runtime.GOOS != "linux" {
+				_testWatch(
+					t,
+					func() {
+						touch("a/deep/directory/direct")
+					},
+					[]string{"a/initial", "a/deep/directory/direct"},
+					[]string{},
+					Mod{
+						Added: []string{"a/deep/directory/direct"},
+					},
+				)
+			}
 		},
 	)
 }
