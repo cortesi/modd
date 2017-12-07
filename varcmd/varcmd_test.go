@@ -77,7 +77,7 @@ func TestVarCmd(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	expect := `"tdir/tfile" "tdir"`
+	expect := `"./tdir/tfile" "./tdir"`
 	if ret != expect {
 		t.Errorf("Expected: %#v, got %#v", expect, ret)
 	}
@@ -91,7 +91,7 @@ func TestVarCmd(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error")
 	}
-	expected := `"foo" "."`
+	expected := `"./foo" "./"`
 	if ret != expected {
 		t.Errorf("Expected: %#v, got %#v", expected, ret)
 	}

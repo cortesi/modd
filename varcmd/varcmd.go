@@ -2,7 +2,7 @@ package varcmd
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"regexp"
 	"strings"
 
@@ -15,7 +15,7 @@ var name = regexp.MustCompile(`(\\*)@\w+`)
 func getDirs(paths []string) []string {
 	m := map[string]bool{}
 	for _, p := range paths {
-		p := filepath.Dir(p)
+		p := path.Dir(p)
 		m[p] = true
 	}
 	keys := []string{}
@@ -33,11 +33,26 @@ func quotePath(path string) string {
 	return "\"" + path + "\""
 }
 
+// The paths we receive from Go's path manipulation functions are "cleaned",
+// which removes redundancy, but also removes the leading "./" needed by many
+// command-line tools. This function turns cleaned paths into "really relative"
+// paths.
+func realRel(p string) string {
+	// They should already be clean, but let's make sure.
+	p = path.Clean(p)
+	if path.IsAbs(p) {
+		return p
+	} else if p == "." {
+		return "./"
+	}
+	return "./" + p
+}
+
 // mkArgs prepares a list of paths for the command line
 func mkArgs(paths []string) string {
 	escaped := make([]string, len(paths))
 	for i, s := range paths {
-		escaped[i] = quotePath(s)
+		escaped[i] = quotePath(realRel(s))
 	}
 	return strings.Join(escaped, " ")
 }

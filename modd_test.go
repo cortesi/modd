@@ -139,11 +139,11 @@ func TestWatch(t *testing.T) {
 		func() { touch("a/touched") },
 		"touched",
 		[]string{
-			":all: a/initial",
-			":a: a/initial",
-			":skipit: a/touched",
-			":all: a/touched",
-			":a: a/touched",
+			":all: ./a/initial",
+			":a: ./a/initial",
+			":skipit: ./a/touched",
+			":all: ./a/touched",
+			":a: ./a/touched",
 		},
 	)
 	_testWatch(
@@ -154,12 +154,12 @@ func TestWatch(t *testing.T) {
 		},
 		"touched",
 		[]string{
-			":all: a/initial",
-			":a: a/initial",
-			":skipit: a/touched b/touched",
-			":all: a/touched b/touched",
-			":a: a/touched",
-			":b: b/touched",
+			":all: ./a/initial",
+			":a: ./a/initial",
+			":skipit: ./a/touched ./b/touched",
+			":all: ./a/touched ./b/touched",
+			":a: ./a/touched",
+			":b: ./b/touched",
 		},
 	)
 	_testWatch(
@@ -169,11 +169,11 @@ func TestWatch(t *testing.T) {
 		},
 		"touched",
 		[]string{
-			":all: a/initial",
-			":a: a/initial",
-			":skipit: a/inner/touched.xxx",
-			":all: a/inner/touched.xxx",
-			":c: a/inner/touched.xxx",
+			":all: ./a/initial",
+			":a: ./a/initial",
+			":skipit: ./a/inner/touched.xxx",
+			":all: ./a/inner/touched.xxx",
+			":c: ./a/inner/touched.xxx",
 		},
 	)
 	_testWatch(
@@ -183,12 +183,12 @@ func TestWatch(t *testing.T) {
 		},
 		"touched",
 		[]string{
-			":all: a/initial",
-			":a: a/initial",
-			":skipit: a/direct",
-			":all: a/direct",
-			":a: a/direct",
-			":d: a/direct",
+			":all: ./a/initial",
+			":a: ./a/initial",
+			":skipit: ./a/direct",
+			":all: ./a/direct",
+			":a: ./a/direct",
+			":d: ./a/direct",
 		},
 	)
 	_testWatch(
@@ -198,11 +198,11 @@ func TestWatch(t *testing.T) {
 		},
 		"touched",
 		[]string{
-			":all: a/initial",
-			":a: a/initial",
-			":skipit: direct",
-			":all: direct",
-			":e: direct",
+			":all: ./a/initial",
+			":a: ./a/initial",
+			":skipit: ./direct",
+			":all: ./direct",
+			":e: ./direct",
 		},
 	)
 }
