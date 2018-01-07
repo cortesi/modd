@@ -8,9 +8,6 @@ import (
 	"github.com/google/shlex"
 )
 
-// Default Inteface to use if none provided.
-var Default = "bash"
-
 // Interface to the shell.
 type Interface interface {
 	// Name of the shell interface.
@@ -25,6 +22,7 @@ var shells = make(map[string]Interface)
 func init() {
 	register(&Exec{})
 	register(&Bash{})
+	register(&PowerShell{})
 }
 
 // Register a new shell interface.
@@ -100,4 +98,15 @@ func (b *Bash) Command(line string) (*exec.Cmd, error) {
 		return nil, err
 	}
 	return exec.Command(sh, "-c", line), nil
+}
+
+// Windows PowerShell
+type PowerShell struct{}
+
+func (r *PowerShell) Name() string {
+	return "powershell"
+}
+
+func (r *PowerShell) Command(line string) (*exec.Cmd, error) {
+	return exec.Command("powershell", "-Command", line), nil
 }
