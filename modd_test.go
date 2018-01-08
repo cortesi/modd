@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +94,21 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
             prep: echo ":e:" @mods
         }
     `
+
+	if runtime.GOOS == "windows" {
+		// Welcome to the wonderful world of Windows where
+		//     echo "foo" "bar"
+		// returns
+		//     foo
+		//     bar
+		// instead of the following:
+		//     foo bar
+		//
+		// To make our tests work we add <mods></mods> marker here and
+		// strip them later when replacing newlines in between with spaces.
+		confTxt = strings.Replace(confTxt, `" @mods`, `<mods>" @mods "</mods>"`, -1)
+	}
+
 	cnf, err := conf.Parse("test", confTxt)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +143,18 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 		t.Fatalf("runOnChan: %s", err)
 	}
 
-	ret := events(lt.String())
+	retStr := lt.String()
+
+	if runtime.GOOS == "windows" {
+		// see above for why we do this
+		strip_nl := func(s string) string {
+			s = s[6 : len(s)-7]
+			return strings.Replace(s, "\n", " ", -1)
+		}
+		retStr = regexp.MustCompile(`<mods>([\s\S]*?)</mods>`).ReplaceAllStringFunc(retStr, strip_nl)
+	}
+
+	ret := events(retStr)
 
 	if !reflect.DeepEqual(ret, expected) {
 		t.Errorf("Expected\n%#v\nGot\n%#v", expected, ret)
