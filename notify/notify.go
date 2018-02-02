@@ -40,6 +40,18 @@ func (GrowlNotifier) Push(title string, text string, iconPath string) {
 	go cmd.Run()
 }
 
+// OSXNotifier is a notifier for osx's Notification Center
+type OSXNotifier struct {
+}
+
+// Push implements Notifier
+func (OSXNotifier) Push(title string, text string, _ string) {
+	cmd := exec.Command(
+		`osascript -e "display notification '`, text, `' with title '`, title, `'"`,
+	)
+	go cmd.Run()
+}
+
 // LibnotifyNotifier is a notifier for lib-notify
 type LibnotifyNotifier struct {
 }
@@ -56,6 +68,8 @@ func (LibnotifyNotifier) Push(title string, text string, iconPath string) {
 func PlatformNotifier() Notifier {
 	if hasExecutable("growlnotify") {
 		return &GrowlNotifier{}
+	} else if hasExecutable("osascript") {
+		return &OSXNotifier{}
 	} else if hasExecutable("notify-send") {
 		return &LibnotifyNotifier{}
 	}
