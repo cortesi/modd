@@ -107,7 +107,10 @@ func (d *daemon) Restart() {
 	} else {
 		if d.cmd != nil {
 			d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
-			d.cmd.Process.Signal(d.conf.RestartSignal)
+			err := d.cmd.Process.Signal(d.conf.RestartSignal)
+			if err != nil {
+				d.log.Warn("failed to send %s signal to %s (pid %d): %v", d.conf.RestartSignal, d.conf.Command, d.cmd.Process.Pid, err)
+			}
 		}
 	}
 }
