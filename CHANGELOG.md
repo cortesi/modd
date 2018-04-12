@@ -1,8 +1,21 @@
 
+# v0.6 - 13 April 2018
+
+* Ensure that emitted relative paths start with "./"
+* Minor bugfixes and updates
+
+
+# v0.5 - 17 November 2017
+
+* Comprehensively reassess how we deal with paths and symlinks.
+* Add escaping for @ in commands.
+* Updates to docs and minor fixes
+
+
 # v0.4 - 28 September 2016
 
 * Add an "indir" block option to control the execution directory for a block.
-* Fix some formatting issues in notifications (thanks @stereosteve)
+* Fix some formatting issues in notifications (thanks @stereosteve).
 
 
 # v0.3 - 8 April 2016
