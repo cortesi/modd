@@ -94,9 +94,15 @@
   revision = "947dcec5ba9c011838740e680966fd7087a71d0d"
   version = "v2.2.6"
 
+[[projects]]
+  name = "mvdan.cc/sh"
+  packages = ["syntax"]
+  revision = "406aa91bb579fc3746db9a55cd9194a7e7db6e92"
+  version = "v2.3.0"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1b86ba9e8a9d05d4b9c6e997a4e3f7117eaaf708e1624d93b5e3eae3465241bb"
+  inputs-digest = "91c4687f476dc9e5390080bead3b4e950a19a91f885de1f52da28ebfeedb6157"
   solver-name = "gps-cdcl"
   solver-version = 1
