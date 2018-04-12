@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +94,11 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
             prep: echo ":e:" @mods
         }
     `
+
+	if runtime.GOOS == "windows" {
+		confTxt = regexp.MustCompile("echo (.*?) @mods").ReplaceAllString(confTxt, "echo \"$1 @mods\"")
+	}
+
 	cnf, err := conf.Parse("test", confTxt)
 	if err != nil {
 		t.Fatal(err)
