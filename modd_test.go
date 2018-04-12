@@ -1,7 +1,6 @@
 package modd
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -72,6 +71,8 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 	time.Sleep(200 * time.Millisecond)
 
 	confTxt := `
+		@shell = bash
+
         ** {
             prep +onchange: echo ":skipit:" @mods
             prep: echo ":all:" @mods
@@ -108,7 +109,6 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 				break
 			}
 			if time.Now().Sub(start) > timeout {
-				fmt.Println("Timeout!")
 				break
 			}
 			time.Sleep(50 * time.Millisecond)

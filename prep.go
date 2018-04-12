@@ -39,6 +39,7 @@ func RunProc(cmd, shellMethod string, log termlog.Stream) error {
 	if err != nil {
 		return err
 	}
+
 	buff := new(bytes.Buffer)
 	mut := sync.Mutex{}
 	err = c.Start()
@@ -51,7 +52,6 @@ func RunProc(cmd, shellMethod string, log termlog.Stream) error {
 		&wg, stde,
 		func(s string, args ...interface{}) {
 			log.Warn(s, args...)
-
 			mut.Lock()
 			defer mut.Unlock()
 			fmt.Fprintf(buff, "%s\n", args...)

@@ -59,7 +59,6 @@ func main() {
 	if *exec != "" {
 		parser := syntax.NewParser()
 		runner := interp.Runner{
-			Stdin:  os.Stdin,
 			Stdout: os.Stdout,
 			Stderr: os.Stderr,
 		}

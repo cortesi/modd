@@ -3,32 +3,29 @@ package shell
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/google/shlex"
 )
 
-// Default Inteface to use if none provided.
 var Default = "bash"
 
-// Interface to the shell.
-type Interface interface {
-	// Name of the shell interface.
+type Executor interface {
 	Name() string
-
-	// Put in a exec command line and get a Cmd.
-	Command(line string) (*exec.Cmd, error)
+	Run(command string) (*exec.Cmd, error)
 }
 
-var shells = make(map[string]Interface)
+var shells = make(map[string]Executor)
 
 func init() {
 	register(&Exec{})
 	register(&Bash{})
+	register(&Builtin{})
 }
 
 // Register a new shell interface.
-func register(i Interface) {
+func register(i Executor) {
 	name := i.Name()
 	if _, has := shells[name]; has {
 		panic("shell interface " + name + " already exists")
@@ -47,8 +44,8 @@ func Has(method string) bool {
 
 // Command returns a *Cmd. If method is empty then the default shell
 // interface method is used. The line should contain the exec line.
-func Command(method, line string) (*exec.Cmd, error) {
-	if len(method) == 0 {
+func Command(method string, line string) (*exec.Cmd, error) {
+	if method == "" {
 		method = Default
 	}
 
@@ -56,7 +53,7 @@ func Command(method, line string) (*exec.Cmd, error) {
 	if !has {
 		return nil, fmt.Errorf("Shell method %q not found", method)
 	}
-	return i.Command(line)
+	return i.Run(line)
 }
 
 // No shell, just execute the command raw.
@@ -66,7 +63,7 @@ func (r *Exec) Name() string {
 	return "exec"
 }
 
-func (r *Exec) Command(line string) (*exec.Cmd, error) {
+func (r *Exec) Run(line string) (*exec.Cmd, error) {
 	ss, err := shlex.Split(line)
 	if err != nil {
 		return nil, err
@@ -94,10 +91,25 @@ func (b *Bash) getShell() (string, error) {
 	return "", fmt.Errorf("Could not find bash or sh on path.")
 }
 
-func (b *Bash) Command(line string) (*exec.Cmd, error) {
+func (b *Bash) Run(line string) (*exec.Cmd, error) {
 	sh, err := b.getShell()
 	if err != nil {
 		return nil, err
 	}
 	return exec.Command(sh, "-c", line), nil
+}
+
+// Builtin shell command.
+type Builtin struct{}
+
+func (b *Builtin) Name() string {
+	return "builtin"
+}
+
+func (b *Builtin) Run(line string) (*exec.Cmd, error) {
+	path, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	return exec.Command(path, "--exec", line), nil
 }

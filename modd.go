@@ -87,8 +87,8 @@ func (mr *ModRunner) ReadConfig() error {
 	}
 
 	shellMethod := newcnf.GetVariables()[shellVarName]
-	if !shell.Has(shellMethod) {
-		return fmt.Errorf("No shell interface %q", shellMethod)
+	if shellMethod != "" && !shell.Has(shellMethod) {
+		return fmt.Errorf("No such shell: %q", shellMethod)
 	}
 
 	newcnf.CommonExcludes(CommonExcludes)
