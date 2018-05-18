@@ -287,7 +287,10 @@ var fileTests = []testCase{
 		},
 	},
 	{
-		Strs: []string{"(($(date -u) > DATE))"},
+		Strs: []string{
+			"(($(date -u) > DATE))",
+			"((`date -u` > DATE))",
+		},
 		bsmk: arithmCmd(&BinaryArithm{
 			Op: Gtr,
 			X:  word(cmdSubst(litStmt("date", "-u"))),
@@ -379,6 +382,7 @@ var fileTests = []testCase{
 	{
 		Strs: []string{
 			"for i; do foo; done",
+			"for i do foo; done",
 			"for i\ndo foo\ndone",
 			"for i;\ndo foo\ndone",
 			"for i in; do foo; done",
@@ -394,6 +398,22 @@ var fileTests = []testCase{
 			"for i in 1 2 3\ndo echo $i\ndone",
 			"for i in 1 2 3;\ndo echo $i\ndone",
 			"for i in 1 2 3 #foo\ndo echo $i\ndone",
+		},
+		common: &ForClause{
+			Loop: &WordIter{
+				Name:  lit("i"),
+				Items: litWords("1", "2", "3"),
+			},
+			Do: stmts(call(
+				litWord("echo"),
+				word(litParamExp("i")),
+			)),
+		},
+	},
+	{
+		Strs: []string{
+			"for i in \\\n\t1 2 3; do #foo\n\techo $i\ndone",
+			"for i #foo\n\tin 1 2 3; do\n\techo $i\ndone",
 		},
 		common: &ForClause{
 			Loop: &WordIter{
@@ -1076,7 +1096,7 @@ var fileTests = []testCase{
 		},
 	},
 	{
-		Strs: []string{"if true; then foo <<-EOF\n\tbar\n\tEOF\nfi"},
+		Strs: []string{"if true; then\n\tfoo <<-EOF\n\t\tbar\n\tEOF\nfi"},
 		common: &IfClause{
 			Cond: litStmts("true"),
 			Then: stmtList(&Stmt{
@@ -1084,13 +1104,13 @@ var fileTests = []testCase{
 				Redirs: []*Redirect{{
 					Op:   DashHdoc,
 					Word: litWord("EOF"),
-					Hdoc: litWord("\tbar\n\t"),
+					Hdoc: litWord("bar\n"),
 				}},
 			}),
 		},
 	},
 	{
-		Strs: []string{"if true; then foo <<-EOF\n\tEOF\nfi"},
+		Strs: []string{"if true; then\n\tfoo <<-EOF\n\tEOF\nfi"},
 		common: &IfClause{
 			Cond: litStmts("true"),
 			Then: stmtList(&Stmt{
@@ -1098,7 +1118,6 @@ var fileTests = []testCase{
 				Redirs: []*Redirect{{
 					Op:   DashHdoc,
 					Word: litWord("EOF"),
-					Hdoc: litWord("\t"),
 				}},
 			}),
 		},
@@ -1184,7 +1203,7 @@ var fileTests = []testCase{
 	},
 	{
 		Strs: []string{
-			"foo <<-EOF\nbar\nEOF",
+			"foo <<-EOF\n\tbar\nEOF",
 			"foo <<- EOF\nbar\nEOF",
 		},
 		common: &Stmt{
@@ -1197,35 +1216,44 @@ var fileTests = []testCase{
 		},
 	},
 	{
-		Strs: []string{"foo <<-EOF\n\tEOF"},
+		Strs: []string{"foo <<EOF\nEOF"},
+		common: &Stmt{
+			Cmd: litCall("foo"),
+			Redirs: []*Redirect{{
+				Op:   Hdoc,
+				Word: litWord("EOF"),
+			}},
+		},
+	},
+	{
+		Strs: []string{"foo <<-EOF\nEOF"},
 		common: &Stmt{
 			Cmd: litCall("foo"),
 			Redirs: []*Redirect{{
 				Op:   DashHdoc,
 				Word: litWord("EOF"),
-				Hdoc: litWord("\t"),
 			}},
 		},
 	},
 	{
-		Strs: []string{"foo <<-EOF\n\tbar\n\tEOF"},
+		Strs: []string{"foo <<-EOF\n\tbar\nEOF"},
 		common: &Stmt{
 			Cmd: litCall("foo"),
 			Redirs: []*Redirect{{
 				Op:   DashHdoc,
 				Word: litWord("EOF"),
-				Hdoc: litWord("\tbar\n\t"),
+				Hdoc: litWord("bar\n"),
 			}},
 		},
 	},
 	{
-		Strs: []string{"foo <<-'EOF'\n\tbar\n\tEOF"},
+		Strs: []string{"foo <<-'EOF'\n\tbar\nEOF"},
 		common: &Stmt{
 			Cmd: litCall("foo"),
 			Redirs: []*Redirect{{
 				Op:   DashHdoc,
 				Word: word(sglQuoted("EOF")),
-				Hdoc: litWord("\tbar\n\t"),
+				Hdoc: litWord("bar\n"),
 			}},
 		},
 	},
@@ -1572,6 +1600,16 @@ var fileTests = []testCase{
 			word(sglQuoted(`a\b`)),
 			word(dblQuoted(lit(`\\`))),
 			word(dblQuoted(lit(`a\a`))),
+		))),
+	},
+	{
+		Strs: []string{
+			"$(echo $(x))",
+			"`echo \\`x\\``",
+		},
+		common: cmdSubst(stmt(call(
+			litWord("echo"),
+			word(cmdSubst(litStmt("x"))),
 		))),
 	},
 	{
@@ -2192,13 +2230,17 @@ var fileTests = []testCase{
 		},
 	},
 	{
-		Strs: []string{
-			`${foo//#/}`,
-			`${foo//#}`,
-		},
+		Strs: []string{`${foo//#/}`, `${foo//#}`},
 		bsmk: &ParamExp{
 			Param: lit("foo"),
 			Repl:  &Replace{All: true, Orig: litWord("#")},
+		},
+	},
+	{
+		Strs: []string{`${foo//[42]/}`},
+		bsmk: &ParamExp{
+			Param: lit("foo"),
+			Repl:  &Replace{All: true, Orig: litWord("[42]")},
 		},
 	},
 	{
@@ -2676,6 +2718,10 @@ var fileTests = []testCase{
 	},
 	{
 		Strs:   []string{"foo$", "foo$\n"},
+		common: word(lit("foo"), lit("$")),
+	},
+	{
+		Strs:   []string{"foo$", "foo$\\\n"},
 		common: word(lit("foo"), lit("$")),
 	},
 	{
@@ -3212,6 +3258,17 @@ var fileTests = []testCase{
 		})},
 	},
 	{
+		Strs: []string{
+			"[[ a && (b) ]]",
+			"[[ a &&\n(\nb) ]]",
+		},
+		bsmk: &TestClause{X: &BinaryTest{
+			Op: AndTest,
+			X:  litWord("a"),
+			Y:  parenTest(litWord("b")),
+		}},
+	},
+	{
 		Strs: []string{"[[ (a && b) || -f c ]]"},
 		bsmk: &TestClause{X: &BinaryTest{
 			Op: OrTest,
@@ -3426,15 +3483,14 @@ var fileTests = []testCase{
 		posix: litStmt("readonly", "-n"),
 	},
 	{
-		Strs: []string{"nameref bar"},
+		Strs: []string{"nameref bar="},
 		bsmk: &DeclClause{
 			Variant: lit("nameref"),
 			Assigns: []*Assign{{
-				Naked: true,
-				Name:  lit("bar"),
+				Name: lit("bar"),
 			}},
 		},
-		posix: litStmt("nameref", "bar"),
+		posix: litStmt("nameref", "bar="),
 	},
 	{
 		Strs: []string{"declare -a +n -b$o foo=bar"},
@@ -3493,10 +3549,7 @@ var fileTests = []testCase{
 		},
 	},
 	{
-		Strs: []string{
-			"declare foo[a]",
-			"declare foo[a]=",
-		},
+		Strs: []string{"declare foo[a]="},
 		bash: &DeclClause{
 			Variant: lit("declare"),
 			Assigns: []*Assign{{
@@ -3512,6 +3565,7 @@ var fileTests = []testCase{
 			Assigns: []*Assign{{
 				Name:  lit("foo"),
 				Index: litWord("*"),
+				Naked: true,
 			}},
 		},
 	},
@@ -3522,6 +3576,7 @@ var fileTests = []testCase{
 			Assigns: []*Assign{{
 				Name:  lit("foo"),
 				Index: word(dblQuoted(lit("x y"))),
+				Naked: true,
 			}},
 		},
 	},
@@ -3532,6 +3587,7 @@ var fileTests = []testCase{
 			Assigns: []*Assign{{
 				Name:  lit("foo"),
 				Index: word(sglQuoted("x y")),
+				Naked: true,
 			}},
 		},
 	},
@@ -3722,6 +3778,19 @@ var fileTests = []testCase{
 		),
 	},
 	{
+		Strs: []string{
+			`let a=$(echo 3)`,
+			"let a=`echo 3`",
+		},
+		bash: letClause(
+			&BinaryArithm{
+				Op: Assgn,
+				X:  litWord("a"),
+				Y:  word(cmdSubst(litStmt("echo", "3"))),
+			},
+		),
+	},
+	{
 		Strs:   []string{"(foo-bar)"},
 		common: subshell(litStmt("foo-bar")),
 	},
@@ -3830,6 +3899,21 @@ var fileTests = []testCase{
 			Index:  litWord("i"),
 			Value:  litWord("2"),
 		}}},
+	},
+	{
+		Strs: []string{`$((a + "b + $c"))`},
+		common: arithmExp(&BinaryArithm{
+			Op: Add,
+			X:  litWord("a"),
+			Y: word(dblQuoted(
+				lit("b + "),
+				litParamExp("c"),
+			)),
+		}),
+	},
+	{
+		Strs: []string{`let 'i++'`},
+		bsmk: letClause(word(sglQuoted("i++"))),
 	},
 	{
 		Strs: []string{`echo ${a["x y"]}`},
@@ -3990,7 +4074,7 @@ var fileTests = []testCase{
 	},
 }
 
-// these don't have a canonical format with the same AST
+// these don't have a canonical format with the same syntax tree
 var fileTestsNoPrint = []testCase{
 	{
 		Strs:  []string{`$[foo]`},
@@ -4055,6 +4139,11 @@ func clearPosRecurse(tb testing.TB, src string, v interface{}) {
 			return
 		}
 		if strs == nil {
+			return
+		}
+		if strings.Contains(src, "<<-") {
+			// since the tab indentation in <<- heredoc bodies
+			// aren't part of the final literals
 			return
 		}
 		var gotErr string
@@ -4133,6 +4222,9 @@ func clearPosRecurse(tb testing.TB, src string, v interface{}) {
 			}
 		}
 		recurse(x.Comments)
+		if src[x.Position.Offset()] == '#' {
+			tb.Fatalf("Stmt.Pos() should not be a comment")
+		}
 		setPos(&x.Position)
 		if x.Semicolon.IsValid() {
 			setPos(&x.Semicolon, ";", "&", "|&")
@@ -4396,7 +4488,9 @@ func clearPosRecurse(tb testing.TB, src string, v interface{}) {
 			recurse(ci)
 		}
 	case *CaseItem:
-		setPos(&x.OpPos, x.Op.String(), "esac")
+		if x.OpPos.IsValid() {
+			setPos(&x.OpPos, x.Op.String(), "esac")
+		}
 		recurse(x.Patterns)
 		recurse(x.StmtList)
 	case *TestClause:

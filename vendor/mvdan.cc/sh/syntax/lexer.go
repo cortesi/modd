@@ -77,7 +77,9 @@ retry:
 					bquotes++
 					goto retry
 				}
-				bquotes = 0
+			}
+			if b == '`' {
+				p.lastBquoteEsc = bquotes
 			}
 			if p.litBs != nil {
 				p.litBs = append(p.litBs, b)
@@ -797,19 +799,17 @@ loop:
 			if p.quote&allParamExp != 0 && p.quote != paramExpExp {
 				break loop
 			}
-		case ']':
-			if p.quote == arithmExprBrack {
-				break loop
-			}
 		case ':', '=', '%', '^', ',', '?', '!', '*':
 			if p.quote&allArithmExpr != 0 || p.quote == paramExpName {
 				break loop
 			}
-		case '#', '[', '@':
-			if p.quote&allParamReg != 0 {
+		case '[', ']':
+			if p.lang != LangPOSIX && p.quote&allArithmExpr != 0 {
 				break loop
 			}
-			if r == '[' && p.lang != LangPOSIX && p.quote&allArithmExpr != 0 {
+			fallthrough
+		case '#', '@':
+			if p.quote&allParamReg != 0 {
 				break loop
 			}
 		case '\'', '+', '-', ' ', '\t', ';', '&', '>', '<', '|', '(', ')', '\n', '\r':
@@ -889,10 +889,14 @@ func (p *Parser) advanceLitHdoc(r rune) {
 	p.newLit(r)
 	if p.quote == hdocBodyTabs {
 		for r == '\t' {
+			p.discardLit(1)
 			r = p.rune()
 		}
 	}
 	lStart := len(p.litBs) - 1
+	if lStart < 0 {
+		return
+	}
 	for ; ; r = p.rune() {
 		switch r {
 		case '`', '$':
@@ -915,6 +919,7 @@ func (p *Parser) advanceLitHdoc(r rune) {
 			if p.quote == hdocBodyTabs {
 				for p.peekByte('\t') {
 					p.rune()
+					p.discardLit(1)
 				}
 			}
 			lStart = len(p.litBs)
@@ -932,10 +937,14 @@ func (p *Parser) hdocLitWord() *Word {
 		}
 		if p.quote == hdocBodyTabs {
 			for r == '\t' {
+				p.discardLit(1)
 				r = p.rune()
 			}
 		}
 		lStart := len(p.litBs) - 1
+		if lStart < 0 {
+			return nil
+		}
 		for r != utf8.RuneSelf && r != '\n' {
 			r = p.rune()
 		}

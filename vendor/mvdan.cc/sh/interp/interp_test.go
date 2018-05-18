@@ -1497,16 +1497,8 @@ var fileCases = []struct {
 	},
 	{"set -o noexec; echo foo", ""},
 	{"set +o noexec; echo foo", "foo\n"},
-	{
-		"set -e; set -o",
-		`allexport:	off
-errexit:	on
-noexec:	off
-noglob:	off
-nounset:	off
-pipefail:	off
- #IGNORE`,
-	},
+	{"set -e; set -o | grep -E 'errexit|noexec' | wc -l", "2\n"},
+	{"set -e; set -o | grep -E 'errexit|noexec' | grep 'on$' | wc -l", "1\n"},
 	{
 		"set -a; set +o",
 		`set -o allexport
@@ -1555,6 +1547,14 @@ set +o pipefail
 		`a=b eval 'echo $a; unset a; echo $a'`,
 		"b\n\n",
 	},
+
+	// shopt
+	{"set -e; shopt -o | grep -E 'errexit|noexec' | wc -l", "2\n"},
+	{"set -e; shopt -o | grep -E 'errexit|noexec' | grep 'on$' | wc -l", "1\n"},
+	{"shopt -s -o noexec; echo foo", ""},
+	{"shopt -u -o noexec; echo foo", "foo\n"},
+	{"shopt -u globstar; shopt globstar | grep 'off$' | wc -l", "1\n"},
+	{"shopt -s globstar; shopt globstar | grep 'off$' | wc -l", "0\n"},
 
 	// IFS
 	{`echo -n "$IFS"`, " \t\n"},
@@ -1883,11 +1883,11 @@ set +o pipefail
 		"*.x\nfoo *.y bar\n",
 	},
 	{
-		"mkdir a; touch a/b.x; echo */*.x | sed 's@\\\\@/@'; cd a; echo *.x",
+		"mkdir a; touch a/b.x; echo */*.x | sed 's@\\\\@/@g'; cd a; echo *.x",
 		"a/b.x\nb.x\n",
 	},
 	{
-		"mkdir -p a/b/c; echo a/* | sed 's@\\\\@/@'",
+		"mkdir -p a/b/c; echo a/* | sed 's@\\\\@/@g'",
 		"a/b\n",
 	},
 	{
@@ -1901,6 +1901,18 @@ set +o pipefail
 	{
 		`mkdir d; touch d/.hidden d/a; set -- "$(echo d/*)" "$(echo d/.h*)"; echo ${#1} ${#2}; rm -r d`,
 		"3 9\n",
+	},
+	{
+		"mkdir -p a/b/c; echo a/** | sed 's@\\\\@/@g'",
+		"a/b\n",
+	},
+	{
+		"shopt -s globstar; mkdir -p a/b/c; echo a/** | sed 's@\\\\@/@g'",
+		"a/ a/b a/b/c\n",
+	},
+	{
+		"shopt -s globstar; mkdir -p a/b/c; echo **/c | sed 's@\\\\@/@g'",
+		"a/b/c\n",
 	},
 
 	// brace expansion; more exhaustive tests in the syntax package
@@ -2151,10 +2163,7 @@ func TestFile(t *testing.T) {
 				cb.WriteString(err.Error())
 			}
 			want := c.want
-			if i := strings.Index(want, " #JUSTERR"); i >= 0 {
-				want = want[:i]
-			}
-			if i := strings.Index(want, " #IGNORE"); i >= 0 {
+			if i := strings.Index(want, " #"); i >= 0 {
 				want = want[:i]
 			}
 			if got := cb.String(); got != want {
@@ -2213,9 +2222,11 @@ func TestFileConfirm(t *testing.T) {
 }
 
 func TestRunnerOpts(t *testing.T) {
-	withPath := func(strs ...string) []string {
-		env := []string{"PATH=" + os.Getenv("PATH")}
-		return append(env, strs...)
+	withPath := func(strs ...string) Environ {
+		list := []string{"PATH=" + os.Getenv("PATH")}
+		list = append(list, strs...)
+		env, _ := EnvFromList(list)
+		return env
 	}
 	cases := []struct {
 		runner   Runner
@@ -2238,21 +2249,18 @@ func TestRunnerOpts(t *testing.T) {
 		},
 		{
 			Runner{Env: withPath("a=b")},
-			"env | grep '^a='; echo $a",
-			"a=b\nb\n",
+			"echo $a",
+			"b\n",
 		},
 		{
-			// TODO(mvdan): remove tail once we only support
-			// Go 1.9 and later, since os/exec doesn't dedup
-			// the env in earlier versions.
-			Runner{Env: withPath("a=b", "a=c")},
-			"env | grep '^a=' | tail -n 1; echo $a",
-			"a=c\nc\n",
+			Runner{Env: withPath("A=b")},
+			"env | grep '^A='; echo $A",
+			"A=b\nb\n",
 		},
 		{
-			Runner{Env: withPath("foo")},
-			"",
-			`env not in the form key=value: "foo"`,
+			Runner{Env: withPath("A=b", "A=c")},
+			"env | grep '^A='; echo $A",
+			"A=c\nc\n",
 		},
 		{
 			Runner{Env: withPath("HOME=")},

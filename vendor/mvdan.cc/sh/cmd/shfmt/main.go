@@ -47,7 +47,7 @@ var (
 	in  io.Reader = os.Stdin
 	out io.Writer = os.Stdout
 
-	version = "v2.3.0"
+	version = "v2.4.0"
 )
 
 func main() {
@@ -81,7 +81,7 @@ Printer options:
 Utilities:
 
   -f        recursively find all shell files and print the paths
-  -tojson   print AST to stdout as a typed JSON
+  -tojson   print syntax tree to stdout as a typed JSON
 `)
 	}
 	flag.Parse()
@@ -129,7 +129,9 @@ Utilities:
 	})
 	if flag.NArg() == 0 {
 		if err := formatStdin(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			if err != errChangedWithDiff {
+				fmt.Fprintln(os.Stderr, err)
+			}
 			os.Exit(1)
 		}
 		return
@@ -141,14 +143,18 @@ Utilities:
 	anyErr := false
 	for _, path := range flag.Args() {
 		walk(path, func(err error) {
+			if err != errChangedWithDiff {
+				fmt.Fprintln(os.Stderr, err)
+			}
 			anyErr = true
-			fmt.Fprintln(os.Stderr, err)
 		})
 	}
 	if anyErr {
 		os.Exit(1)
 	}
 }
+
+var errChangedWithDiff = fmt.Errorf("")
 
 func formatStdin() error {
 	if *write {
@@ -262,6 +268,7 @@ func formatBytes(src []byte, path string) error {
 				return fmt.Errorf("computing diff: %s", err)
 			}
 			out.Write(data)
+			return errChangedWithDiff
 		}
 	}
 	if !*list && !*write && !*diff {

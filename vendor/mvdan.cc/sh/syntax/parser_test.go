@@ -286,7 +286,7 @@ func singleParse(p *Parser, in string, want *File) func(t *testing.T) {
 		}
 		clearPosRecurse(t, in, got)
 		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("AST mismatch in %q\ndiff:\n%s", in,
+			t.Fatalf("syntax tree mismatch in %q\ndiff:\n%s", in,
 				strings.Join(pretty.Diff(want, got), "\n"),
 			)
 		}
@@ -294,47 +294,28 @@ func singleParse(p *Parser, in string, want *File) func(t *testing.T) {
 }
 
 func BenchmarkParse(b *testing.B) {
-	type benchmark struct {
-		name, in string
-	}
-	benchmarks := []benchmark{
-		{
-			"LongStrs",
-			strings.Repeat("\n\n\t\t        \n", 10) +
-				"# " + strings.Repeat("foo bar ", 10) + "\n" +
-				strings.Repeat("longlit_", 10) + "\n" +
-				"'" + strings.Repeat("foo bar ", 20) + "'\n" +
-				`"` + strings.Repeat("foo bar ", 20) + `"`,
-		},
-		{
-			"Cmds+Nested",
-			strings.Repeat("a b c d; ", 8) +
-				"a() { (b); { c; }; }; $(d; `e`)",
-		},
-		{
-			"Vars+Clauses",
-			"foo=bar; a=b; c=d$foo${bar}e $simple ${complex:-default}; " +
-				"if a; then while b; do for c in d e; do f; done; done; fi",
-		},
-		{
-			"Binary+Redirs",
-			"a | b && c || d | e && g || f | h; " +
-				"foo >a <b <<<c 2>&1 <<EOF\n" +
-				strings.Repeat("somewhat long heredoc line\n", 10) +
-				"EOF",
-		},
-	}
-	for _, c := range benchmarks {
-		b.Run(c.name, func(b *testing.B) {
-			p := NewParser(KeepComments)
-			in := strings.NewReader(c.in)
-			for i := 0; i < b.N; i++ {
-				if _, err := p.Parse(in, ""); err != nil {
-					b.Fatal(err)
-				}
-				in.Reset(c.in)
-			}
-		})
+	src := "" +
+		strings.Repeat("\n\n\t\t        \n", 10) +
+		"# " + strings.Repeat("foo bar ", 10) + "\n" +
+		strings.Repeat("longlit_", 10) + "\n" +
+		"'" + strings.Repeat("foo bar ", 10) + "'\n" +
+		`"` + strings.Repeat("foo bar ", 10) + `"` + "\n" +
+		strings.Repeat("aa bb cc dd; ", 6) +
+		"a() { (b); { c; }; }; $(d; `e`)\n" +
+		"foo=bar; a=b; c=d$foo${bar}e $simple ${complex:-default}\n" +
+		"if a; then while b; do for c in d e; do f; done; done; fi\n" +
+		"a | b && c || d | e && g || f\n" +
+		"foo >a <b <<<c 2>&1 <<EOF\n" +
+		strings.Repeat("somewhat long heredoc line\n", 10) +
+		"EOF" +
+		""
+	p := NewParser(KeepComments)
+	in := strings.NewReader(src)
+	for i := 0; i < b.N; i++ {
+		if _, err := p.Parse(in, ""); err != nil {
+			b.Fatal(err)
+		}
+		in.Reset(src)
 	}
 }
 
@@ -758,6 +739,16 @@ var shellTests = []errorCase{
 		mksh:   `1:1: unclosed here-document 'EOF'`,
 	},
 	{
+		in:     "<<-EOF\n\t",
+		common: `1:1: unclosed here-document 'EOF' #NOERR`,
+		mksh:   `1:1: unclosed here-document 'EOF'`,
+	},
+	{
+		in:     "<<-'EOF'\n\t",
+		common: `1:1: unclosed here-document 'EOF' #NOERR`,
+		mksh:   `1:1: unclosed here-document 'EOF'`,
+	},
+	{
 		in:     "<<\nEOF\nbar\nEOF",
 		common: `1:1: << must be followed by a word`,
 	},
@@ -831,7 +822,7 @@ var shellTests = []errorCase{
 	},
 	{
 		in:     "for i",
-		common: `1:1: "for foo" must be followed by "in", ; or a newline`,
+		common: `1:1: "for foo" must be followed by "in", "do", ;, or a newline`,
 	},
 	{
 		in:     "for i in;",
@@ -863,7 +854,7 @@ var shellTests = []errorCase{
 	},
 	{
 		in:     "for in 1 2 3; do echo $i; done",
-		common: `1:1: "for foo" must be followed by "in", ; or a newline`,
+		common: `1:1: "for foo" must be followed by "in", "do", ;, or a newline`,
 	},
 	{
 		in:   "select",
@@ -871,7 +862,7 @@ var shellTests = []errorCase{
 	},
 	{
 		in:   "select i",
-		bsmk: `1:1: "select foo" must be followed by "in", ; or a newline`,
+		bsmk: `1:1: "select foo" must be followed by "in", "do", ;, or a newline`,
 	},
 	{
 		in:   "select i in;",
@@ -895,7 +886,7 @@ var shellTests = []errorCase{
 	},
 	{
 		in:   "select in 1 2 3; do echo $i; done",
-		bsmk: `1:1: "select foo" must be followed by "in", ; or a newline`,
+		bsmk: `1:1: "select foo" must be followed by "in", "do", ;, or a newline`,
 	},
 	{
 		in:     "echo foo &\n;",
@@ -922,28 +913,8 @@ var shellTests = []errorCase{
 		common: `1:6: reached EOF without matching $(( with ))`,
 	},
 	{
-		in:     `echo $(("`,
-		common: `1:9: quotes should not be used in arithmetic expressions`,
-	},
-	{
-		in:     `echo $((a"`,
-		common: `1:10: quotes should not be used in arithmetic expressions`,
-	},
-	{
-		in:   `echo $(($'`,
-		bsmk: `1:9: quotes should not be used in arithmetic expressions`,
-	},
-	{
-		in:     `echo $(('`,
-		common: `1:9: quotes should not be used in arithmetic expressions`,
-	},
-	{
 		in:     `echo $(($(a"`,
 		common: `1:12: reached EOF without closing quote "`,
-	},
-	{
-		in:     `echo $(($((a"`,
-		common: `1:13: quotes should not be used in arithmetic expressions`,
 	},
 	{
 		in:     "echo $((`echo 0`",
@@ -960,10 +931,6 @@ var shellTests = []errorCase{
 	{
 		in:     `echo $((a b"`,
 		common: `1:11: not a valid arithmetic operator: b`,
-	},
-	{
-		in:     "echo $((\"`)",
-		common: `1:9: quotes should not be used in arithmetic expressions`,
 	},
 	{
 		in:     "echo $(())",
@@ -1035,17 +1002,8 @@ var shellTests = []errorCase{
 		common: `1:13: = must follow a name #NOERR`,
 	},
 	{
-		in:     "echo $(('1=2'))",
-		common: `1:9: quotes should not be used in arithmetic expressions`,
-	},
-	{
 		in:     "echo $((1'2'))",
 		common: `1:10: not a valid arithmetic operator: '`,
-	},
-	{
-		in:     "echo $(($1'2'))",
-		common: `1:11: quotes should not be used in arithmetic expressions`,
-		mksh:   `1:11: quotes should not be used in arithmetic expressions #NOERR`,
 	},
 	{
 		in:     "<<EOF\n$(()a",
@@ -1363,14 +1321,6 @@ var shellTests = []errorCase{
 		bsmk: `1:8: = must follow a name`,
 	},
 	{
-		in:   "let 'foo'",
-		bsmk: `1:5: quotes should not be used in arithmetic expressions`,
-	},
-	{
-		in:   `let a"=b+c"`,
-		bsmk: `1:6: quotes should not be used in arithmetic expressions`,
-	},
-	{
 		in:   "`let` { foo; }",
 		bsmk: `1:2: "let" must be followed by an expression`,
 	},
@@ -1597,10 +1547,6 @@ var shellTests = []errorCase{
 		bsmk: `1:1: reached ( without matching (( with ))`,
 	},
 	{
-		in:   "echo $((\"a`b((",
-		bsmk: `1:9: quotes should not be used in arithmetic expressions`,
-	},
-	{
 		in:   "time {",
 		bsmk: `1:6: reached EOF without matching { with }`,
 	},
@@ -1628,6 +1574,10 @@ var shellTests = []errorCase{
 	{
 		in:   "echo ${foo[}",
 		bsmk: `1:11: [ must be followed by an expression`,
+	},
+	{
+		in:   "echo ${foo]}",
+		bsmk: `1:11: not a valid parameter expansion operator: ]`,
 	},
 	{
 		in:   "echo ${foo[]}",

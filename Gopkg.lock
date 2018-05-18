@@ -38,10 +38,10 @@
   revision = "87cefd5ac843f65364f70a1fd2477bb6437690e8"
 
 [[projects]]
+  branch = "master"
   name = "github.com/fatih/color"
   packages = ["."]
-  revision = "507f6050b8568533fb3f5504de8e5205fa62a114"
-  version = "v1.6.0"
+  revision = "2d684516a8861da43017284349b7e303e809ac21"
 
 [[projects]]
   branch = "master"
@@ -71,13 +71,13 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "d6449816ce06963d9d136eee5a56fca5b0616e7e"
+  revision = "1a580b3eff7814fc9b40602fd35256c63b50f491"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
-  revision = "61147c48b25b599e5b561d2e9c4f3e1ef489ca41"
+  revision = "2491c5de3490fced2f6cff376127c667efeed857"
 
 [[projects]]
   branch = "master"
@@ -86,7 +86,7 @@
     "unix",
     "windows"
   ]
-  revision = "3b87a42e500a6dc65dae1a55d0b641295971163e"
+  revision = "7c87d13f8e835d2fb3a70a2912c811ed0c1d241b"
 
 [[projects]]
   name = "gopkg.in/alecthomas/kingpin.v2"
@@ -96,13 +96,16 @@
 
 [[projects]]
   name = "mvdan.cc/sh"
-  packages = ["syntax"]
-  revision = "406aa91bb579fc3746db9a55cd9194a7e7db6e92"
-  version = "v2.3.0"
+  packages = [
+    "interp",
+    "syntax"
+  ]
+  revision = "128633afd9abdc36754d0c4dbbe9d226d35965a5"
+  version = "v2.4.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "91c4687f476dc9e5390080bead3b4e950a19a91f885de1f52da28ebfeedb6157"
+  inputs-digest = "6b470cd110bcec6965be485965089982c073d1986aa718e4dc39872d97987087"
   solver-name = "gps-cdcl"
   solver-version = 1
