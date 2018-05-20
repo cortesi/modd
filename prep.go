@@ -1,9 +1,8 @@
 package modd
 
 import (
-	"bytes"
 	"fmt"
-	"sync"
+	"time"
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
@@ -26,45 +25,19 @@ func (p ProcError) Error() string {
 // RunProc runs a process to completion, sending output to log
 func RunProc(cmd, shellMethod string, log termlog.Stream) error {
 	log.Header()
-
-	c, err := shell.Command(shellMethod, cmd)
+	ex := shell.GetExecutor(shellMethod)
+	if ex == nil {
+		return fmt.Errorf("Could not find executor %s", shellMethod)
+	}
+	start := time.Now()
+	err, procerr, errbuf := ex.Run(cmd, log, true)
 	if err != nil {
 		return err
+	} else if procerr != nil {
+		log.Shout("%s", procerr)
+		return ProcError{err.Error(), errbuf}
 	}
-	stdo, err := c.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stde, err := c.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	buff := new(bytes.Buffer)
-	mut := sync.Mutex{}
-	err = c.Start()
-	if err != nil {
-		return err
-	}
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	go logOutput(
-		&wg, stde,
-		func(s string, args ...interface{}) {
-			log.Warn(s, args...)
-			mut.Lock()
-			defer mut.Unlock()
-			fmt.Fprintf(buff, "%s\n", args...)
-		},
-	)
-	go logOutput(&wg, stdo, log.Say)
-	wg.Wait()
-	err = c.Wait()
-	if err != nil {
-		log.Shout("%s", c.ProcessState.String())
-		return ProcError{err.Error(), buff.String()}
-	}
-	log.Notice(">> done (%s)", c.ProcessState.UserTime())
+	log.Notice(">> done (%s)", time.Since(start))
 	return nil
 }
 

@@ -27,7 +27,6 @@ type daemon struct {
 	indir string
 
 	log     termlog.Stream
-	cmd     *exec.Cmd
 	shell   string
 	stop    bool
 	started bool
@@ -44,6 +43,12 @@ func (d *daemon) Run() {
 			time.Sleep(delay - since)
 		}
 		lastStart = time.Now()
+
+		ex := shell.GetExecutor(d.shell)
+		if ex == nil {
+			d.log.Shout("Could not find executor %s", d.shell)
+		}
+		err, procerr, errbuf := ex.Run(d.conf.Command, d.log, false)
 
 		c, err := shell.Command(d.shell, d.conf.Command)
 		if err != nil {

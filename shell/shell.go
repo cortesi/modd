@@ -1,115 +1,173 @@
 package shell
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"sync"
 
+	"github.com/cortesi/termlog"
 	"github.com/google/shlex"
 )
 
 var Default = "bash"
 
-type Executor interface {
-	Name() string
-	Run(command string) (*exec.Cmd, error)
+type ExitError error
+
+type Executor struct {
+	Shell   string
+	Command string
+
+	cmd *exec.Cmd
+	sync.Mutex
 }
 
-var shells = make(map[string]Executor)
-
-func init() {
-	register(&Exec{})
-	register(&Bash{})
-	register(&Builtin{})
-}
-
-// Register a new shell interface.
-func register(i Executor) {
-	name := i.Name()
-	if _, has := shells[name]; has {
-		panic("shell interface " + name + " already exists")
-	}
-	shells[name] = i
-}
-
-// Has returns if the method name exists or not.
-func Has(method string) bool {
-	if len(method) == 0 {
-		method = Default
-	}
-	_, has := shells[method]
-	return has
-}
-
-// Command returns a *Cmd. If method is empty then the default shell
-// interface method is used. The line should contain the exec line.
-func Command(method string, line string) (*exec.Cmd, error) {
-	if method == "" {
-		method = Default
-	}
-
-	i, has := shells[method]
-	if !has {
-		return nil, fmt.Errorf("Shell method %q not found", method)
-	}
-	return i.Run(line)
-}
-
-// No shell, just execute the command raw.
-type Exec struct{}
-
-func (r *Exec) Name() string {
-	return "exec"
-}
-
-func (r *Exec) Run(line string) (*exec.Cmd, error) {
-	ss, err := shlex.Split(line)
+func NewExecutor(shell string, command string) (*Executor, error) {
+	_, err := makeCommand(shell, command)
 	if err != nil {
 		return nil, err
 	}
-	if len(ss) == 0 {
-		return nil, errors.New("No command defined")
+	return &Executor{Shell: shell, Command: command}, nil
+}
+
+func (e *Executor) start(
+	log termlog.Stream, bufferr bool,
+) (*exec.Cmd, *bytes.Buffer, *sync.WaitGroup, error) {
+	e.Lock()
+	defer e.Unlock()
+
+	cmd, err := makeCommand(e.Shell, e.Command)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	return exec.Command(ss[0], ss[1:]...), nil
+	e.cmd = cmd
+
+	stdo, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	stde, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	buff := new(bytes.Buffer)
+	err = cmd.Start()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	buflock := sync.Mutex{}
+	go logOutput(
+		&wg, stde,
+		func(s string, args ...interface{}) {
+			log.Warn(s, args...)
+			if bufferr {
+				buflock.Lock()
+				defer buflock.Unlock()
+				fmt.Fprintf(buff, "%s\n", args...)
+			}
+		},
+	)
+	go logOutput(&wg, stdo, log.Say)
+	return cmd, buff, &wg, nil
 }
 
-// Bash shell command.
-type Bash struct{}
-
-func (b *Bash) Name() string {
-	return "bash"
+func (e *Executor) running() bool {
+	return e.cmd != nil
 }
 
-func (b *Bash) getShell() (string, error) {
+func (e *Executor) Running() bool {
+	e.Lock()
+	defer e.Unlock()
+	return e.running()
+}
+
+func (e *Executor) reset() {
+	e.Lock()
+	defer e.Unlock()
+	e.cmd = nil
+}
+
+func (e *Executor) Run(log termlog.Stream, bufferr bool) (error, ExitError, string) {
+	cmd, buff, wg, err := e.start(log, bufferr)
+	if err != nil {
+		return err, nil, ""
+	}
+	eret := cmd.Wait()
+	wg.Wait()
+	e.reset()
+	return nil, eret, buff.String()
+}
+
+func (e *Executor) Signal(sig os.Signal) error {
+	e.Lock()
+	defer e.Unlock()
+	if !e.running() {
+		return fmt.Errorf("executor not running")
+	}
+	return e.cmd.Process.Signal(sig)
+}
+
+func (e *Executor) Stop() error {
+	e.Lock()
+	defer e.Unlock()
+	if !e.running() {
+		return fmt.Errorf("executor not running")
+	}
+	return e.cmd.Process.Kill()
+}
+
+func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interface{})) {
+	defer wg.Done()
+	r := bufio.NewReader(fp)
+	for {
+		line, _, err := r.ReadLine()
+		if err != nil {
+			return
+		}
+		out("%s", string(line))
+	}
+}
+
+func makeCommand(shell string, command string) (*exec.Cmd, error) {
+	switch shell {
+	case "exec":
+		ss, err := shlex.Split(command)
+		if err != nil {
+			return nil, err
+		}
+		if len(ss) == 0 {
+			return nil, errors.New("No command defined")
+		}
+		return exec.Command(ss[0], ss[1:]...), nil
+	case "bash":
+		sh, err := getBash()
+		if err != nil {
+			return nil, fmt.Errorf("Could not find bash or sh")
+		}
+		return exec.Command(sh, "-c", command), nil
+	case "builtin":
+		path, err := os.Executable()
+		if err != nil {
+			return nil, err
+		}
+		return exec.Command(path, "--exec", command), nil
+	default:
+		return nil, fmt.Errorf("Unknown shell: %s", shell)
+	}
+}
+
+func getBash() (string, error) {
 	if _, err := exec.LookPath("bash"); err == nil {
 		return "bash", nil
 	}
 	if _, err := exec.LookPath("sh"); err == nil {
 		return "sh", nil
 	}
-	return "", fmt.Errorf("Could not find bash or sh on path.")
-}
-
-func (b *Bash) Run(line string) (*exec.Cmd, error) {
-	sh, err := b.getShell()
-	if err != nil {
-		return nil, err
-	}
-	return exec.Command(sh, "-c", line), nil
-}
-
-// Builtin shell command.
-type Builtin struct{}
-
-func (b *Builtin) Name() string {
-	return "builtin"
-}
-
-func (b *Builtin) Run(line string) (*exec.Cmd, error) {
-	path, err := os.Executable()
-	if err != nil {
-		return nil, err
-	}
-	return exec.Command(path, "--exec", line), nil
+	return "", fmt.Errorf("could not find bash or sh on path")
 }

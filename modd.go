@@ -87,7 +87,10 @@ func (mr *ModRunner) ReadConfig() error {
 	}
 
 	shellMethod := newcnf.GetVariables()[shellVarName]
-	if shellMethod != "" && !shell.Has(shellMethod) {
+	if shellMethod == "" {
+		shellMethod = shell.Default
+	}
+	if shell.GetExecutor(shellMethod) == nil {
 		return fmt.Errorf("No such shell: %q", shellMethod)
 	}
 
