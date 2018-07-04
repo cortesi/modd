@@ -410,7 +410,7 @@ any prep command that exits abnormally to a desktop notifier. Since modd
 commands are shell scripts, you can redirect or manipulate output to entirely
 customise what gets sent to notifiers as needed.
 
-At the moment, we support [Growl](http://growl.info/) on OSX, and
+At the moment, we support [Growl](http://growl.info/) on OSX, [osascript display notification](https://developer.apple.com/library/content/documentation/LanguagesUtilities/Conceptual/MacAutomationScriptingGuide/DisplayNotifications.html) on OSX and
 [libnotify](https://launchpad.net/ubuntu/+source/libnotify) on Linux and other
 Unix systems.
 
