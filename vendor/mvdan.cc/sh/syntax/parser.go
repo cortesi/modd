@@ -712,9 +712,16 @@ func (p *Parser) wordPart() WordPart {
 		p.pos = posAddCol(p.pos, 1)
 		pe.Param = p.getLit()
 		if pe.Param != nil && pe.Param.Value == "" {
-			// e.g. "$\\\n", which we can't detect above
 			l := p.lit(pe.Dollar, "$")
-			p.next()
+			if p.val == "" {
+				// e.g. "$\\\n" followed by a closing double
+				// quote, so we need the next token.
+				p.next()
+			} else {
+				// e.g. "$\\\"" within double quotes, so we must
+				// keep the rest of the literal characters.
+				l.ValueEnd = posAddCol(l.ValuePos, 1)
+			}
 			return l
 		}
 		return pe
@@ -1067,6 +1074,9 @@ func (p *Parser) paramExp() *ParamExp {
 	op := p.tok
 	switch p.tok {
 	case _Lit, _LitWord:
+		if !numberLiteral(p.val) && !ValidName(p.val) {
+			p.curErr("invalid parameter name")
+		}
 		pe.Param = p.lit(p.pos, p.val)
 		p.next()
 	case quest, minus:
@@ -1252,6 +1262,15 @@ func ValidName(val string) bool {
 	return true
 }
 
+func numberLiteral(val string) bool {
+	for _, r := range val {
+		if '0' > r || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func (p *Parser) hasValidIdent() bool {
 	if p.tok != _Lit && p.tok != _LitWord {
 		return false
@@ -1394,6 +1413,9 @@ func (p *Parser) doRedirect(s *Stmt) {
 		s.Redirs = append(s.Redirs, r)
 	}
 	r.N = p.getLit()
+	if p.lang != LangBash && r.N != nil && r.N.Value[0] == '{' {
+		p.posErr(r.N.Pos(), "{varname} redirects are a bash feature")
+	}
 	r.Op, r.OpPos = RedirOperator(p.tok), p.pos
 	p.next()
 	switch r.Op {

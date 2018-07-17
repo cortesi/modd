@@ -1455,6 +1455,15 @@ var fileTests = []testCase{
 		),
 	},
 	{
+		Strs: []string{"foo {fd}<f"},
+		bash: &Stmt{
+			Cmd: litCall("foo"),
+			Redirs: []*Redirect{
+				{Op: RdrIn, N: lit("{fd}"), Word: litWord("f")},
+			},
+		},
+	},
+	{
 		Strs: []string{"! foo"},
 		common: &Stmt{
 			Negated: true,
@@ -1779,7 +1788,7 @@ var fileTests = []testCase{
 		common: litWord("$"),
 	},
 	{
-		Strs: []string{`${@} ${*} ${#} ${$} ${?} ${!} ${0} ${-}`},
+		Strs: []string{`${@} ${*} ${#} ${$} ${?} ${!} ${0} ${29} ${-}`},
 		common: call(
 			word(&ParamExp{Param: lit("@")}),
 			word(&ParamExp{Param: lit("*")}),
@@ -1788,6 +1797,7 @@ var fileTests = []testCase{
 			word(&ParamExp{Param: lit("?")}),
 			word(&ParamExp{Param: lit("!")}),
 			word(&ParamExp{Param: lit("0")}),
+			word(&ParamExp{Param: lit("29")}),
 			word(&ParamExp{Param: lit("-")}),
 		),
 	},
@@ -2661,7 +2671,7 @@ var fileTests = []testCase{
 		}),
 	},
 	{
-		Strs: []string{"$((a /= b))"},
+		Strs: []string{"$((a /= b))", "$((a/=b))"},
 		common: arithmExp(&BinaryArithm{
 			Op: QuoAssgn,
 			X:  litWord("a"),
@@ -2803,6 +2813,10 @@ var fileTests = []testCase{
 	{
 		Strs:   []string{`"foo$$"`},
 		common: dblQuoted(lit("foo"), litParamExp("$")),
+	},
+	{
+		Strs:   []string{`"a $\"b\" c"`},
+		common: dblQuoted(lit(`a `), lit(`$`), lit(`\"b\" c`)),
 	},
 	{
 		Strs: []string{"$(foo$)", "`foo$`"},
@@ -4292,8 +4306,8 @@ func clearPosRecurse(tb testing.TB, src string, v interface{}) {
 		case end == len(src):
 			// same as above, but with word and EOF
 		case end != want:
-			tb.Fatalf("Unexpected Lit.End() %d (wanted %d) in %q",
-				end, want, string(src))
+			tb.Fatalf("Unexpected Lit %q End() %d (wanted %d) in %q",
+				val, end, want, string(src))
 		}
 		setPos(&x.ValuePos, val)
 		setPos(&x.ValueEnd)

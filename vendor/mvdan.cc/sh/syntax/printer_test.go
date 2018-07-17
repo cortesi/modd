@@ -70,6 +70,7 @@ var printTests = []printCase{
 	{"foo\n\n", "foo"},
 	{"\n\nfoo", "foo"},
 	{"# foo \n # bar\t", "# foo\n# bar"},
+	{"#", "#"},
 	samePrint("a=b # inline\nbar"),
 	samePrint("a=$(b) # inline"),
 	samePrint("foo # inline\n# after"),
@@ -299,6 +300,10 @@ var printTests = []printCase{
 		"foo | while read l; do\n\tbar\ndone",
 	},
 	samePrint("while x; do\n\t#comment\ndone"),
+	{
+		"while x\ndo\n\ty\ndone",
+		"while x; do\n\ty\ndone",
+	},
 	samePrint("\"\\\nfoo\""),
 	samePrint("'\\\nfoo'"),
 	samePrint("\"foo\\\n  bar\""),
@@ -369,6 +374,10 @@ var printTests = []printCase{
 	{
 		"a <<EOF\n$(\n\tb\n\tc)\nEOF",
 		"a <<EOF\n$(\n\tb\n\tc\n)\nEOF",
+	},
+	{
+		"<(<<EOF\nbody\nEOF\n)",
+		"<(\n\t<<EOF\nbody\nEOF\n)",
 	},
 	{
 		"( (foo) )\n$( (foo) )\n<( (foo) )",
@@ -658,6 +667,26 @@ func TestPrintSwitchCaseIndent(t *testing.T) {
 	}
 }
 
+func TestPrintSpaceRedirects(t *testing.T) {
+	var tests = [...]printCase{
+		samePrint("echo foo bar > f"),
+		samePrint("echo > f foo bar"),
+		samePrint("echo >(cmd)"),
+		samePrint("echo > >(cmd)"),
+		samePrint("<< EOF\nfoo\nEOF"),
+		samePrint("echo 2> f"),
+		samePrint("echo foo bar >&1"),
+		samePrint("echo 2<&1 foo bar"),
+	}
+	parser := NewParser(KeepComments)
+	printer := NewPrinter(SpaceRedirects)
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("%03d", i), func(t *testing.T) {
+			printTest(t, parser, printer, tc.in, tc.want)
+		})
+	}
+}
+
 func TestPrintKeepPadding(t *testing.T) {
 	var tests = [...]printCase{
 		samePrint("echo foo bar"),
@@ -690,6 +719,10 @@ func TestPrintMinify(t *testing.T) {
 	var tests = [...]printCase{
 		samePrint("echo foo bar $a $(b)"),
 		{
+			"#comment",
+			"",
+		},
+		{
 			"foo #comment",
 			"foo",
 		},
@@ -701,11 +734,7 @@ func TestPrintMinify(t *testing.T) {
 			"foo &",
 			"foo&",
 		},
-		{
-			"foo >bar",
-			"foo>bar",
-		},
-		samePrint("foo 2>bar"),
+		samePrint("foo >bar 2>baz <etc"),
 		{
 			"{\n\tfoo\n}",
 			"{\nfoo\n}",
@@ -731,6 +760,10 @@ func TestPrintMinify(t *testing.T) {
 			"echo $a $b $c-d ${e}f ${g}_h",
 		},
 		{
+			"echo ${0} ${3} ${10} ${22}",
+			"echo $0 $3 ${10} ${22}",
+		},
+		{
 			"case $a in\nx) c ;;\ny | z)\n\td\n\t;;\nesac",
 			"case $a in\nx)c;;\ny|z)d\nesac",
 		},
@@ -748,6 +781,52 @@ func TestPrintMinify(t *testing.T) {
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("%03d", i), func(t *testing.T) {
 			printTest(t, parser, printer, tc.in, tc.want)
+		})
+	}
+}
+
+func TestPrintMinifyNotBroken(t *testing.T) {
+	parserBash := NewParser(KeepComments)
+	parserPosix := NewParser(KeepComments, Variant(LangPOSIX))
+	parserMirBSD := NewParser(KeepComments, Variant(LangMirBSDKorn))
+	printer := NewPrinter(Minify)
+	for i, tc := range fileTests {
+		t.Run(fmt.Sprintf("File%03d", i), func(t *testing.T) {
+			parser := parserPosix
+			if tc.Bash != nil {
+				parser = parserBash
+			} else if tc.MirBSDKorn != nil {
+				parser = parserMirBSD
+			}
+			in := tc.Strs[0]
+			prog, err := parser.Parse(strings.NewReader(in), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := strPrint(printer, prog)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = parser.Parse(strings.NewReader(got), "")
+			if err != nil {
+				t.Fatalf("minified program was broken: %v\n%s", err, got)
+			}
+		})
+	}
+	for i, tc := range printTests {
+		t.Run(fmt.Sprintf("Print%03d", i), func(t *testing.T) {
+			prog, err := parserBash.Parse(strings.NewReader(tc.in), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := strPrint(printer, prog)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = parserBash.Parse(strings.NewReader(got), "")
+			if err != nil {
+				t.Fatalf("minified program was broken: %v\n%s", err, got)
+			}
 		})
 	}
 }
@@ -805,6 +884,39 @@ func TestPrintNodeTypes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if got != tc.want {
+				t.Fatalf("Print mismatch:\nwant:\n%s\ngot:\n%s",
+					tc.want, got)
+			}
+		})
+	}
+}
+
+func TestPrintManyStmts(t *testing.T) {
+	var tests = [...]struct {
+		in, want string
+	}{
+		{"foo; bar", "foo\nbar\n"},
+		{"foo\nbar", "foo\nbar\n"},
+		{"\n\nfoo\nbar\n\n", "foo\nbar\n"},
+		{"foo\nbar <<EOF\nbody\nEOF\n", "foo\nbar <<EOF\nbody\nEOF\n"},
+		{"foo\nbar # inline", "foo\nbar # inline\n"},
+		{"# comment before\nfoo bar", "# comment before\nfoo bar\n"},
+	}
+	parser := NewParser(KeepComments)
+	printer := NewPrinter()
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("%03d", i), func(t *testing.T) {
+			f, err := parser.Parse(strings.NewReader(tc.in), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var buf bytes.Buffer
+			for _, stmt := range f.Stmts {
+				printer.Print(&buf, stmt)
+				buf.WriteByte('\n')
+			}
+			got := buf.String()
 			if got != tc.want {
 				t.Fatalf("Print mismatch:\nwant:\n%s\ngot:\n%s",
 					tc.want, got)

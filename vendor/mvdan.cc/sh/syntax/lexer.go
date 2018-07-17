@@ -163,11 +163,12 @@ func (p *Parser) nextKeepSpaces() {
 			p.advanceLitDquote(r)
 		}
 	case hdocBody, hdocBodyTabs:
-		if r == '`' || r == '$' {
+		switch {
+		case r == '`' || r == '$':
 			p.tok = p.dqToken(r)
-		} else if p.hdocStop == nil {
+		case p.hdocStop == nil:
 			p.tok = _Newl
-		} else {
+		default:
 			p.advanceLitHdoc(r)
 		}
 	default: // paramExpExp:
@@ -721,14 +722,17 @@ func (p *Parser) arithmToken(r rune) token {
 }
 
 func (p *Parser) newLit(r rune) {
-	// don't let r == utf8.RuneSelf go to the second case as RuneLen
-	// would return -1
-	if r <= utf8.RuneSelf {
+	switch {
+	case r < utf8.RuneSelf:
 		p.litBs = p.litBuf[:1]
 		p.litBs[0] = byte(r)
-	} else {
+	case r > utf8.RuneSelf:
 		w := utf8.RuneLen(r)
 		p.litBs = append(p.litBuf[:0], p.bs[p.bsp-w:p.bsp]...)
+	default:
+		// don't let r == utf8.RuneSelf go to the second case as RuneLen
+		// would return -1
+		p.litBs = p.litBuf[:0]
 	}
 }
 
@@ -744,10 +748,13 @@ func (p *Parser) endLit() (s string) {
 	return
 }
 
-func (p *Parser) numLit() bool {
-	for _, b := range p.litBs {
+func (p *Parser) isLitRedir() bool {
+	lit := p.litBs[:len(p.litBs)-1]
+	if lit[0] == '{' && lit[len(lit)-1] == '}' {
+		return ValidName(string(lit[1 : len(lit)-1]))
+	}
+	for _, b := range lit {
 		switch b {
-		case '>', '<':
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		default:
 			return false
@@ -796,7 +803,7 @@ loop:
 				break loop
 			}
 		case '/':
-			if p.quote&allParamExp != 0 && p.quote != paramExpExp {
+			if p.quote != paramExpExp {
 				break loop
 			}
 		case ':', '=', '%', '^', ',', '?', '!', '*':
@@ -834,7 +841,7 @@ loop:
 				p.discardLit(2)
 			}
 		case '>', '<':
-			if p.peekByte('(') || !p.numLit() {
+			if p.peekByte('(') || !p.isLitRedir() {
 				tok = _Lit
 			} else {
 				tok = _LitRedir

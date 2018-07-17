@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -60,10 +61,10 @@ func TestMain(m *testing.M) {
 	os.Unsetenv("CDPATH")
 	hasBash44 = checkBash()
 	os.Setenv("INTERP_GLOBAL", "value")
-	exit := m.Run()
 	for _, s := range []string{"a", "b", "c", "d", "foo", "bar"} {
 		os.Unsetenv(s)
 	}
+	exit := m.Run()
 	os.Exit(exit)
 }
 
@@ -2222,6 +2223,7 @@ func TestFileConfirm(t *testing.T) {
 }
 
 func TestRunnerOpts(t *testing.T) {
+	t.Parallel()
 	withPath := func(strs ...string) Environ {
 		list := []string{"PATH=" + os.Getenv("PATH")}
 		list = append(list, strs...)
@@ -2299,6 +2301,7 @@ func TestRunnerOpts(t *testing.T) {
 }
 
 func TestRunnerContext(t *testing.T) {
+	t.Parallel()
 	cases := []string{
 		"",
 		"while true; do true; done",
@@ -2338,6 +2341,7 @@ func TestRunnerContext(t *testing.T) {
 }
 
 func TestRunnerAltNodes(t *testing.T) {
+	t.Parallel()
 	in := "echo foo"
 	want := "foo\n"
 	file, err := syntax.NewParser().Parse(strings.NewReader(in), "")
@@ -2367,6 +2371,7 @@ func TestRunnerAltNodes(t *testing.T) {
 }
 
 func TestElapsedString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		in    time.Duration
 		posix bool
@@ -2396,4 +2401,54 @@ func TestElapsedString(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunnerDir(t *testing.T) {
+	t.Parallel()
+	dir, err := ioutil.TempDir("", "interp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(dir)
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, err := filepath.Rel(wd, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("Missing", func(t *testing.T) {
+		r := Runner{Dir: "missing"}
+		if err := r.Reset(); err == nil {
+			t.Fatal("expected Runner to error when Dir is missing")
+		}
+	})
+	t.Run("NoDir", func(t *testing.T) {
+		r := Runner{Dir: "interp_test.go"}
+		if err := r.Reset(); err == nil {
+			t.Fatal("expected Runner to error when Dir is not a dir")
+		}
+	})
+	t.Run("NoDirAbs", func(t *testing.T) {
+		r := Runner{Dir: filepath.Join(wd, "interp_test.go")}
+		if err := r.Reset(); err == nil {
+			t.Fatal("expected Runner to error when Dir is not a dir")
+		}
+	})
+	t.Run("Relative", func(t *testing.T) {
+		var b bytes.Buffer
+		r := Runner{
+			Dir:    rel,
+			Stdout: &b,
+			Stderr: &b,
+		}
+		if err := r.Reset(); err != nil {
+			t.Error(err)
+		}
+		if !filepath.IsAbs(r.Dir) {
+			t.Errorf("Runner.Dir is not absolute")
+		}
+	})
 }
