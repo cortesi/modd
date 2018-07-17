@@ -1,7 +1,6 @@
 package modd
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/cortesi/modd/conf"
@@ -23,19 +22,19 @@ func (p ProcError) Error() string {
 }
 
 // RunProc runs a process to completion, sending output to log
-func RunProc(cmd, shellMethod string, log termlog.Stream) error {
+func RunProc(cmd string, shellMethod string, dir string, log termlog.Stream) error {
 	log.Header()
-	ex := shell.GetExecutor(shellMethod)
-	if ex == nil {
-		return fmt.Errorf("Could not find executor %s", shellMethod)
-	}
-	start := time.Now()
-	err, procerr, errbuf := ex.Run(cmd, log, true)
+	ex, err := shell.NewExecutor(shellMethod, cmd, dir)
 	if err != nil {
 		return err
-	} else if procerr != nil {
-		log.Shout("%s", procerr)
-		return ProcError{err.Error(), errbuf}
+	}
+	start := time.Now()
+	err, estate := ex.Run(log, true)
+	if err != nil {
+		return err
+	} else if estate.Error != nil {
+		log.Shout("%s", estate.Error)
+		return ProcError{err.Error(), estate.ErrOutput}
 	}
 	log.Notice(">> done (%s)", time.Since(start))
 	return nil
@@ -50,7 +49,11 @@ func RunPreps(
 	notifiers []notify.Notifier,
 	initial bool,
 ) error {
-	shell := vars[shellVarName]
+	sh, err := shell.GetShellName(vars[shellVarName])
+	if err != nil {
+		return err
+	}
+
 	var modified []string
 	if mod != nil {
 		modified = mod.All()
@@ -65,7 +68,7 @@ func RunPreps(
 		if err != nil {
 			return err
 		}
-		err = RunProc(cmd, shell, log.Stream(niceHeader("prep: ", cmd)))
+		err = RunProc(cmd, sh, b.InDir, log.Stream(niceHeader("prep: ", cmd)))
 		if err != nil {
 			if pe, ok := err.(ProcError); ok {
 				for _, n := range notifiers {

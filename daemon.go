@@ -14,7 +14,7 @@ import (
 
 const (
 	// MinRestart is the minimum amount of time between daemon restarts
-	MinRestart = 1 * time.Second
+	MinRestart = 500 * time.Millisecond
 	// MulRestart is the exponential backoff multiplier applied when the daemon exits uncleanly
 	MulRestart = 2
 	// MaxRestart is the maximum amount of time between daemon restarts
@@ -26,14 +26,20 @@ type daemon struct {
 	conf  conf.Daemon
 	indir string
 
-	log     termlog.Stream
-	shell   string
-	stop    bool
-	started bool
+	ex    *shell.Executor
+	log   termlog.Stream
+	shell string
+	stop  bool
 	sync.Mutex
 }
 
 func (d *daemon) Run() {
+	ex, err := shell.NewExecutor(d.shell, d.conf.Command, d.indir)
+	if err != nil {
+		d.log.Shout("Could not create executor: %s", err)
+	}
+	d.ex = ex
+
 	var lastStart time.Time
 	delay := MinRestart
 	for d.stop != true {
@@ -43,90 +49,54 @@ func (d *daemon) Run() {
 			time.Sleep(delay - since)
 		}
 		lastStart = time.Now()
+		err, pstate := ex.Run(d.log, false)
 
-		ex := shell.GetExecutor(d.shell)
-		if ex == nil {
-			d.log.Shout("Could not find executor %s", d.shell)
-		}
-		err, procerr, errbuf := ex.Run(d.conf.Command, d.log, false)
-
-		c, err := shell.Command(d.shell, d.conf.Command)
+		bump := false
 		if err != nil {
-			d.log.Shout("%s", err)
-			return
-		}
-		c.Dir = d.indir
-		stdo, err := c.StdoutPipe()
-		if err != nil {
-			d.log.Shout("%s", err)
-			continue
-		}
-		stde, err := c.StderrPipe()
-		if err != nil {
-			d.log.Shout("%s", err)
-			continue
-		}
-		wg := sync.WaitGroup{}
-		wg.Add(2)
-		go logOutput(&wg, stde, d.log.Warn)
-		go logOutput(&wg, stdo, d.log.Say)
-
-		d.Lock()
-		err = c.Start()
-		if err != nil {
-			d.log.Shout("%s", err)
-			d.Unlock()
-			continue
-		}
-		d.cmd = c
-		d.Unlock()
-
-		wg.Wait()
-		err = c.Wait()
-		if err != nil {
-			if _, ok := err.(*exec.ExitError); ok {
-				d.log.Warn("exited: %s", c.ProcessState.String())
+			bump = true
+			d.log.Shout("execution error: %s", err)
+		} else if pstate.Error != nil {
+			bump = true
+			if _, ok := pstate.Error.(*exec.ExitError); ok {
+				d.log.Warn("exited: %s", pstate.ProcState)
 			} else {
 				d.log.Shout("exited: %s", err)
 			}
-			// unclean restart; increase backoff
-			delay *= MulRestart
-			if delay > MaxRestart {
-				delay = MaxRestart
-			}
 		} else {
-			d.log.Warn("exited: %s", c.ProcessState.String())
-			// clean restart; reset backoff
+			d.log.Warn("exited: %s", pstate.ProcState)
+		}
+
+		// If we exited cleanly, or the process ran for > MaxRestart, we reset
+		// the delay timer
+		if !bump || (time.Now().Sub(lastStart) > MaxRestart) {
 			delay = MinRestart
+		} else {
+			delay *= MulRestart
 		}
 	}
 }
 
 // Restart the daemon, or start it if it's not yet running
 func (d *daemon) Restart() {
-	d.Lock()
-	defer d.Unlock()
-	if !d.started {
+	if d.ex == nil {
 		go d.Run()
-		d.started = true
 	} else {
-		if d.cmd != nil {
-			d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
-			err := d.cmd.Process.Signal(d.conf.RestartSignal)
-			if err != nil {
-				d.log.Warn("failed to send %s signal to %s (pid %d): %v", d.conf.RestartSignal, d.conf.Command, d.cmd.Process.Pid, err)
-			}
+		d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
+		err := d.ex.Signal(d.conf.RestartSignal)
+		if err != nil {
+			d.log.Warn(
+				"failed to send %s signal to %s: %v", d.conf.RestartSignal, d.conf.Command, err,
+			)
 		}
 	}
 }
 
-func (d *daemon) Shutdown(sig os.Signal) {
-	d.Lock()
-	defer d.Unlock()
+func (d *daemon) Shutdown(sig os.Signal) error {
 	d.stop = true
-	if d.cmd != nil {
-		d.cmd.Process.Signal(sig)
+	if d.ex != nil {
+		return d.ex.Stop()
 	}
+	return nil
 }
 
 // DaemonPen is a group of daemons in a single block, managed as a unit.
@@ -154,11 +124,15 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 				return nil, err
 			}
 		}
+		sh, err := shell.GetShellName(vars[shellVarName])
+		if err != nil {
+			return nil, err
+		}
 
 		d[i] = &daemon{
 			conf:  dmn,
 			log:   log.Stream(niceHeader("daemon: ", dmn.Command)),
-			shell: vars[shellVarName],
+			shell: sh,
 			indir: indir,
 		}
 	}

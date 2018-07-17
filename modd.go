@@ -16,7 +16,7 @@ import (
 )
 
 // Version is the modd release version
-const Version = "0.6"
+const Version = "0.7"
 
 const lullTime = time.Millisecond * 100
 
@@ -86,12 +86,8 @@ func (mr *ModRunner) ReadConfig() error {
 		return fmt.Errorf("Error reading config file %s: %s", mr.ConfPath, err)
 	}
 
-	shellMethod := newcnf.GetVariables()[shellVarName]
-	if shellMethod == "" {
-		shellMethod = shell.Default
-	}
-	if shell.GetExecutor(shellMethod) == nil {
-		return fmt.Errorf("No such shell: %q", shellMethod)
+	if _, err := shell.GetShellName(newcnf.GetVariables()[shellVarName]); err != nil {
+		return err
 	}
 
 	newcnf.CommonExcludes(CommonExcludes)

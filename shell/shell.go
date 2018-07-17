@@ -14,24 +14,47 @@ import (
 	"github.com/google/shlex"
 )
 
-var Default = "bash"
+var ValidShells = map[string]bool{
+	"builtin": true,
+	"bash":    true,
+	"exec":    true,
+	"sh":      true,
+}
 
-type ExitError error
+var Default = "bash"
 
 type Executor struct {
 	Shell   string
 	Command string
+	Dir     string
 
 	cmd *exec.Cmd
 	sync.Mutex
 }
 
-func NewExecutor(shell string, command string) (*Executor, error) {
-	_, err := makeCommand(shell, command)
+type ExecState struct {
+	Error     error
+	ErrOutput string
+	ProcState string
+}
+
+func GetShellName(v string) (string, error) {
+	if v == "" {
+		return Default, nil
+	}
+	if _, ok := ValidShells[v]; !ok {
+		return "", fmt.Errorf("Unsupported shell: %q", v)
+	} else {
+		return v, nil
+	}
+}
+
+func NewExecutor(shell string, command string, dir string) (*Executor, error) {
+	_, err := makeCommand(shell, command, dir)
 	if err != nil {
 		return nil, err
 	}
-	return &Executor{Shell: shell, Command: command}, nil
+	return &Executor{Shell: shell, Command: command, Dir: dir}, nil
 }
 
 func (e *Executor) start(
@@ -40,7 +63,7 @@ func (e *Executor) start(
 	e.Lock()
 	defer e.Unlock()
 
-	cmd, err := makeCommand(e.Shell, e.Command)
+	cmd, err := makeCommand(e.Shell, e.Command, e.Dir)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -93,15 +116,20 @@ func (e *Executor) reset() {
 	e.cmd = nil
 }
 
-func (e *Executor) Run(log termlog.Stream, bufferr bool) (error, ExitError, string) {
+func (e *Executor) Run(log termlog.Stream, bufferr bool) (error, *ExecState) {
 	cmd, buff, wg, err := e.start(log, bufferr)
 	if err != nil {
-		return err, nil, ""
+		return err, nil
 	}
 	eret := cmd.Wait()
 	wg.Wait()
+	estate := &ExecState{
+		Error:     eret,
+		ErrOutput: buff.String(),
+		ProcState: cmd.ProcessState.String(),
+	}
 	e.reset()
-	return nil, eret, buff.String()
+	return nil, estate
 }
 
 func (e *Executor) Signal(sig os.Signal) error {
@@ -134,7 +162,8 @@ func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interfa
 	}
 }
 
-func makeCommand(shell string, command string) (*exec.Cmd, error) {
+func makeCommand(shell string, command string, dir string) (*exec.Cmd, error) {
+	var cmd *exec.Cmd
 	switch shell {
 	case "exec":
 		ss, err := shlex.Split(command)
@@ -144,22 +173,24 @@ func makeCommand(shell string, command string) (*exec.Cmd, error) {
 		if len(ss) == 0 {
 			return nil, errors.New("No command defined")
 		}
-		return exec.Command(ss[0], ss[1:]...), nil
-	case "bash":
+		cmd = exec.Command(ss[0], ss[1:]...)
+	case "bash", "sh":
 		sh, err := getBash()
 		if err != nil {
 			return nil, fmt.Errorf("Could not find bash or sh")
 		}
-		return exec.Command(sh, "-c", command), nil
+		cmd = exec.Command(sh, "-c", command)
 	case "builtin":
 		path, err := os.Executable()
 		if err != nil {
 			return nil, err
 		}
-		return exec.Command(path, "--exec", command), nil
+		cmd = exec.Command(path, "--exec", command)
 	default:
 		return nil, fmt.Errorf("Unknown shell: %s", shell)
 	}
+	cmd.Dir = dir
+	return cmd, nil
 }
 
 func getBash() (string, error) {

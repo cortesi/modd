@@ -21,21 +21,20 @@ type cmdTest struct {
 
 func testCmd(t *testing.T, shell string, ct cmdTest) {
 	lt := termlog.NewLogTest()
-	exec, err := NewExecutor(shell, ct.cmd)
+	exec, err := NewExecutor(shell, ct.cmd, "")
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	type result struct {
-		err     error
-		procerr error
-		buff    string
+		err    error
+		pstate *ExecState
 	}
 
 	ch := make(chan result)
 	go func() {
-		err, procerr, buff := exec.Run(lt.Log.Stream(""), ct.bufferr)
-		ch <- result{err: err, procerr: procerr, buff: buff}
+		err, pstate := exec.Run(lt.Log.Stream(""), ct.bufferr)
+		ch <- result{err: err, pstate: pstate}
 	}()
 
 	if ct.kill {
@@ -56,11 +55,11 @@ func testCmd(t *testing.T, shell string, ct cmdTest) {
 	if (res.err != nil) != ct.err {
 		t.Errorf("Unexpected invocation error: %s", err)
 	}
-	if (res.procerr != nil) != ct.procerr {
-		t.Errorf("Unexpected process error: %s", res.procerr)
+	if (res.pstate.Error != nil) != ct.procerr {
+		t.Errorf("Unexpected process error: %s", res.pstate.Error)
 	}
-	if ct.buffHas != "" && !strings.Contains(res.buff, ct.buffHas) {
-		t.Errorf("Unexpected buffer return: %s", res.buff)
+	if ct.buffHas != "" && !strings.Contains(res.pstate.ErrOutput, ct.buffHas) {
+		t.Errorf("Unexpected buffer return: %s", res.pstate.ErrOutput)
 	}
 	if ct.logHas != "" && !strings.Contains(lt.String(), ct.logHas) {
 		t.Errorf("Unexpected log return: %s", lt.String())
