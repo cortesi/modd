@@ -21,7 +21,7 @@ var ValidShells = map[string]bool{
 	"sh":      true,
 }
 
-var Default = "bash"
+var Default = "builtin"
 
 type Executor struct {
 	Shell   string

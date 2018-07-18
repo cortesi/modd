@@ -36,10 +36,6 @@ On OSX, you can install modd with homebrew:
 
     $ brew install modd
 
-By default modd interprets commands with *bash* or *sh*, one of which must be on
-your PATH. To avoid using a shell, you can set `@shell = exec` in your
-"modd.conf" file.
-
 
 # Quick start
 
@@ -109,6 +105,10 @@ project you're hacking on, but when developing devd _itself_, we actually want
 it to exit and restart to pick up changes. We therefore tell modd to send a
 SIGTERM to the daemon instead, which causes devd to exit and be restarted by
 modd.
+
+By default modd interprets commands using a [built-in POSIX-like
+shell](https://github.com/mvdan/sh). External shells can be used by setting
+`@shell` variable in your "modd.conf" file.
 
 
 # File watch patterns
@@ -223,12 +223,12 @@ Class      | Meaning
 Each file match pattern specification has an associated block, which is
 enclosed in curly brackets. Blocks contain commands and block-scoped options.
 
-Commands are shell scripts specified in-line in the *modd.conf* file. They are
-executed in **bash** (or **sh** as a fallback) by default. Bash can be bypassed
-and the commands executed directly by setting `@shell = exec`. If bash is used
-it is assumed to be on the
-user's path, and inherit the parent's environment. Single-line commands don't
-need to be quoted:
+Commands are shell scripts specified in-line in the *modd.conf* file. By
+default, commands are executed with modd's built-in [POSIX-like
+shell](https://github.com/mvdan/sh). Alternative shells can be specified using
+the `@shell` variable.
+
+Single-line commands don't need to be quoted:
 
 ```
 prep: echo "I'm now rebuilding" | tee /tmp/output
@@ -372,17 +372,16 @@ be enclosed in quotes to span multiple lines.
 
 # Variables
 
-You can declare variables like this:
+Variables are declared as follows:
 
 ```
 @variable = value
 ```
 
-Variables can only be declared in the global scope (i.e. not inside blocks).
-All values are strings and follow the same semantics as commands - that is,
-they can have escaped line endings, or be quoted strings. Variables are read
-once at startup, and it is an error to re-declare a variable that already
-exists.
+Variables can only be declared in the global scope (i.e. not inside blocks). All
+values are strings and follow the same semantics as commands - that is, they can
+have escaped line endings, or be quoted strings. Variables are read once at
+startup, and it is an error to re-declare a variable that already exists.
 
 You can use variables in commands like so:
 
@@ -393,22 +392,30 @@ You can use variables in commands like so:
 }
 ```
 
-There is a special "@shell" variable that when set determines how commands are
-executed. Valid values are:
+There is a special "@shell" variable that determines which shell is used to
+execute commands. Valid values are:
+
 ```
 # Execute commands directly from go.
 @shell = exec
 
 # Pass commands on to bash or sh for execution.
 @shell = bash
+
+# Use the builtin modd shell
+@shell = builtin
 ```
+
+Avoid using the `@shell` variable if you can - using the built-in shell ensures
+that `modd.conf` files remain portable across platforms.
+
 
 # Desktop Notifications
 
-When the **-n** flag is specified, modd sends anything sent to *stderr* from
-any prep command that exits abnormally to a desktop notifier. Since modd
-commands are shell scripts, you can redirect or manipulate output to entirely
-customise what gets sent to notifiers as needed.
+When the **-n** flag is specified, modd sends anything sent to *stderr* from any
+prep command that exits abnormally to a desktop notifier. Since modd commands
+are shell scripts, you can redirect or manipulate output to entirely customise
+what gets sent to notifiers as needed.
 
 At the moment, we support [Growl](http://growl.info/) on OSX, and
 [libnotify](https://launchpad.net/ubuntu/+source/libnotify) on Linux and other
