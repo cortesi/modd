@@ -18,7 +18,7 @@ const (
 	// MulRestart is the exponential backoff multiplier applied when the daemon exits uncleanly
 	MulRestart = 2
 	// MaxRestart is the maximum amount of time between daemon restarts
-	MaxRestart = 5 * time.Second
+	MaxRestart = 8 * time.Second
 )
 
 // A single daemon
@@ -26,10 +26,11 @@ type daemon struct {
 	conf  conf.Daemon
 	indir string
 
-	ex    *shell.Executor
-	log   termlog.Stream
-	shell string
-	stop  bool
+	running bool
+	ex      *shell.Executor
+	log     termlog.Stream
+	shell   string
+	stop    bool
 	sync.Mutex
 }
 
@@ -43,20 +44,17 @@ func (d *daemon) Run() {
 	var lastStart time.Time
 	delay := MinRestart
 	for d.stop != true {
-		d.log.Notice(">> starting...")
-		since := time.Now().Sub(lastStart)
-		if since < delay {
-			time.Sleep(delay - since)
+		if !lastStart.IsZero() {
+			d.log.Notice(">> sleeping... %#v", delay)
+			time.Sleep(delay)
 		}
+		d.log.Notice(">> starting...")
 		lastStart = time.Now()
 		err, pstate := ex.Run(d.log, false)
 
-		bump := false
 		if err != nil {
-			bump = true
 			d.log.Shout("execution error: %s", err)
 		} else if pstate.Error != nil {
-			bump = true
 			if _, ok := pstate.Error.(*exec.ExitError); ok {
 				d.log.Warn("exited: %s", pstate.ProcState)
 			} else {
@@ -68,17 +66,23 @@ func (d *daemon) Run() {
 
 		// If we exited cleanly, or the process ran for > MaxRestart, we reset
 		// the delay timer
-		if !bump || (time.Now().Sub(lastStart) > MaxRestart) {
+		if time.Now().Sub(lastStart) > MaxRestart {
 			delay = MinRestart
 		} else {
 			delay *= MulRestart
+			if delay > MaxRestart {
+				delay = MaxRestart
+			}
 		}
 	}
 }
 
 // Restart the daemon, or start it if it's not yet running
 func (d *daemon) Restart() {
-	if d.ex == nil {
+	d.Lock()
+	defer d.Unlock()
+	if !d.running {
+		d.running = true
 		go d.Run()
 	} else {
 		d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
@@ -92,6 +96,7 @@ func (d *daemon) Restart() {
 }
 
 func (d *daemon) Shutdown(sig os.Signal) error {
+	d.log.Notice(">> stopping")
 	d.stop = true
 	if d.ex != nil {
 		return d.ex.Stop()

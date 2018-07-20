@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -58,15 +59,22 @@ func main() {
 
 	if *exec != "" {
 		parser := syntax.NewParser()
-		runner := interp.Runner{
-			Stdout: os.Stdout,
-			Stderr: os.Stderr,
-		}
 		prog, err := parser.Parse(strings.NewReader(*exec), "")
 		if err != nil {
 			os.Exit(1)
 		}
+
+		runner := interp.Runner{
+			Stdin:       os.Stdin,
+			Stdout:      os.Stdout,
+			Stderr:      os.Stderr,
+			KillTimeout: -1,
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		runner.Context = ctx
 		runner.Reset()
+
 		err = runner.Run(prog)
 		if err != nil {
 			os.Exit(1)

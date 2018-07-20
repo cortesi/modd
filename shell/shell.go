@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"syscall"
 
 	"github.com/cortesi/termlog"
 	"github.com/google/shlex"
@@ -117,11 +118,15 @@ func (e *Executor) reset() {
 }
 
 func (e *Executor) Run(log termlog.Stream, bufferr bool) (error, *ExecState) {
+	if e.cmd != nil {
+		return fmt.Errorf("already running"), nil
+	}
 	cmd, buff, wg, err := e.start(log, bufferr)
 	if err != nil {
 		return err, nil
 	}
 	eret := cmd.Wait()
+
 	wg.Wait()
 	estate := &ExecState{
 		Error:     eret,
@@ -138,16 +143,11 @@ func (e *Executor) Signal(sig os.Signal) error {
 	if !e.running() {
 		return fmt.Errorf("executor not running")
 	}
-	return e.cmd.Process.Signal(sig)
+	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
 }
 
 func (e *Executor) Stop() error {
-	e.Lock()
-	defer e.Unlock()
-	if !e.running() {
-		return fmt.Errorf("executor not running")
-	}
-	return e.cmd.Process.Kill()
+	return e.Signal(os.Kill)
 }
 
 func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interface{})) {
@@ -190,6 +190,7 @@ func makeCommand(shell string, command string, dir string) (*exec.Cmd, error) {
 		return nil, fmt.Errorf("Unknown shell: %s", shell)
 	}
 	cmd.Dir = dir
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return cmd, nil
 }
 
