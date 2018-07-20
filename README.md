@@ -2,8 +2,8 @@
 [![Appveyor Build status](https://ci.appveyor.com/api/projects/status/1k7fk4j48oepvubo?svg=true)](https://ci.appveyor.com/project/cortesi/modd)
 
 
-Modd is a developer tool that triggers commands and manages daemons in response to
-filesystem changes.
+Modd is a developer tool that triggers commands and manages daemons in response
+to filesystem changes.
 
 If you use modd, you should also look at
 [devd](https://github.com/cortesi/devd), a compact HTTP daemon for developers.
@@ -63,11 +63,15 @@ only on the enclosing module.
 On startup, modd looks for a file called *modd.conf* in the current directory.
 This file has a simple but powerful syntax - one or more blocks of commands,
 each of which can be triggered on changes to files matching a set of file
-patterns. Commands have two flavors: **prep** commands that run and terminate
-(e.g. compiling, running test suites or running linters), and **daemon**
-commands that run and keep running (e.g databases or webservers). Daemons are
-sent a SIGHUP (by default) when their block is triggered, and are restarted if
-they ever exit.
+patterns. The *modd.conf* file is meant to be portable, and can safely be
+checked into source repositories. Functionality that users will want to
+customize (like desktop notifications) is controlled through command-line
+flags.
+
+Commands have two flavors: **prep** commands that run and terminate (e.g.
+compiling, running test suites or running linters), and **daemon** commands that
+run and keep running (e.g databases or webservers). Daemons are sent a SIGHUP
+(by default) when their block is triggered, and are restarted if they ever exit.
 
 Prep commands are run in order of occurrence. If any prep command exits with an
 error, execution of the current block is stopped immediately. If all prep
@@ -107,13 +111,13 @@ SIGTERM to the daemon instead, which causes devd to exit and be restarted by
 modd.
 
 By default modd interprets commands using a [built-in POSIX-like
-shell](https://github.com/mvdan/sh). External shells can be used by setting
-`@shell` variable in your "modd.conf" file.
+shell](https://github.com/mvdan/sh). Some external shells are also supported,
+and can be used by setting `@shell` variable in your "modd.conf" file.
 
 
 # File watch patterns
 
-Modd's batches up changes until there is a lull in filesystem activity - this
+Modd batches up changes until there is a lull in filesystem activity - this
 means that coherent processes like compilation and rendering that touch many
 files are likely to trigger commands only once. Patterns therefore match on a
 batch of changed files - when the first match in a batch is seen, the block is
@@ -311,9 +315,9 @@ there is a detected change.
 
 Daemons are executed on startup, and are restarted by modd whenever they exit.
 When a block containing a daemon command is triggered, modd sends a signal to
-the daemon process. If the signal causes the daemon to exit, it is immediately
-restarted by modd - however, it's also common for daemons to do other useful
-things like reloading configuration in response to signals.
+the daemon process group. If the signal causes the daemon to exit, it is
+immediately restarted by modd - however, it's also common for daemons to do
+other useful things like reloading configuration in response to signals.
 
 The default signal used is SIGHUP, but the signal can be controlled using
 modifier flags, like so:
@@ -328,12 +332,12 @@ The following signals are supported: **sighup**, **sigterm**, **sigint**,
 
 ## Controlling log headers
 
-Modd outputs a short header on the terminal to show which command is
-responsible for output. This header is calculated from the first non-whitespace
-line of the command - backslash escapes are removed from the end of the line,
-comment characters are removed from the beginning, and whitespace is stripped.
-Using the fact that the shell itself permits comments, you can completely
-control the log display name.
+Modd outputs a short header on the terminal to show which command is responsible
+for output. This header is calculated from the first non-whitespace line of the
+command - backslash escapes are removed from the end of the line, comment
+characters are removed from the beginning, and whitespace is stripped. Using the
+fact that the shell itself permits comments, you can completely control the log
+display name.
 
 ```
 {
