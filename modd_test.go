@@ -134,75 +134,100 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 }
 
 func TestWatch(t *testing.T) {
-	_testWatch(
-		t,
-		func() { touch("a/touched") },
-		"touched",
-		[]string{
-			":all: ./a/initial",
-			":a: ./a/initial",
-			":skipit: ./a/touched",
-			":all: ./a/touched",
-			":a: ./a/touched",
+	t.Run(
+		"single",
+		func(t *testing.T) {
+			_testWatch(
+				t,
+				func() { touch("a/touched") },
+				"touched",
+				[]string{
+					":all: ./a/initial",
+					":a: ./a/initial",
+					":skipit: ./a/touched",
+					":all: ./a/touched",
+					":a: ./a/touched",
+				},
+			)
 		},
 	)
-	_testWatch(
-		t,
-		func() {
-			touch("a/touched")
-			touch("b/touched")
-		},
-		"touched",
-		[]string{
-			":all: ./a/initial",
-			":a: ./a/initial",
-			":skipit: ./a/touched ./b/touched",
-			":all: ./a/touched ./b/touched",
-			":a: ./a/touched",
-			":b: ./b/touched",
-		},
-	)
-	_testWatch(
-		t,
-		func() {
-			touch("a/inner/touched.xxx")
-		},
-		"touched",
-		[]string{
-			":all: ./a/initial",
-			":a: ./a/initial",
-			":skipit: ./a/inner/touched.xxx",
-			":all: ./a/inner/touched.xxx",
-			":c: ./a/inner/touched.xxx",
+	t.Run(
+		"double",
+		func(t *testing.T) {
+			_testWatch(
+				t,
+				func() {
+					touch("a/touched")
+					touch("b/touched")
+				},
+				"touched",
+				[]string{
+					":all: ./a/initial",
+					":a: ./a/initial",
+					":skipit: ./a/touched ./b/touched",
+					":all: ./a/touched ./b/touched",
+					":a: ./a/touched",
+					":b: ./b/touched",
+				},
+			)
 		},
 	)
-	_testWatch(
-		t,
-		func() {
-			touch("a/direct")
-		},
-		"touched",
-		[]string{
-			":all: ./a/initial",
-			":a: ./a/initial",
-			":skipit: ./a/direct",
-			":all: ./a/direct",
-			":a: ./a/direct",
-			":d: ./a/direct",
+	t.Run(
+		"inner",
+		func(t *testing.T) {
+			_testWatch(
+				t,
+				func() {
+					touch("a/inner/touched.xxx")
+				},
+				"touched",
+				[]string{
+					":all: ./a/initial",
+					":a: ./a/initial",
+					":skipit: ./a/inner/touched.xxx",
+					":all: ./a/inner/touched.xxx",
+					":c: ./a/inner/touched.xxx",
+				},
+			)
 		},
 	)
-	_testWatch(
-		t,
-		func() {
-			touch("direct")
+	t.Run(
+		"direct",
+		func(t *testing.T) {
+			_testWatch(
+				t,
+				func() {
+					touch("a/direct")
+				},
+				"direct",
+				[]string{
+					":all: ./a/initial",
+					":a: ./a/initial",
+					":skipit: ./a/direct",
+					":all: ./a/direct",
+					":a: ./a/direct",
+					":d: ./a/direct",
+				},
+			)
 		},
-		"touched",
-		[]string{
-			":all: ./a/initial",
-			":a: ./a/initial",
-			":skipit: ./direct",
-			":all: ./direct",
-			":e: ./direct",
+	)
+	t.Run(
+		"rootdirect",
+		func(t *testing.T) {
+			_testWatch(
+				t,
+				func() {
+					touch("direct")
+				},
+				"direct",
+				[]string{
+					":all: ./a/initial",
+					":a: ./a/initial",
+					":skipit: ./direct",
+					":all: ./direct",
+					":e: ./direct",
+				},
+			)
 		},
 	)
 }
