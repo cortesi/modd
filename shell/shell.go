@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 
 	"github.com/cortesi/termlog"
 	"github.com/google/shlex"
@@ -143,7 +142,7 @@ func (e *Executor) Signal(sig os.Signal) error {
 	if !e.running() {
 		return fmt.Errorf("executor not running")
 	}
-	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
+	return sendSignal(e.cmd, sig)
 }
 
 func (e *Executor) Stop() error {
@@ -190,7 +189,7 @@ func makeCommand(shell string, command string, dir string) (*exec.Cmd, error) {
 		return nil, fmt.Errorf("Unknown shell: %s", shell)
 	}
 	cmd.Dir = dir
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	prepCmd(cmd)
 	return cmd, nil
 }
 
