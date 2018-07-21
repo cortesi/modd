@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -98,7 +99,12 @@ func TestBash(t *testing.T) {
 		t.Skip("skipping bash tests")
 		return
 	}
-	for _, tc := range bashTests {
-		testCmd(t, "bash", tc)
+	for i, tc := range bashTests {
+		t.Run(
+			fmt.Sprintf("%d", i),
+			func(t *testing.T) {
+				testCmd(t, "bash", tc)
+			},
+		)
 	}
 }

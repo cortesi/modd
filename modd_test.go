@@ -15,7 +15,7 @@ import (
 	"github.com/cortesi/termlog"
 )
 
-const timeout = 2 * time.Second
+const timeout = 5 * time.Second
 
 func touch(p string) {
 	p = filepath.FromSlash(p)
@@ -51,7 +51,7 @@ func events(p string) []string {
 	return parts
 }
 
-func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string) {
+func _testWatch(t *testing.T, modfunc func(), expected []string) {
 	defer utils.WithTempDir(t)()
 
 	err := os.MkdirAll("a/inner", 0777)
@@ -99,16 +99,17 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 	}
 
 	lt := termlog.NewLogTest()
-
 	modchan := make(chan *moddwatch.Mod, 1024)
 	cback := func() {
 		start := time.Now()
 		modfunc()
 		for {
-			if strings.Contains(lt.String(), trigger) {
+			ret := events(lt.String())
+			if reflect.DeepEqual(ret, expected) {
 				break
 			}
 			if time.Now().Sub(start) > timeout {
+				t.Errorf("Expected\n%#v\nGot\n%#v", expected, ret)
 				break
 			}
 			time.Sleep(50 * time.Millisecond)
@@ -125,9 +126,7 @@ func _testWatch(t *testing.T, modfunc func(), trigger string, expected []string)
 	if err != nil {
 		t.Fatalf("runOnChan: %s", err)
 	}
-
 	ret := events(lt.String())
-
 	if !reflect.DeepEqual(ret, expected) {
 		t.Errorf("Expected\n%#v\nGot\n%#v", expected, ret)
 	}
@@ -140,7 +139,6 @@ func TestWatch(t *testing.T) {
 			_testWatch(
 				t,
 				func() { touch("a/touched") },
-				"touched",
 				[]string{
 					":all: ./a/initial",
 					":a: ./a/initial",
@@ -160,7 +158,6 @@ func TestWatch(t *testing.T) {
 					touch("a/touched")
 					touch("b/touched")
 				},
-				"touched",
 				[]string{
 					":all: ./a/initial",
 					":a: ./a/initial",
@@ -180,7 +177,6 @@ func TestWatch(t *testing.T) {
 				func() {
 					touch("a/inner/touched.xxx")
 				},
-				"touched",
 				[]string{
 					":all: ./a/initial",
 					":a: ./a/initial",
@@ -199,7 +195,6 @@ func TestWatch(t *testing.T) {
 				func() {
 					touch("a/direct")
 				},
-				"direct",
 				[]string{
 					":all: ./a/initial",
 					":a: ./a/initial",
@@ -219,7 +214,6 @@ func TestWatch(t *testing.T) {
 				func() {
 					touch("direct")
 				},
-				"direct",
 				[]string{
 					":all: ./a/initial",
 					":a: ./a/initial",

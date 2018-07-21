@@ -74,7 +74,7 @@ type Mod struct {
 
 func (mod Mod) String() string {
 	return fmt.Sprintf(
-		"Added: %v\nDeleted: %v\nChanged: %v",
+		"{add: %v, del: %v, ch: %v}",
 		mod.Added, mod.Deleted, mod.Changed,
 	)
 }

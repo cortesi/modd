@@ -124,9 +124,12 @@ func (e *Executor) Run(log termlog.Stream, bufferr bool) (error, *ExecState) {
 	if err != nil {
 		return err, nil
 	}
-	eret := cmd.Wait()
 
+	// Order is important here. We MUST wait for the readers to exit before we wait
+	// on the command itself.
 	wg.Wait()
+
+	eret := cmd.Wait()
 	estate := &ExecState{
 		Error:     eret,
 		ErrOutput: buff.String(),
