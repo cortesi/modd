@@ -1,3 +1,11 @@
+# v0.7 - July 2018
+
+* Modd now has a built-in shell interpreter, which is used to execute commands
+  by default. This means modd.conf files should now be fully portable.
+* Subprocess execution has been revamped. On POSIX systems, this means we now
+  send signals to process groups, which fixes issues with runners that don't
+  pass signals on to children (notably `go run`).
+
 
 # v0.6 - 13 April 2018
 
