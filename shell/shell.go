@@ -3,7 +3,6 @@ package shell
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,24 +10,25 @@ import (
 	"sync"
 
 	"github.com/cortesi/termlog"
-	"github.com/google/shlex"
 )
 
 var ValidShells = map[string]bool{
-	"builtin": true,
-	"bash":    true,
-	"exec":    true,
-	"sh":      true,
+	"bash":       true,
+	"modd":       true,
+	"powershell": true,
+	"sh":         true,
 }
 
-var Default = "builtin"
+var Default = "modd"
 
 type Executor struct {
 	Shell   string
 	Command string
 	Dir     string
 
-	cmd *exec.Cmd
+	cmd  *exec.Cmd
+	stdo io.ReadCloser
+	stde io.ReadCloser
 	sync.Mutex
 }
 
@@ -44,9 +44,8 @@ func GetShellName(v string) (string, error) {
 	}
 	if _, ok := ValidShells[v]; !ok {
 		return "", fmt.Errorf("Unsupported shell: %q", v)
-	} else {
-		return v, nil
 	}
+	return v, nil
 }
 
 func NewExecutor(shell string, command string, dir string) (*Executor, error) {
@@ -54,7 +53,11 @@ func NewExecutor(shell string, command string, dir string) (*Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Executor{Shell: shell, Command: command, Dir: dir}, nil
+	return &Executor{
+		Shell:   shell,
+		Command: command,
+		Dir:     dir,
+	}, nil
 }
 
 func (e *Executor) start(
@@ -77,6 +80,9 @@ func (e *Executor) start(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	e.stdo = stdo
+	e.stde = stde
+
 	buff := new(bytes.Buffer)
 	err = cmd.Start()
 	if err != nil {
@@ -145,7 +151,7 @@ func (e *Executor) Signal(sig os.Signal) error {
 	if !e.running() {
 		return fmt.Errorf("executor not running")
 	}
-	return sendSignal(e.cmd, sig)
+	return e.sendSignal(sig)
 }
 
 func (e *Executor) Stop() error {
@@ -164,44 +170,43 @@ func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interfa
 	}
 }
 
+// checkShell checks that a shell is supported, and returns the correct command name
+func checkShell(shell string) (string, error) {
+	if _, ok := ValidShells[shell]; !ok {
+		return "", fmt.Errorf("unsupported shell: %q", shell)
+	}
+	if shell == "powershell" {
+		if _, err := exec.LookPath("powershell"); err == nil {
+			return "powershell", nil
+		} else if _, err := exec.LookPath("pwsh"); err == nil {
+			return "pwsh", nil
+		} else {
+			return "", fmt.Errorf("powershell/pwsh not on path")
+		}
+	} else if _, err := exec.LookPath(shell); err != nil {
+		return "", fmt.Errorf("%s not on path", shell)
+	}
+	return shell, nil
+}
+
 func makeCommand(shell string, command string, dir string) (*exec.Cmd, error) {
+	shcmd, err := checkShell(shell)
+	if err != nil {
+		return nil, err
+	}
+
 	var cmd *exec.Cmd
 	switch shell {
-	case "exec":
-		ss, err := shlex.Split(command)
-		if err != nil {
-			return nil, err
-		}
-		if len(ss) == 0 {
-			return nil, errors.New("No command defined")
-		}
-		cmd = exec.Command(ss[0], ss[1:]...)
 	case "bash", "sh":
-		sh, err := getBash()
-		if err != nil {
-			return nil, fmt.Errorf("Could not find bash or sh")
-		}
-		cmd = exec.Command(sh, "-c", command)
-	case "builtin":
-		path, err := os.Executable()
-		if err != nil {
-			return nil, err
-		}
-		cmd = exec.Command(path, "--exec", command)
+		cmd = exec.Command(shcmd, "-c", command)
+	case "modd":
+		cmd = exec.Command(shcmd, "--exec", command)
+	case "powershell":
+		cmd = exec.Command(shcmd, "-Command", command)
 	default:
 		return nil, fmt.Errorf("Unknown shell: %s", shell)
 	}
 	cmd.Dir = dir
 	prepCmd(cmd)
 	return cmd, nil
-}
-
-func getBash() (string, error) {
-	if _, err := exec.LookPath("bash"); err == nil {
-		return "bash", nil
-	}
-	if _, err := exec.LookPath("sh"); err == nil {
-		return "sh", nil
-	}
-	return "", fmt.Errorf("could not find bash or sh on path")
 }

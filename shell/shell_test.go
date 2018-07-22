@@ -2,6 +2,7 @@ package shell
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -10,8 +11,11 @@ import (
 )
 
 type cmdTest struct {
+	name    string
 	cmd     string
 	bufferr bool
+
+	shells []string
 
 	logHas  string
 	buffHas string
@@ -21,6 +25,21 @@ type cmdTest struct {
 }
 
 func testCmd(t *testing.T, shell string, ct cmdTest) {
+	if ct.shells != nil {
+		issh := func() bool {
+			for _, v := range ct.shells {
+				if v == shell {
+					return true
+				}
+			}
+			return false
+		}()
+		if !issh {
+			t.Skip("skipping")
+			return
+		}
+	}
+
 	lt := termlog.NewLogTest()
 	exec, err := NewExecutor(shell, ct.cmd, "")
 	if err != nil {
@@ -38,18 +57,21 @@ func testCmd(t *testing.T, shell string, ct cmdTest) {
 		ch <- result{err: err, pstate: pstate}
 	}()
 
-	if ct.kill {
-		for {
-			if exec.Running() {
-				break
-			}
-			time.Sleep(50 * time.Millisecond)
+	// Wait for the first output to make sure process is running
+	for {
+		time.Sleep(100 * time.Millisecond)
+		if lt.String() != "" {
+			break
 		}
+	}
+
+	if ct.kill {
 		err := exec.Stop()
 		if err != nil {
 			t.Errorf("Error stopping: %s", err)
 			return
 		}
+		time.Sleep(1 * time.Second)
 	}
 
 	res := <-ch
@@ -57,7 +79,7 @@ func testCmd(t *testing.T, shell string, ct cmdTest) {
 		t.Errorf("Unexpected invocation error: %s", err)
 	}
 	if (res.pstate.Error != nil) != ct.procerr {
-		t.Errorf("Unexpected process error: %s", res.pstate.Error)
+		t.Errorf("Unexpected process error: %s, %s", res.pstate.Error, res.pstate.ErrOutput)
 	}
 	if ct.buffHas != "" && !strings.Contains(res.pstate.ErrOutput, ct.buffHas) {
 		t.Errorf("Unexpected buffer return: %s", res.pstate.ErrOutput)
@@ -67,44 +89,74 @@ func testCmd(t *testing.T, shell string, ct cmdTest) {
 	}
 }
 
-var bashTests = []cmdTest{
+var shellTests = []cmdTest{
 	{
+		name:   "echosuccess",
 		cmd:    "echo moddtest; true",
 		logHas: "moddtest",
 	},
 	{
+		name:    "echofail",
 		cmd:     "echo moddtest; false",
 		logHas:  "moddtest",
 		procerr: true,
 	},
 	{
+		name:    "unknowncmd",
 		cmd:     "definitelynosuchcommand",
 		procerr: true,
 	},
 	{
+		name:    "stderr-posix",
 		cmd:     "echo moddstderr >&2",
 		bufferr: true,
 		buffHas: "moddstderr",
+		shells:  []string{"modd", "sh", "bash"},
 	},
 	{
-		cmd:     "echo moddtest; sleep 999999",
+		name:    "stderr-powershell",
+		cmd:     "Write-Error \"moddstderr\"",
+		bufferr: true,
+		procerr: true,
+		buffHas: "moddstderr",
+		shells:  []string{"powershell"},
+	},
+	{
+		name:    "kill",
+		cmd:     "echo moddtest; echo; sleep 999999",
 		logHas:  "moddtest",
 		kill:    true,
 		procerr: true,
 	},
 }
 
-func TestBash(t *testing.T) {
-	if _, err := getBash(); err != nil {
-		t.Skip("skipping bash tests")
-		return
+func TestShells(t *testing.T) {
+	var shells []string
+	if runtime.GOOS == "windows" {
+		shells = []string{
+			"modd",
+			"powershell",
+		}
+	} else {
+		shells = []string{
+			"sh",
+			"bash",
+			"modd",
+			"powershell",
+		}
 	}
-	for i, tc := range bashTests {
-		t.Run(
-			fmt.Sprintf("%d", i),
-			func(t *testing.T) {
-				testCmd(t, "bash", tc)
-			},
-		)
+	for _, sh := range shells {
+		for _, tc := range shellTests {
+			t.Run(
+				fmt.Sprintf("%s/%s", sh, tc.name),
+				func(t *testing.T) {
+					if _, err := checkShell(sh); err != nil {
+						t.Skipf("skipping - %s", err)
+						return
+					}
+					testCmd(t, sh, tc)
+				},
+			)
+		}
 	}
 }

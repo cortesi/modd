@@ -1,12 +1,9 @@
 version: "{build}"
 
-os: Windows Server 2012 R2
-
 clone_folder: c:\gopath\src\github.com\cortesi\modd
 
 environment:
   GOPATH: c:\gopath
-  GO15VENDOREXPERIMENT: 1
 
 install:
   - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
@@ -15,7 +12,8 @@ install:
   - go get -d ./...
 
 build_script:
-  - go test -race -v ./...
+  - go install ./cmd/modd
+  - go test -timeout 30s -race -v ./...
 
 test: off
 
