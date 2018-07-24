@@ -131,6 +131,8 @@ var shellTests = []cmdTest{
 }
 
 func TestShells(t *testing.T) {
+	shellTesting = true
+
 	var shells []string
 	if runtime.GOOS == "windows" {
 		shells = []string{
@@ -150,7 +152,7 @@ func TestShells(t *testing.T) {
 			t.Run(
 				fmt.Sprintf("%s/%s", sh, tc.name),
 				func(t *testing.T) {
-					if _, err := checkShell(sh); err != nil {
+					if _, err := CheckShell(sh); err != nil {
 						t.Skipf("skipping - %s", err)
 						return
 					}

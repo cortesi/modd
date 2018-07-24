@@ -19,6 +19,8 @@ var ValidShells = map[string]bool{
 	"sh":         true,
 }
 
+var shellTesting bool
+
 var Default = "modd"
 
 type Executor struct {
@@ -170,12 +172,13 @@ func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interfa
 	}
 }
 
-// checkShell checks that a shell is supported, and returns the correct command name
-func checkShell(shell string) (string, error) {
+// CheckShell checks that a shell is supported, and returns the correct command name
+func CheckShell(shell string) (string, error) {
 	if _, ok := ValidShells[shell]; !ok {
 		return "", fmt.Errorf("unsupported shell: %q", shell)
 	}
-	if shell == "powershell" {
+	switch shell {
+	case "powershell":
 		if _, err := exec.LookPath("powershell"); err == nil {
 			return "powershell", nil
 		} else if _, err := exec.LookPath("pwsh"); err == nil {
@@ -183,18 +186,23 @@ func checkShell(shell string) (string, error) {
 		} else {
 			return "", fmt.Errorf("powershell/pwsh not on path")
 		}
-	} else if _, err := exec.LookPath(shell); err != nil {
-		return "", fmt.Errorf("%s not on path", shell)
+	case "modd":
+		// When testing, we're running under a special compiled test executable,
+		// so we look for an instance of modd on our path.
+		if shellTesting {
+			return exec.LookPath("modd")
+		}
+		return os.Executable()
+	default:
+		return exec.LookPath(shell)
 	}
-	return shell, nil
 }
 
 func makeCommand(shell string, command string, dir string) (*exec.Cmd, error) {
-	shcmd, err := checkShell(shell)
+	shcmd, err := CheckShell(shell)
 	if err != nil {
 		return nil, err
 	}
-
 	var cmd *exec.Cmd
 	switch shell {
 	case "bash", "sh":
@@ -203,8 +211,6 @@ func makeCommand(shell string, command string, dir string) (*exec.Cmd, error) {
 		cmd = exec.Command(shcmd, "--exec", command)
 	case "powershell":
 		cmd = exec.Command(shcmd, "-Command", command)
-	default:
-		return nil, fmt.Errorf("Unknown shell: %s", shell)
 	}
 	cmd.Dir = dir
 	prepCmd(cmd)
