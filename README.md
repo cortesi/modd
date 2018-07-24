@@ -227,11 +227,6 @@ Class      | Meaning
 Each file match pattern specification has an associated block, which is
 enclosed in curly brackets. Blocks contain commands and block-scoped options.
 
-Commands are shell scripts specified in-line in the *modd.conf* file. By
-default, commands are executed with modd's built-in [POSIX-like
-shell](https://github.com/mvdan/sh). Alternative shells can be specified using
-the `@shell` variable.
-
 Single-line commands don't need to be quoted:
 
 ```
@@ -329,6 +324,9 @@ daemon +sigterm: mydaemon --config ./foo.conf
 The following signals are supported: **sighup**, **sigterm**, **sigint**,
 **sigkill**, **sigquit**, **sigusr1**, **sigusr2**, **sigwinch**.
 
+Support for signals on Windows is limited. The signal type is ignored, and all
+daemons are stopped and restarted when a signal would normally be sent.
+
 
 ## Controlling log headers
 
@@ -397,17 +395,11 @@ You can use variables in commands like so:
 ```
 
 There is a special "@shell" variable that determines which shell is used to
-execute commands. Valid values are:
+execute commands. Valid values are `modd` (the default), `bash`, `sh` and
+`powershell`. This variable is set as follows:
 
 ```
-# Execute commands directly from go.
-@shell = exec
-
-# Pass commands on to bash or sh for execution.
 @shell = bash
-
-# Use the builtin modd shell
-@shell = builtin
 ```
 
 Avoid using the `@shell` variable if you can - using the built-in shell ensures
