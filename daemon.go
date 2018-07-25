@@ -44,8 +44,10 @@ func (d *daemon) Run() {
 	var lastStart time.Time
 	delay := MinRestart
 	for d.stop != true {
+		if delay > MinRestart {
+			d.log.Notice(">> restart backoff... %dms", delay/time.Millisecond)
+		}
 		if !lastStart.IsZero() {
-			d.log.Notice(">> sleeping... %#v", delay)
 			time.Sleep(delay)
 		}
 		d.log.Notice(">> starting...")
