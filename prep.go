@@ -34,7 +34,7 @@ func RunProc(cmd string, shellMethod string, dir string, log termlog.Stream) err
 		return err
 	} else if estate.Error != nil {
 		log.Shout("%s", estate.Error)
-		return ProcError{err.Error(), estate.ErrOutput}
+		return ProcError{estate.Error.Error(), estate.ErrOutput}
 	}
 	log.Notice(">> done (%s)", time.Since(start))
 	return nil
