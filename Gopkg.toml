@@ -75,10 +75,6 @@
   name = "github.com/cortesi/termlog"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/google/shlex"
-
-[[constraint]]
   name = "gopkg.in/alecthomas/kingpin.v2"
 
 [[constraint]]
