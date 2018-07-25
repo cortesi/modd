@@ -184,11 +184,11 @@ restart by modd.
 
 ## Symlinks
 
-Modd does not implicitly traverse symlinks. To monitor a symlink, it must be
-specified as the base of an include pattern, like this:
+Modd does not implicitly traverse symlinks. To monitor a symlink, split the path
+specification and the matching pattern, like this:
 
 ```
-mydir mydir/symlinkdir/** {
+mydir/symlinkdir foo.* {
     prep: echo changed
 }
 ```
@@ -197,7 +197,6 @@ Behind the scenes, we resolve the symlinked directory as if it was specified
 directly by the user. This means that if the symlink destination lies outside of
 the current working directory, the resulting paths for matches, exclusions and
 commands will be absolute.
-
 
 
 ## Syntax
