@@ -1,14 +1,15 @@
 const assert = require('assert').strict
+const stream = require('stream')
 
 const sh = require('./index')
 
-var syntax = sh.syntax
-var parser = syntax.NewParser()
-var printer = syntax.NewPrinter()
+const syntax = sh.syntax
+const parser = syntax.NewParser()
+const printer = syntax.NewPrinter()
 
 {
 	// parsing a simple program
-	var src = "echo 'foo'"
+	const src = "echo 'foo'"
 	var f = parser.Parse(src, "src")
 
 	var stmts = f.StmtList.Stmts
@@ -22,7 +23,7 @@ var printer = syntax.NewPrinter()
 
 {
 	// accessing fields or methods creates separate objects
-	var src = "echo 'foo'"
+	const src = "echo 'foo'"
 	var f = parser.Parse(src, "src")
 
 	assert.equal(f.StmtList.Stmts == f.StmtList.Stmts, false)
@@ -34,27 +35,35 @@ var printer = syntax.NewPrinter()
 
 {
 	// parse errors
-	var src = "echo ${"
+	const src = "echo ${"
 	try {
-		var f = parser.Parse(src, "src")
+		parser.Parse(src, "src")
 		assert.fail("did not error")
 	} catch (err) {
 	}
 }
 
 {
-	// getting the types of nodes
-	var src = "echo 'foo'"
+	// node types, operators, and positions
+	const src = "foo || bar"
 	var f = parser.Parse(src, "src")
 
 	var cmd = f.StmtList.Stmts[0].Cmd
-	assert.equal(syntax.NodeType(cmd), "CallExpr")
-	assert.equal(syntax.NodeType(cmd.Args[0].Parts[0]), "Lit")
+	assert.equal(syntax.NodeType(cmd), "BinaryCmd")
+
+	// TODO: see https://github.com/myitcv/gopherjs/issues/26
+	// assert.equal(syntax.String(cmd.Op), "||")
+
+	assert.equal(cmd.Pos().String(), "1:1")
+	assert.equal(cmd.OpPos.String(), "1:5")
+	assert.equal(cmd.OpPos.Line(), 1)
+	assert.equal(cmd.OpPos.Col(), 5)
+	assert.equal(cmd.OpPos.Offset(), 4)
 }
 
 {
 	// running Walk
-	var src = "foo bar"
+	const src = "foo bar"
 	var f = parser.Parse(src, "src")
 
 	var nilCount = 0
@@ -86,9 +95,75 @@ var printer = syntax.NewPrinter()
 
 {
 	// printing
-	var src = "echo      'foo'"
+	const src = "echo      'foo'"
 	var f = parser.Parse(src, "src")
 
 	var out = printer.Print(f)
 	assert.equal(out, "echo 'foo'\n")
+}
+
+{
+	// parser options
+	const parser = syntax.NewParser(
+		syntax.KeepComments,
+		syntax.Variant(syntax.LangMirBSDKorn),
+		syntax.StopAt("$$")
+	)
+	const src = "echo ${|stmts;} # bar\n$$"
+	var f = parser.Parse(src, "src")
+
+	var out = printer.Print(f)
+	assert.equal(out, "echo ${|stmts;} # bar\n")
+}
+
+{
+	// parsing a readable stream
+	const src = new stream.Readable
+	src.push("echo foo")
+	src.push(null)
+
+	var f = parser.Parse(src, "src")
+
+	var cmd = f.StmtList.Stmts[0].Cmd
+	assert.equal(cmd.Args.length, 2)
+}
+
+{
+	// using the parser interactively
+	const inputs = [
+		"foo\n",
+		"bar; baz\n",
+		"\n",
+		"'incom\n",
+		"plete'\n",
+	]
+	const wantCallbacks = [
+		{"count": 1, "incomplete": false},
+		{"count": 2, "incomplete": false},
+		{"count": 0, "incomplete": false},
+		{"count": 0, "incomplete": true},
+		{"count": 1, "incomplete": false},
+	]
+	var gotCallbacks = []
+
+	const src = {"read": function(size) {
+		if (inputs.length == 0) {
+			if (gotCallbacks.length == 0) {
+				throw "did not see any callbacks before EOF"
+			}
+			return null // EOF
+		}
+		s = inputs[0]
+		inputs.shift()
+		return s
+	}}
+
+	parser.Interactive(src, function(stmts) {
+		gotCallbacks.push({
+			"count":      stmts.length,
+			"incomplete": parser.Incomplete(),
+		})
+		return true
+	})
+	assert.deepEqual(gotCallbacks, wantCallbacks)
 }

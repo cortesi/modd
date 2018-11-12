@@ -3,20 +3,26 @@ language: go
 matrix:
   include:
     - os: linux
-      dist: trusty
-      sudo: false
-      go: 1.9.x
+      go: "1.10"
     - os: linux
-      dist: trusty
-      sudo: false
       go: 1.10.x
+    - os: linux
+      go: 1.11.x
+      env: CHECK_GOFMT=1
     - os: osx
-      osx_image: xcode9.2
-      go: 1.10.x
+      go: 1.11.x
+    - os: windows
+      go: 1.11.x
 
 go_import_path: mvdan.cc/sh
 
+install: true
+
 script:
+  - go get -d -t ./...
+  - go install ./...
   - go test ./...
-  - go test -short -race ./...
+    # TODO: reenable test -race on windows once TestInteractive stops failing
+  - if [[ $TRAVIS_OS_NAME != "windows" ]]; then go test -short -race ./...; fi
+  - if [[ -n $CHECK_GOFMT ]]; then diff <(echo -n) <(gofmt -d .); fi
   - shfmt -version

@@ -3,7 +3,7 @@
 
 // Package fileutil contains code to work with shell files, also known
 // as shell scripts.
-package fileutil // import "mvdan.cc/sh/fileutil"
+package fileutil
 
 import (
 	"os"

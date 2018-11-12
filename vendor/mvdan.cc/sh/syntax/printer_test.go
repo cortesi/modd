@@ -70,7 +70,10 @@ var printTests = []printCase{
 	{"foo\n\n", "foo"},
 	{"\n\nfoo", "foo"},
 	{"# foo \n # bar\t", "# foo\n# bar"},
-	{"#", "#"},
+	samePrint("#"),
+	samePrint("#c1\\\n#c2"),
+	samePrint("#\\\n#"),
+	samePrint("foo\\\\\nbar"),
 	samePrint("a=b # inline\nbar"),
 	samePrint("a=$(b) # inline"),
 	samePrint("foo # inline\n# after"),
@@ -183,11 +186,10 @@ var printTests = []printCase{
 		"aa #b\nc  #d\ne\nf #g",
 		"aa #b\nc  #d\ne\nf #g",
 	},
-	// TODO: reenable once we improve comment handling
-	//{
-	//	"{ a; } #x\nbbb #y\n{ #z\n}",
-	//	"{ a; } #x\nbbb    #y\n{ #z\n}",
-	//},
+	{
+		"{ a; } #x\nbbb #y\n{ #z\n}",
+		"{ a; } #x\nbbb    #y\n{ #z\n}",
+	},
 	{
 		"foo; foooo # 1",
 		"foo\nfoooo # 1",
@@ -355,11 +357,11 @@ var printTests = []printCase{
 	samePrint("case $i in\n#bef\n1) ;; #inl\nesac"),
 	samePrint("case $i in\n1) ;; #inl1\n2) ;; #inl2\nesac"),
 	samePrint("case $i in\n#bef\n1) #inl\n\tfoo\n\t;;\nesac"),
-	// TODO: reenable once we improve comment handling
-	//samePrint("case $i in\n1) #inl\n\t;;\nesac"),
+	samePrint("case $i in\n1) #inl\n\t;;\nesac"),
 	samePrint("case $i in\n1) a \\\n\tb ;;\nesac"),
 	samePrint("case $i in\n1 | 2 | \\\n\t3 | 4) a b ;;\nesac"),
 	samePrint("case $i in\n1 | 2 | \\\n\t3 | 4)\n\ta b\n\t;;\nesac"),
+	samePrint("case $i in\nx) ;;\ny) for n in 1; do echo $n; done ;;\nesac"),
 	{
 		"a=(\nb\nc\n) b=c",
 		"a=(\n\tb\n\tc\n) b=c",
@@ -426,10 +428,28 @@ var printTests = []printCase{
 	samePrint("f <<EOF\nbody\nEOF"),
 	samePrint("f <<EOF\nEOF"),
 	samePrint("f <<-EOF\n\tbody\nEOF"),
+	{
+		"f <<-EOF\nbody\nEOF",
+		"f <<-EOF\n\tbody\nEOF",
+	},
 	samePrint("f <<-EOF\nEOF"),
 	samePrint("{\n\tf <<EOF\nEOF\n}"),
 	samePrint("{\n\tf <<-EOF\n\t\tbody\n\tEOF\n}"),
 	samePrint("{\n\tf <<-EOF\n\t\tbody\n\tEOF\n\tf2\n}"),
+	samePrint("f <<-EOF\n\t{\n\t\tnicely indented\n\t}\nEOF"),
+	samePrint("f <<-EOF\n\t{\n\t\tnicely indented\n\t}\nEOF"),
+	{
+		"f <<-EOF\n\t{\nbadly indented\n\t}\nEOF",
+		"f <<-EOF\n\t{\n\tbadly indented\n\t}\nEOF",
+	},
+	{
+		"f <<-EOF\n\t\t{\n\t\t\ttoo indented\n\t\t}\nEOF",
+		"f <<-EOF\n\t{\n\t\ttoo indented\n\t}\nEOF",
+	},
+	{
+		"f <<-EOF\n{\n\ttoo little indented\n}\nEOF",
+		"f <<-EOF\n\t{\n\t\ttoo little indented\n\t}\nEOF",
+	},
 	samePrint("f <<EOF\nEOF\n# comment"),
 	samePrint("f <<EOF\nEOF\n# comment\nbar"),
 	samePrint("f <<EOF # inline\n$(\n\t# inside\n)\nEOF\n# outside\nbar"),
@@ -458,12 +478,27 @@ var printTests = []printCase{
 		"foo() { # inline\n\tbar\n}",
 	},
 	samePrint("if foo; then\n\tbar\n\t# comment\nfi"),
+	samePrint("if foo; then\n\tbar\n# else commented out\nfi"),
 	samePrint("if foo; then\n\tx\nelse\n\tbar\n\t# comment\nfi"),
+	samePrint("if foo; then\n\tx\n#comment\nelse\n\ty\nfi"),
+	samePrint("if foo; then\n\tx\n\t#comment\nelse\n\ty\nfi"),
+	{
+		"if foo; then\n\tx\n#a\n\t#b\n\t#c\nelse\n\ty\nfi",
+		"if foo; then\n\tx\n\t#a\n\t#b\n\t#c\nelse\n\ty\nfi",
+	},
+	samePrint("if foo; then\n\tx\nelse #comment\n\ty\nfi"),
+	samePrint("if foo; then\n\tx\n#comment\nelif bar; then\n\ty\nfi"),
+	samePrint("if foo; then\n\tx\n\t#comment\nelif bar; then\n\ty\nfi"),
+	samePrint("case i in\nx)\n\ta\n\t;;\n#comment\ny) ;;\nesac"),
+	samePrint("case i in\nx)\n\ta\n\t;;\n\t#comment\ny) ;;\nesac"),
+	{
+		"case i in\nx)\n\ta\n\t;;\n\t#a\n#b\n\t#c\ny) ;;\nesac",
+		"case i in\nx)\n\ta\n\t;;\n\t#a\n\t#b\n\t#c\ny) ;;\nesac",
+	},
 }
 
 func TestPrintWeirdFormat(t *testing.T) {
 	t.Parallel()
-
 	parser := NewParser(KeepComments)
 	printer := NewPrinter()
 	for i, tc := range printTests {
@@ -495,17 +530,23 @@ func parsePath(tb testing.TB, path string) *File {
 const canonicalPath = "canonical.sh"
 
 func TestPrintMultiline(t *testing.T) {
+	t.Parallel()
 	prog := parsePath(t, canonicalPath)
 	got, err := strPrint(NewPrinter(), prog)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want, err := ioutil.ReadFile(canonicalPath)
+	wantBs, err := ioutil.ReadFile(canonicalPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != string(want) {
+
+	// If we're on Windows and it was set up to automatically replace LF
+	// with CRLF, that might make this test fail. Just ignore \r characters.
+	want := strings.Replace(string(wantBs), "\r", "", -1)
+	got = strings.Replace(got, "\r", "", -1)
+	if got != want {
 		t.Fatalf("Print mismatch in canonical.sh")
 	}
 }
@@ -521,6 +562,7 @@ func BenchmarkPrint(b *testing.B) {
 }
 
 func TestPrintSpaces(t *testing.T) {
+	t.Parallel()
 	var spaceFormats = [...]struct {
 		spaces   uint
 		in, want string
@@ -558,6 +600,7 @@ type badWriter struct{}
 func (b badWriter) Write(p []byte) (int, error) { return 0, errBadWriter }
 
 func TestWriteErr(t *testing.T) {
+	t.Parallel()
 	_ = (*byteCounter)(nil).Flush()
 	f := &File{StmtList: StmtList{Stmts: []*Stmt{
 		{
@@ -579,6 +622,7 @@ func TestWriteErr(t *testing.T) {
 }
 
 func TestPrintBinaryNextLine(t *testing.T) {
+	t.Parallel()
 	var tests = [...]printCase{
 		{
 			"foo <<EOF &&\nl1\nEOF\nbar",
@@ -647,6 +691,7 @@ func TestPrintBinaryNextLine(t *testing.T) {
 }
 
 func TestPrintSwitchCaseIndent(t *testing.T) {
+	t.Parallel()
 	var tests = [...]printCase{
 		{
 			"case $i in\n1)\nfoo\n;;\nesac",
@@ -668,6 +713,7 @@ func TestPrintSwitchCaseIndent(t *testing.T) {
 }
 
 func TestPrintSpaceRedirects(t *testing.T) {
+	t.Parallel()
 	var tests = [...]printCase{
 		samePrint("echo foo bar > f"),
 		samePrint("echo > f foo bar"),
@@ -688,6 +734,7 @@ func TestPrintSpaceRedirects(t *testing.T) {
 }
 
 func TestPrintKeepPadding(t *testing.T) {
+	t.Parallel()
 	var tests = [...]printCase{
 		samePrint("echo foo bar"),
 		samePrint("echo  foo   bar"),
@@ -705,17 +752,23 @@ func TestPrintKeepPadding(t *testing.T) {
 		samePrint("{  a;  }"),
 		samePrint("(  a   )"),
 		samePrint("'foo\nbar'   # x"),
+		{"\tfoo", "foo"},
+		{"  if foo; then bar; fi", "if   foo; then bar; fi"},
 	}
 	parser := NewParser(KeepComments)
 	printer := NewPrinter(KeepPadding)
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("%03d", i), func(t *testing.T) {
+			// ensure that Reset does properly reset colCounter
+			printer.WriteByte('x')
+			printer.Reset(nil)
 			printTest(t, parser, printer, tc.in, tc.want)
 		})
 	}
 }
 
 func TestPrintMinify(t *testing.T) {
+	t.Parallel()
 	var tests = [...]printCase{
 		samePrint("echo foo bar $a $(b)"),
 		{
@@ -775,6 +828,10 @@ func TestPrintMinify(t *testing.T) {
 			"a &&\n\tb |\n\tc",
 			"a&&b|c",
 		},
+		{
+			"${0/${a}\\\n}",
+			"${0/$a/}",
+		},
 	}
 	parser := NewParser(KeepComments)
 	printer := NewPrinter(Minify)
@@ -786,6 +843,7 @@ func TestPrintMinify(t *testing.T) {
 }
 
 func TestPrintMinifyNotBroken(t *testing.T) {
+	t.Parallel()
 	parserBash := NewParser(KeepComments)
 	parserPosix := NewParser(KeepComments, Variant(LangPOSIX))
 	parserMirBSD := NewParser(KeepComments, Variant(LangMirBSDKorn))
@@ -852,37 +910,77 @@ func printTest(t *testing.T, parser *Parser, printer *Printer, in, want string) 
 }
 
 func TestPrintNodeTypes(t *testing.T) {
+	t.Parallel()
+
+	multiline, err := NewParser().Parse(strings.NewReader(`
+		echo foo
+	`), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var tests = [...]struct {
-		in   Node
-		want string
+		in      Node
+		want    string
+		wantErr bool
 	}{
 		{
-			&File{StmtList: litStmts("foo")},
-			"foo\n",
+			in:   &File{StmtList: litStmts("foo")},
+			want: "foo\n",
 		},
 		{
-			&File{StmtList: litStmts("foo", "bar")},
-			"foo\nbar\n",
+			in:   &File{StmtList: litStmts("foo", "bar")},
+			want: "foo\nbar\n",
 		},
 		{
-			litStmt("foo", "bar"),
-			"foo bar",
+			in:   litStmt("foo", "bar"),
+			want: "foo bar",
 		},
 		{
-			litCall("foo", "bar"),
-			"foo bar",
+			in:   litCall("foo", "bar"),
+			want: "foo bar",
 		},
 		{
-			litWord("foo"),
-			"foo",
+			in:   litWord("foo"),
+			want: "foo",
+		},
+		{
+			in:   lit("foo"),
+			want: "foo",
+		},
+		{
+			in:   sglQuoted("foo"),
+			want: "'foo'",
+		},
+		{
+			in:      &Comment{},
+			wantErr: true,
+		},
+		{
+			in:   multiline.Stmts[0],
+			want: "echo foo",
+		},
+		{
+			in:   multiline.Stmts[0].Cmd,
+			want: "echo foo",
+		},
+		{
+			in:   multiline.Stmts[0].Cmd.(*CallExpr).Args[0],
+			want: "echo",
+		},
+		{
+			in:   multiline.Stmts[0].Cmd.(*CallExpr).Args[0].Parts[0],
+			want: "echo",
 		},
 	}
 	printer := NewPrinter()
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("%03d", i), func(t *testing.T) {
 			got, err := strPrint(printer, tc.in)
-			if err != nil {
-				t.Fatal(err)
+			if err == nil && tc.wantErr {
+				t.Fatalf("wanted an error but found none")
+			} else if err != nil && !tc.wantErr {
+				t.Fatalf("didn't want an error but got %v", err)
 			}
 			if got != tc.want {
 				t.Fatalf("Print mismatch:\nwant:\n%s\ngot:\n%s",
@@ -893,6 +991,7 @@ func TestPrintNodeTypes(t *testing.T) {
 }
 
 func TestPrintManyStmts(t *testing.T) {
+	t.Parallel()
 	var tests = [...]struct {
 		in, want string
 	}{

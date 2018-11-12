@@ -64,18 +64,21 @@ func main() {
 			os.Exit(1)
 		}
 
-		runner := interp.Runner{
-			Stdin:       os.Stdin,
-			Stdout:      os.Stdout,
-			Stderr:      os.Stderr,
-			KillTimeout: -1,
+		runner, err := interp.New(
+			interp.StdIO(os.Stdin, os.Stdout, os.Stderr),
+			func(r *interp.Runner) error {
+				r.KillTimeout = -1
+				return nil
+			},
+		)
+		if err != nil {
+			os.Exit(1)
 		}
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		runner.Context = ctx
 		runner.Reset()
-
-		err = runner.Run(prog)
+		err = runner.Run(ctx, prog)
 		if err != nil {
 			os.Exit(1)
 		}

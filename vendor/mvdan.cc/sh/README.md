@@ -1,12 +1,18 @@
 # sh
 
 [![GoDoc](https://godoc.org/mvdan.cc/sh?status.svg)](https://godoc.org/mvdan.cc/sh)
-[![Linux & OSX build](https://travis-ci.org/mvdan/sh.svg?branch=master)](https://travis-ci.org/mvdan/sh)
-[![Windows build](https://ci.appveyor.com/api/projects/status/rxxs08v65aj2fqof?svg=true)](https://ci.appveyor.com/project/mvdan/sh)
-[![Coverage Status](https://coveralls.io/repos/github/mvdan/sh/badge.svg?branch=master)](https://coveralls.io/github/mvdan/sh)
+[![Build](https://travis-ci.org/mvdan/sh.svg?branch=master)](https://travis-ci.org/mvdan/sh)
 
 A shell parser, formatter and interpreter. Supports [POSIX Shell], [Bash] and
-[mksh]. Requires Go 1.9 or later.
+[mksh]. Requires Go 1.10 or later.
+
+### Quick start
+
+To parse shell scripts, inspect them, and print them out, see the [syntax
+examples](https://godoc.org/mvdan.cc/sh/syntax#pkg-examples).
+
+For high-level operations like performing shell expansions on strings, see the
+[shell examples](https://godoc.org/mvdan.cc/sh/shell#pkg-examples).
 
 ### shfmt
 
@@ -23,24 +29,29 @@ extension and a shell shebang.
 
 	shfmt -l -w script.sh
 
+Typically, CI builds should use the command below, to error if any shell scripts
+in a project don't adhere to the format:
+
+	shfmt -d .
+
 Use `-i N` to indent with a number of spaces instead of tabs. There are other
 formatting options - see `shfmt -h`. For example, to get the formatting
 appropriate for [Google's Style][google-style] guide, use `shfmt -i 2 -ci`.
 
 Packages are available for [Arch], [CRUX], [Homebrew], [NixOS] and [Void].
 
-#### Advantages over `bash -n`
+#### Replacing `bash -n`
 
 `bash -n` can be useful to check for syntax errors in shell scripts. However,
 `shfmt >/dev/null` can do a better job as it checks for invalid UTF-8 and does
 all parsing statically, including checking POSIX Shell validity:
 
-```
- $ echo '${foo:1 2}' | bash -n
- $ echo '${foo:1 2}' | shfmt
+```sh
+$ echo '${foo:1 2}' | bash -n
+$ echo '${foo:1 2}' | shfmt
 1:9: not a valid arithmetic operator: 2
- $ echo 'foo=(1 2)' | bash --posix -n
- $ echo 'foo=(1 2)' | shfmt -p
+$ echo 'foo=(1 2)' | bash --posix -n
+$ echo 'foo=(1 2)' | shfmt -p
 1:5: arrays are a bash feature
 ```
 
@@ -64,18 +75,18 @@ and the printer. To get started, run:
 * When indexing Bash associative arrays, always use quotes. The static parser
   will otherwise have to assume that the index is an arithmetic expression.
 
-```
+```sh
 $ echo '${array[spaced string]}' | shfmt
 1:16: not a valid arithmetic operator: string
 $ echo '${array[dash-string]}' | shfmt
 ${array[dash - string]}
 ```
 
-* `$((` and `((` ambiguity is not suported. Backtracking would complicate the
+* `$((` and `((` ambiguity is not supported. Backtracking would complicate the
   parser and make streaming support via `io.Reader` impossible. The POSIX spec
   recommends to [space the operands][posix-ambiguity] if `$( (` is meant.
 
-```
+```sh
 $ echo '$((foo); (bar))' | shfmt
 1:1: reached ) without matching $(( with ))
 ```
@@ -91,7 +102,7 @@ See the [_js](_js) directory for more information.
 
 ### Related projects
 
-* [dockerised-shfmt] - A docker image of `shfmt`
+* Docker images - by [jamesmstone][dockerized-jamesmstone], [PeterDaveHello][dockerized-peterdavehello]
 * [format-shell] - Atom plugin for `shfmt`
 * [micro] - Editor with a built-in plugin for `shfmt`
 * [shell-format] - VS Code plugin for `shfmt`
@@ -100,7 +111,8 @@ See the [_js](_js) directory for more information.
 [arch]: https://aur.archlinux.org/packages/shfmt/
 [bash]: https://www.gnu.org/software/bash/
 [crux]: https://github.com/6c37/crux-ports-git/tree/3.3/shfmt
-[dockerised-shfmt]: https://hub.docker.com/r/jamesmstone/shfmt/
+[dockerized-jamesmstone]: https://hub.docker.com/r/jamesmstone/shfmt/
+[dockerized-peterdavehello]: https://github.com/PeterDaveHello/dockerized-shfmt
 [examples]: https://godoc.org/mvdan.cc/sh/syntax#pkg-examples
 [format-shell]: https://atom.io/packages/format-shell
 [go-fuzz]: https://github.com/dvyukov/go-fuzz

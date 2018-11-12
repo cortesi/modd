@@ -16,9 +16,11 @@ import (
 	"testing"
 
 	"github.com/kr/pretty"
+	"mvdan.cc/sh/internal"
 )
 
 func TestKeepComments(t *testing.T) {
+	t.Parallel()
 	in := "# foo\ncmd\n# bar"
 	want := &File{StmtList: StmtList{
 		Stmts: []*Stmt{{
@@ -287,8 +289,7 @@ func singleParse(p *Parser, in string, want *File) func(t *testing.T) {
 		clearPosRecurse(t, in, got)
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("syntax tree mismatch in %q\ndiff:\n%s", in,
-				strings.Join(pretty.Diff(want, got), "\n"),
-			)
+				strings.Join(pretty.Diff(want, got), "\n"))
 		}
 	}
 }
@@ -1104,14 +1105,6 @@ var shellTests = []errorCase{
 		bsmk: `1:9: cannot index a special parameter name`,
 	},
 	{
-		in:   "echo ${#-4}",
-		bsmk: `1:9: $# can never be unset or null #NOERR bash is not strict`,
-	},
-	{
-		in:   "echo ${??4}",
-		bsmk: `1:9: $? can never be unset or null #NOERR bash is not strict`,
-	},
-	{
 		in:   "echo ${foo*}",
 		bsmk: `1:11: not a valid parameter expansion operator: *`,
 	},
@@ -1705,15 +1698,15 @@ var shellTests = []errorCase{
 	},
 	{
 		in:    "echo !(a)",
-		posix: `1:6: extended globs are a bash feature`,
+		posix: `1:6: extended globs are a bash/mksh feature`,
 	},
 	{
 		in:    "echo $a@(b)",
-		posix: `1:8: extended globs are a bash feature`,
+		posix: `1:8: extended globs are a bash/mksh feature`,
 	},
 	{
 		in:    "foo=(1 2)",
-		posix: `1:5: arrays are a bash feature`,
+		posix: `1:5: arrays are a bash/mksh feature`,
 	},
 	{
 		in:     "a=$c\n'",
@@ -1721,19 +1714,19 @@ var shellTests = []errorCase{
 	},
 	{
 		in:    "echo ${!foo}",
-		posix: `1:8: ${!foo} is a bash feature`,
+		posix: `1:8: ${!foo} is a bash/mksh feature`,
 	},
 	{
 		in:    "echo ${foo[1]}",
-		posix: `1:11: arrays are a bash feature`,
+		posix: `1:11: arrays are a bash/mksh feature`,
 	},
 	{
 		in:    "echo ${foo/a/b}",
-		posix: `1:11: search and replace is a bash feature`,
+		posix: `1:11: search and replace is a bash/mksh feature`,
 	},
 	{
 		in:    "echo ${foo:1}",
-		posix: `1:11: slicing is a bash feature`,
+		posix: `1:11: slicing is a bash/mksh feature`,
 	},
 	{
 		in:    "echo ${foo,bar}",
@@ -1742,7 +1735,7 @@ var shellTests = []errorCase{
 	},
 	{
 		in:    "echo ${foo@Q}",
-		posix: `1:11: this expansion operator is a bash feature`,
+		posix: `1:11: this expansion operator is a bash/mksh feature`,
 	},
 	{
 		in:     "`\"`\\",
@@ -1824,6 +1817,7 @@ func TestParseErrMirBSDKorn(t *testing.T) {
 }
 
 func TestInputName(t *testing.T) {
+	t.Parallel()
 	in := "("
 	want := "some-file.sh:1:1: reached EOF without matching ( with )"
 	p := NewParser()
@@ -1845,6 +1839,7 @@ type badReader struct{}
 func (b badReader) Read(p []byte) (int, error) { return 0, errBadReader }
 
 func TestReadErr(t *testing.T) {
+	t.Parallel()
 	p := NewParser()
 	_, err := p.Parse(badReader{}, "")
 	if err == nil {
@@ -1876,65 +1871,194 @@ func (r *strictStringReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-type chunkedReader struct {
-	rem  []string
-	cont chan bool
-}
-
-func (c *chunkedReader) Read(p []byte) (n int, err error) {
-	if len(c.rem) < 1 {
-		return 0, io.EOF
-	}
-	<-c.cont
-	src := []byte(c.rem[0])
-	c.rem = c.rem[1:]
-	if len(p) < len(src) {
-		panic("TODO: small byte buffers")
-	}
-	return copy(p, src), nil
-}
-
 func TestParseStmts(t *testing.T) {
-	in := []string{"foo\n", "bar; baz"}
+	t.Parallel()
 	p := NewParser()
-	cr := &chunkedReader{in, make(chan bool, 10)}
+	input := internal.ChanPipe(make(chan []byte, 8))
 	recv := make(chan bool, 10)
 	errc := make(chan error)
 	go func() {
-		errc <- p.Stmts(cr, func(s *Stmt) bool {
+		errc <- p.Stmts(input, func(s *Stmt) bool {
 			recv <- true
 			return true
 		})
 	}()
-	cr.cont <- true
+	input.WriteString("foo\n")
 	<-recv
-	cr.cont <- true
+	input.WriteString("bar; baz")
+	close(input)
 	<-recv
 	<-recv
 	if err := <-errc; err != nil {
-		t.Fatalf("Expected no error in %q: %v", in, err)
+		t.Fatalf("Expected no error: %v", err)
 	}
 }
 
 func TestParseStmtsStopEarly(t *testing.T) {
-	in := []string{"a\n", "b &\n", "c\n"}
+	t.Parallel()
 	p := NewParser()
-	cr := &chunkedReader{in, make(chan bool, 10)}
+	input := internal.ChanPipe(make(chan []byte, 8))
 	recv := make(chan bool, 10)
 	errc := make(chan error)
 	go func() {
-		errc <- p.Stmts(cr, func(s *Stmt) bool {
+		errc <- p.Stmts(input, func(s *Stmt) bool {
 			recv <- true
 			return !s.Background
 		})
 	}()
-	cr.cont <- true
+	input.WriteString("a\n")
 	<-recv
-	cr.cont <- true
+	input.WriteString("b &\n")
 	<-recv
-	cr.cont <- true
+	input.WriteString("c\n")
+	close(input)
 	if err := <-errc; err != nil {
-		t.Fatalf("Expected no error in %q: %v", in, err)
+		t.Fatalf("Expected no error: %v", err)
+	}
+}
+
+func TestParseStmtsError(t *testing.T) {
+	t.Parallel()
+	in := "foo; )"
+	p := NewParser()
+	recv := make(chan bool, 10)
+	errc := make(chan error)
+	go func() {
+		errc <- p.Stmts(strings.NewReader(in), func(s *Stmt) bool {
+			recv <- true
+			return true
+		})
+	}()
+	<-recv
+	if err := <-errc; err == nil {
+		t.Fatalf("Expected an error in %q, but got nil", in)
+	}
+}
+
+func TestParseWords(t *testing.T) {
+	t.Parallel()
+	p := NewParser()
+	input := internal.ChanPipe(make(chan []byte, 8))
+	recv := make(chan bool, 10)
+	errc := make(chan error)
+	go func() {
+		errc <- p.Words(input, func(w *Word) bool {
+			recv <- true
+			return true
+		})
+	}()
+	// TODO: Allow a single space to end parsing a word. At the moment, the
+	// parser must read the next non-space token (the next literal or
+	// newline, in this case) to finish parsing a word.
+	input.WriteString("foo ")
+	input.WriteString("bar\n")
+	<-recv
+	input.WriteString("baz etc")
+	close(input)
+	<-recv
+	<-recv
+	<-recv
+	if err := <-errc; err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+}
+
+func TestParseWordsStopEarly(t *testing.T) {
+	t.Parallel()
+	p := NewParser()
+	input := internal.ChanPipe(make(chan []byte, 8))
+	recv := make(chan bool, 10)
+	errc := make(chan error)
+	go func() {
+		errc <- p.Words(input, func(w *Word) bool {
+			recv <- true
+			return w.Lit() != "b"
+		})
+	}()
+	input.WriteString("a\n")
+	<-recv
+	input.WriteString("b\n")
+	<-recv
+	input.WriteString("c\n")
+	close(input)
+	if err := <-errc; err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+}
+
+func TestParseWordsError(t *testing.T) {
+	t.Parallel()
+	in := "foo )"
+	p := NewParser()
+	recv := make(chan bool, 10)
+	errc := make(chan error)
+	go func() {
+		errc <- p.Words(strings.NewReader(in), func(w *Word) bool {
+			recv <- true
+			return true
+		})
+	}()
+	<-recv
+	want := "1:5: ) is not a valid word"
+	got := fmt.Sprintf("%v", <-errc)
+	if got != want {
+		t.Fatalf("Expected %q as an error, but got %q", want, got)
+	}
+}
+
+var documentTests = []struct {
+	in   string
+	want []WordPart
+}{
+	{
+		"foo",
+		[]WordPart{lit("foo")},
+	},
+	{
+		" foo  $bar",
+		[]WordPart{
+			lit(" foo  "),
+			litParamExp("bar"),
+		},
+	},
+	{
+		"$bar\n\n",
+		[]WordPart{
+			litParamExp("bar"),
+			lit("\n\n"),
+		},
+	},
+}
+
+func TestParseDocument(t *testing.T) {
+	t.Parallel()
+	p := NewParser()
+
+	for i, tc := range documentTests {
+		t.Run(fmt.Sprintf("%02d", i), func(t *testing.T) {
+			got, err := p.Document(strings.NewReader(tc.in))
+			if err != nil {
+				t.Fatal(err)
+			}
+			clearPosRecurse(t, "", got)
+			want := &Word{Parts: tc.want}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("syntax tree mismatch in %q\ndiff:\n%s", tc.in,
+					strings.Join(pretty.Diff(want, got), "\n"))
+			}
+		})
+	}
+}
+
+func TestParseDocumentError(t *testing.T) {
+	t.Parallel()
+	in := "foo $("
+	p := NewParser()
+	_, err := p.Document(strings.NewReader(in))
+	want := "1:5: reached EOF without matching ( with )"
+	got := fmt.Sprintf("%v", err)
+	if got != want {
+		t.Fatalf("Expected %q as an error, but got %q", want, got)
 	}
 }
 

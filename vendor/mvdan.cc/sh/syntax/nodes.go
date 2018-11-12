@@ -3,7 +3,10 @@
 
 package syntax
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Node represents a syntax tree node.
 type Node interface {
@@ -289,16 +292,24 @@ type Block struct {
 func (b *Block) Pos() Pos { return b.Lbrace }
 func (b *Block) End() Pos { return posAddCol(b.Rbrace, 1) }
 
+// TODO(v3): Refactor and simplify elif/else. For example, we could likely make
+// Else an *IfClause, remove ElsePos, make IfPos also do opening "else"
+// positions, and join the comment slices as Last []Comment.
+
 // IfClause represents an if statement.
 type IfClause struct {
-	Elif    bool
-	IfPos   Pos // pos of "elif" if Elif == true
+	Elif    bool // whether this IfClause begins with "elif"
+	IfPos   Pos  // position of the starting "if" or "elif" token
 	ThenPos Pos
-	ElsePos Pos // pos of "elif" if FollowedByElif() == true
-	FiPos   Pos // empty if Elif == true
-	Cond    StmtList
-	Then    StmtList
-	Else    StmtList
+	ElsePos Pos // position of a following "else" or "elif", if any
+	FiPos   Pos // position of "fi", empty if Elif == true
+
+	Cond StmtList
+	Then StmtList
+	Else StmtList
+
+	ElseComments []Comment // comments on the "else"
+	FiComments   []Comment // comments on the "fi"
 }
 
 func (c *IfClause) Pos() Pos { return c.IfPos }
@@ -411,6 +422,28 @@ type Word struct {
 
 func (w *Word) Pos() Pos { return w.Parts[0].Pos() }
 func (w *Word) End() Pos { return w.Parts[len(w.Parts)-1].End() }
+
+// Lit returns the word as a literal value, if the word consists of *syntax.Lit
+// nodes only. An empty string is returned otherwise. Words with multiple
+// literals, which can appear in some edge cases, are handled properly.
+//
+// For example, the word "foo" will return "foo", but the word "foo${bar}" will
+// return "".
+func (w *Word) Lit() string {
+	// In the usual case, we'll have either a single part that's a literal,
+	// or one of the parts being a non-literal. Using strings.Join instead
+	// of a strings.Builder avoids extra work in these cases, since a single
+	// part is a shortcut, and many parts don't incur string copies.
+	lits := make([]string, 0, 1)
+	for _, part := range w.Parts {
+		lit, ok := part.(*Lit)
+		if !ok {
+			return ""
+		}
+		lits = append(lits, lit.Value)
+	}
+	return strings.Join(lits, "")
+}
 
 // WordPart represents all nodes that can form part of a word.
 //
