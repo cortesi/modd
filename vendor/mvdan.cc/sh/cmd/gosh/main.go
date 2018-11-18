@@ -1,9 +1,10 @@
 // Copyright (c) 2017, Daniel Martí <mvdan@mvdan.cc>
 // See LICENSE for licensing information
 
-package main // import "mvdan.cc/sh/cmd/gosh"
+package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -19,13 +20,9 @@ import (
 var (
 	command = flag.String("c", "", "command to be executed")
 
-	parser *syntax.Parser
+	parser = syntax.NewParser()
 
-	runner = interp.Runner{
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}
+	mainRunner, _ = interp.New(interp.StdIO(os.Stdin, os.Stdout, os.Stderr))
 )
 
 func main() {
@@ -37,13 +34,12 @@ func main() {
 }
 
 func runAll() error {
-	parser = syntax.NewParser()
 	if *command != "" {
 		return run(strings.NewReader(*command), "")
 	}
 	if flag.NArg() == 0 {
 		if terminal.IsTerminal(int(os.Stdin.Fd())) {
-			return interactive()
+			return interactive(mainRunner)
 		}
 		return run(os.Stdin, "")
 	}
@@ -69,39 +65,33 @@ func run(reader io.Reader, name string) error {
 	if err != nil {
 		return err
 	}
-	runner.Reset()
-	return runner.Run(prog)
+	mainRunner.Reset()
+	ctx := context.Background()
+	return mainRunner.Run(ctx, prog)
 }
 
-type promptReader struct {
-	io.Reader
-	first bool
-}
-
-func (pr *promptReader) Read(p []byte) (int, error) {
-	if pr.first {
-		fmt.Printf("$ ")
-		pr.first = false
-	} else {
-		fmt.Printf("> ")
-	}
-	return pr.Reader.Read(p)
-}
-
-func interactive() error {
-	r := &promptReader{os.Stdin, true}
-	runner.Reset()
-	fn := func(s *syntax.Stmt) bool {
-		if err := runner.Stmt(s); err != nil {
-			code, ok := err.(interp.ExitCode)
-			if ok {
-				os.Exit(int(code))
-			}
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+func interactive(runner *interp.Runner) error {
+	fmt.Fprintf(runner.Stdout, "$ ")
+	fn := func(stmts []*syntax.Stmt) bool {
+		if parser.Incomplete() {
+			fmt.Fprintf(runner.Stdout, "> ")
+			return true
 		}
-		r.first = true
+		ctx := context.Background()
+		for _, stmt := range stmts {
+			if err := runner.Run(ctx, stmt); err != nil {
+				switch x := err.(type) {
+				case interp.ShellExitStatus:
+					os.Exit(int(x))
+				case interp.ExitStatus:
+				default:
+					fmt.Fprintln(runner.Stderr, err)
+					os.Exit(1)
+				}
+			}
+		}
+		fmt.Fprintf(runner.Stdout, "$ ")
 		return true
 	}
-	return parser.Stmts(r, fn)
+	return parser.Interactive(runner.Stdin, fn)
 }

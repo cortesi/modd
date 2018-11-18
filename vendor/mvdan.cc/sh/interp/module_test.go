@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"mvdan.cc/sh/internal"
 	"mvdan.cc/sh/syntax"
 )
 
@@ -27,7 +28,7 @@ var modCases = []struct {
 }{
 	{
 		name: "ExecBlacklist",
-		exec: func(ctx Ctxt, path string, args []string) error {
+		exec: func(ctx context.Context, path string, args []string) error {
 			if args[0] == "sleep" {
 				return fmt.Errorf("blacklisted: %s", args[0])
 			}
@@ -38,7 +39,7 @@ var modCases = []struct {
 	},
 	{
 		name: "ExecWhitelist",
-		exec: func(ctx Ctxt, path string, args []string) error {
+		exec: func(ctx context.Context, path string, args []string) error {
 			switch args[0] {
 			case "sed", "grep":
 			default:
@@ -51,7 +52,7 @@ var modCases = []struct {
 	},
 	{
 		name: "ExecSubshell",
-		exec: func(ctx Ctxt, path string, args []string) error {
+		exec: func(ctx context.Context, path string, args []string) error {
 			return fmt.Errorf("blacklisted: %s", args[0])
 		},
 		src:  "(malicious)",
@@ -59,7 +60,7 @@ var modCases = []struct {
 	},
 	{
 		name: "ExecPipe",
-		exec: func(ctx Ctxt, path string, args []string) error {
+		exec: func(ctx context.Context, path string, args []string) error {
 			return fmt.Errorf("blacklisted: %s", args[0])
 		},
 		src:  "malicious | echo foo",
@@ -67,7 +68,7 @@ var modCases = []struct {
 	},
 	{
 		name: "ExecCmdSubst",
-		exec: func(ctx Ctxt, path string, args []string) error {
+		exec: func(ctx context.Context, path string, args []string) error {
 			return fmt.Errorf("blacklisted: %s", args[0])
 		},
 		src:  "a=$(malicious)",
@@ -75,17 +76,17 @@ var modCases = []struct {
 	},
 	{
 		name: "ExecBackground",
-		exec: func(ctx Ctxt, path string, args []string) error {
+		exec: func(ctx context.Context, path string, args []string) error {
 			return fmt.Errorf("blacklisted: %s", args[0])
 		},
-		// TODO: find a way to bubble up the error, perhaps
-		src:  "{ malicious; echo foo; } & wait",
-		want: "",
+		src:  "{ malicious; true; } & { malicious; true; } & wait",
+		want: "blacklisted: malicious",
 	},
 	{
 		name: "OpenForbidNonDev",
-		open: OpenDevImpls(func(ctx Ctxt, path string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
-			return nil, fmt.Errorf("non-dev: %s", ctx.UnixPath(path))
+		open: OpenDevImpls(func(ctx context.Context, path string, flags int, mode os.FileMode) (io.ReadWriteCloser, error) {
+			mc, _ := FromModuleContext(ctx)
+			return nil, fmt.Errorf("non-dev: %s", mc.UnixPath(path))
 		}),
 		src:  "echo foo >/dev/null; echo bar >/tmp/x",
 		want: "non-dev: /tmp/x",
@@ -93,6 +94,7 @@ var modCases = []struct {
 }
 
 func TestRunnerModules(t *testing.T) {
+	t.Parallel()
 	p := syntax.NewParser()
 	for _, tc := range modCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -100,15 +102,14 @@ func TestRunnerModules(t *testing.T) {
 			if err != nil {
 				t.Fatalf("could not parse: %v", err)
 			}
-			var cb concBuffer
-			r := Runner{
-				Stdout: &cb,
-				Stderr: &cb,
-				Exec:   tc.exec,
-				Open:   tc.open,
+			var cb internal.ConcBuffer
+			r, err := New(StdIO(nil, &cb, &cb),
+				Module(tc.exec), Module(tc.open))
+			if err != nil {
+				t.Fatal(err)
 			}
-			r.Reset()
-			if err := r.Run(file); err != nil {
+			ctx := context.Background()
+			if err := r.Run(ctx, file); err != nil {
 				cb.WriteString(err.Error())
 			}
 			got := cb.String()
@@ -116,6 +117,14 @@ func TestRunnerModules(t *testing.T) {
 				t.Fatalf("want:\n%s\ngot:\n%s", tc.want, got)
 			}
 		})
+	}
+}
+
+func TestRunnerDefaultModules(t *testing.T) {
+	t.Parallel()
+	_, err := New(Module(DefaultOpen), Module(DefaultExec))
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -182,22 +191,18 @@ func TestKillTimeout(t *testing.T) {
 				var rbuf readyBuffer
 				rbuf.seenReady.Add(1)
 				ctx, cancel := context.WithCancel(context.Background())
-				r := Runner{
-					Context:     ctx,
-					Stdout:      &rbuf,
-					Stderr:      &rbuf,
-					KillTimeout: test.killTimeout,
+				r, err := New(StdIO(nil, &rbuf, &rbuf))
+				if err != nil {
+					t.Fatal(err)
 				}
-				if err = r.Reset(); err != nil {
-					t.Errorf("could not reset: %v", err)
-				}
+				r.KillTimeout = test.killTimeout
 				go func() {
 					rbuf.seenReady.Wait()
 					cancel()
 				}()
-				err = r.Run(file)
+				err = r.Run(ctx, file)
 				if test.forcedKill {
-					if _, ok := err.(ExitCode); ok || err == nil {
+					if _, ok := err.(ExitStatus); ok || err == nil {
 						t.Error("command was not force-killed")
 					}
 				} else {

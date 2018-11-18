@@ -1,7 +1,7 @@
 // Copyright (c) 2016, Daniel Martí <mvdan@mvdan.cc>
 // See LICENSE for licensing information
 
-package main // import "mvdan.cc/sh/cmd/shfmt"
+package main
 
 import (
 	"bytes"
@@ -48,7 +48,7 @@ var (
 	in  io.Reader = os.Stdin
 	out io.Writer = os.Stdout
 
-	version = "v2.5.0"
+	version = "v2.6.0"
 )
 
 func main() {
@@ -63,7 +63,7 @@ by filename extension and by shebang.
 
   -l        list files whose formatting differs from shfmt's
   -w        write result to file instead of stdout
-  -d        display diffs when formatting differs
+  -d        error with a diff when the formatting differs
   -s        simplify the code
 
 Parser options:

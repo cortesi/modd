@@ -4,6 +4,7 @@
 package interp
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,29 +16,36 @@ import (
 )
 
 // non-empty string is true, empty string is false
-func (r *Runner) bashTest(expr syntax.TestExpr) string {
+func (r *Runner) bashTest(ctx context.Context, expr syntax.TestExpr, classic bool) string {
 	switch x := expr.(type) {
 	case *syntax.Word:
-		return r.loneWord(x)
+		return r.literal(x)
 	case *syntax.ParenTest:
-		return r.bashTest(x.X)
+		return r.bashTest(ctx, x.X, classic)
 	case *syntax.BinaryTest:
 		switch x.Op {
 		case syntax.TsMatch, syntax.TsNoMatch:
-			str := r.loneWord(x.X.(*syntax.Word))
+			str := r.literal(x.X.(*syntax.Word))
 			yw := x.Y.(*syntax.Word)
-			pat := r.lonePattern(yw)
-			if match(pat, str) == (x.Op == syntax.TsMatch) {
-				return "1"
+			if classic { // test, [
+				lit := r.literal(yw)
+				if (str == lit) == (x.Op == syntax.TsMatch) {
+					return "1"
+				}
+			} else { // [[
+				pattern := r.pattern(yw)
+				if match(pattern, str) == (x.Op == syntax.TsMatch) {
+					return "1"
+				}
 			}
 			return ""
 		}
-		if r.binTest(x.Op, r.bashTest(x.X), r.bashTest(x.Y)) {
+		if r.binTest(x.Op, r.bashTest(ctx, x.X, classic), r.bashTest(ctx, x.Y, classic)) {
 			return "1"
 		}
 		return ""
 	case *syntax.UnaryTest:
-		if r.unTest(x.Op, r.bashTest(x.X)) {
+		if r.unTest(ctx, x.Op, r.bashTest(ctx, x.X, classic)) {
 			return "1"
 		}
 		return ""
@@ -103,7 +111,7 @@ func (r *Runner) statMode(name string, mode os.FileMode) bool {
 	return err == nil && info.Mode()&mode != 0
 }
 
-func (r *Runner) unTest(op syntax.UnTestOperator, x string) bool {
+func (r *Runner) unTest(ctx context.Context, op syntax.UnTestOperator, x string) bool {
 	switch op {
 	case syntax.TsExists:
 		_, err := r.stat(x)
@@ -136,13 +144,13 @@ func (r *Runner) unTest(op syntax.UnTestOperator, x string) bool {
 	//case syntax.TsUsrOwn:
 	//case syntax.TsModif:
 	case syntax.TsRead:
-		f, err := r.open(r.relPath(x), os.O_RDONLY, 0, false)
+		f, err := r.open(ctx, r.relPath(x), os.O_RDONLY, 0, false)
 		if err == nil {
 			f.Close()
 		}
 		return err == nil
 	case syntax.TsWrite:
-		f, err := r.open(r.relPath(x), os.O_WRONLY, 0, false)
+		f, err := r.open(ctx, r.relPath(x), os.O_WRONLY, 0, false)
 		if err == nil {
 			f.Close()
 		}
@@ -165,11 +173,9 @@ func (r *Runner) unTest(op syntax.UnTestOperator, x string) bool {
 		}
 		return false
 	case syntax.TsVarSet:
-		_, e := r.lookupVar(x)
-		return e
+		return r.lookupVar(x).IsSet()
 	case syntax.TsRefVar:
-		v, _ := r.lookupVar(x)
-		return v.NameRef
+		return r.lookupVar(x).NameRef
 	case syntax.TsNot:
 		return x == ""
 	default:

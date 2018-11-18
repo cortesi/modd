@@ -8,52 +8,327 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
+	"mvdan.cc/sh/expand"
 	"mvdan.cc/sh/syntax"
 )
 
-// A Runner interprets shell programs. It cannot be reused once a
-// program has been interpreted.
+// New creates a new Runner, applying a number of options. If applying any of
+// the options results in an error, it is returned.
 //
-// Note that writes to Stdout and Stderr may not be sequential. If
-// you plan on using an io.Writer implementation that isn't safe for
-// concurrent use, consider a workaround like hiding writes behind a
-// mutex.
-type Runner struct {
-	// Env specifies the environment of the interpreter.
-	// If Env is nil, Run uses the current process's environment.
-	Env Environ
+// Any unset options fall back to their defaults. For example, not supplying the
+// environment falls back to the process's environment, and not supplying the
+// standard output writer means that the output will be discarded.
+func New(opts ...func(*Runner) error) (*Runner, error) {
+	r := &Runner{usedNew: true}
+	for _, opt := range opts {
+		if err := opt(r); err != nil {
+			return nil, err
+		}
+	}
+	// Set the default fallbacks, if necessary.
+	if r.Env == nil {
+		Env(nil)(r)
+	}
+	if r.Dir == "" {
+		if err := Dir("")(r); err != nil {
+			return nil, err
+		}
+	}
+	if r.Exec == nil {
+		Module(ModuleExec(nil))(r)
+	}
+	if r.Open == nil {
+		Module(ModuleOpen(nil))(r)
+	}
+	if r.Stdout == nil || r.Stderr == nil {
+		StdIO(r.Stdin, r.Stdout, r.Stderr)(r)
+	}
+	return r, nil
+}
 
-	// Dir specifies the working directory of the command. If Dir is
-	// the empty string, Run runs the command in the calling
-	// process's current directory.
+func (r *Runner) fillExpandConfig(ctx context.Context) {
+	r.ectx = ctx
+	r.ecfg = &expand.Config{
+		Env: expandEnv{r},
+		CmdSubst: func(w io.Writer, cs *syntax.CmdSubst) error {
+			r2 := r.sub()
+			r2.Stdout = w
+			r2.stmts(ctx, cs.StmtList)
+			return r2.err
+		},
+		ReadDir: ioutil.ReadDir,
+	}
+	r.updateExpandOpts()
+}
+
+func (r *Runner) updateExpandOpts() {
+	r.ecfg.NoGlob = r.opts[optNoGlob]
+	r.ecfg.GlobStar = r.opts[optGlobStar]
+}
+
+func (r *Runner) expandErr(err error) {
+	switch err := err.(type) {
+	case nil:
+	case expand.UnsetParameterError:
+		r.errf("%s\n", err.Message)
+		r.exit = 1
+		r.setErr(ShellExitStatus(r.exit))
+	default:
+		r.setErr(err)
+		r.exit = 1
+	}
+}
+
+func (r *Runner) arithm(expr syntax.ArithmExpr) int {
+	n, err := expand.Arithm(r.ecfg, expr)
+	r.expandErr(err)
+	return n
+}
+
+func (r *Runner) fields(words ...*syntax.Word) []string {
+	strs, err := expand.Fields(r.ecfg, words...)
+	r.expandErr(err)
+	return strs
+}
+
+func (r *Runner) literal(word *syntax.Word) string {
+	str, err := expand.Literal(r.ecfg, word)
+	r.expandErr(err)
+	return str
+}
+
+func (r *Runner) document(word *syntax.Word) string {
+	str, err := expand.Document(r.ecfg, word)
+	r.expandErr(err)
+	return str
+}
+
+func (r *Runner) pattern(word *syntax.Word) string {
+	str, err := expand.Pattern(r.ecfg, word)
+	r.expandErr(err)
+	return str
+}
+
+// expandEnv exposes Runner's variables to the expand package.
+type expandEnv struct {
+	r *Runner
+}
+
+func (e expandEnv) Get(name string) expand.Variable {
+	return e.r.lookupVar(name)
+}
+func (e expandEnv) Set(name string, vr expand.Variable) {
+	e.r.setVarInternal(name, vr)
+}
+func (e expandEnv) Each(fn func(name string, vr expand.Variable) bool) {
+	e.r.Env.Each(fn)
+	for name, vr := range e.r.Vars {
+		if !fn(name, vr) {
+			return
+		}
+	}
+}
+
+// Env sets the interpreter's environment. If nil, a copy of the current
+// process's environment is used.
+func Env(env expand.Environ) func(*Runner) error {
+	return func(r *Runner) error {
+		if env == nil {
+			env = expand.ListEnviron(os.Environ()...)
+		}
+		r.Env = env
+		return nil
+	}
+}
+
+// Dir sets the interpreter's working directory. If empty, the process's current
+// directory is used.
+func Dir(path string) func(*Runner) error {
+	return func(r *Runner) error {
+		if path == "" {
+			path, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("could not get current dir: %v", err)
+			}
+			r.Dir = path
+			return nil
+		}
+		path, err := filepath.Abs(path)
+		if err != nil {
+			return fmt.Errorf("could not get absolute dir: %v", err)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return fmt.Errorf("could not stat: %v", err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("%s is not a directory", path)
+		}
+		r.Dir = path
+		return nil
+	}
+}
+
+// Params populates the shell options and parameters. For example, Params("-e",
+// "--", "foo") will set the "-e" option and the parameters ["foo"].
+//
+// This is similar to what the interpreter's "set" builtin does.
+func Params(args ...string) func(*Runner) error {
+	return func(r *Runner) error {
+		for len(args) > 0 {
+			arg := args[0]
+			if arg == "" || (arg[0] != '-' && arg[0] != '+') {
+				break
+			}
+			if arg == "--" {
+				args = args[1:]
+				break
+			}
+			enable := arg[0] == '-'
+			var opt *bool
+			if flag := arg[1:]; flag == "o" {
+				args = args[1:]
+				if len(args) == 0 && enable {
+					for i, opt := range &shellOptsTable {
+						r.printOptLine(opt.name, r.opts[i])
+					}
+					break
+				}
+				if len(args) == 0 && !enable {
+					for i, opt := range &shellOptsTable {
+						setFlag := "+o"
+						if r.opts[i] {
+							setFlag = "-o"
+						}
+						r.outf("set %s %s\n", setFlag, opt.name)
+					}
+					break
+				}
+				opt = r.optByName(args[0], false)
+			} else {
+				opt = r.optByFlag(flag)
+			}
+			if opt == nil {
+				return fmt.Errorf("invalid option: %q", arg)
+			}
+			*opt = enable
+			args = args[1:]
+		}
+		r.Params = args
+		r.updateExpandOpts()
+		return nil
+	}
+}
+
+type ModuleFunc interface {
+	isModule()
+}
+
+// Module sets an interpreter module, which can be ModuleExec or ModuleOpen. If
+// the value is nil, the default module implementation is used.
+func Module(mod ModuleFunc) func(*Runner) error {
+	return func(r *Runner) error {
+		switch mod := mod.(type) {
+		case ModuleExec:
+			if mod == nil {
+				mod = DefaultExec
+			}
+			r.Exec = mod
+		case ModuleOpen:
+			if mod == nil {
+				mod = DefaultOpen
+			}
+			r.Open = mod
+		default:
+			return fmt.Errorf("unknown module type: %T", mod)
+		}
+		return nil
+	}
+}
+
+// StdIO configures an interpreter's standard input, standard output, and
+// standard error. If out or err are nil, they default to a writer that discards
+// the output.
+func StdIO(in io.Reader, out, err io.Writer) func(*Runner) error {
+	return func(r *Runner) error {
+		r.Stdin = in
+		if out == nil {
+			out = ioutil.Discard
+		}
+		r.Stdout = out
+		if err == nil {
+			err = ioutil.Discard
+		}
+		r.Stderr = err
+		return nil
+	}
+}
+
+// A Runner interprets shell programs. It can be reused, but it is not safe for
+// concurrent use. You should typically use New to build a new Runner.
+//
+// Note that writes to Stdout and Stderr may be concurrent if background
+// commands are used. If you plan on using an io.Writer implementation that
+// isn't safe for concurrent use, consider a workaround like hiding writes
+// behind a mutex.
+//
+// To create a Runner, use New.
+type Runner struct {
+	// Env specifies the environment of the interpreter, which must be
+	// non-nil.
+	Env expand.Environ
+
+	// Dir specifies the working directory of the command, which must be an
+	// absolute path.
 	Dir string
 
-	// Params are the current parameters, e.g. from running a shell
-	// file or calling a function. Accessible via the $@/$* family
-	// of vars.
+	// Params are the current shell parameters, e.g. from running a shell
+	// file or calling a function. Accessible via the $@/$* family of vars.
 	Params []string
 
+	// Exec is the module responsible for executing programs. It must be
+	// non-nil.
 	Exec ModuleExec
+	// Open is the module responsible for opening files. It must be non-nil.
 	Open ModuleOpen
+
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+
+	// Separate maps - note that bash allows a name to be both a var and a
+	// func simultaneously
+
+	Vars  map[string]expand.Variable
+	Funcs map[string]*syntax.Stmt
+
+	ecfg *expand.Config
+	ectx context.Context // just so that Runner.Sub can use it again
+
+	// didReset remembers whether the runner has ever been reset. This is
+	// used so that Reset is automatically called when running any program
+	// or node for the first time on a Runner.
+	didReset bool
+
+	usedNew bool
 
 	filename string // only if Node was a File
 
-	// Separate maps, note that bash allows a name to be both a var
-	// and a func simultaneously
-	Vars  map[string]Variable
-	Funcs map[string]*syntax.Stmt
-
 	// like Vars, but local to a func i.e. "local foo=bar"
-	funcVars map[string]Variable
+	funcVars map[string]expand.Variable
 
 	// like Vars, but local to a cmd i.e. "foo=bar prog args..."
 	cmdVars map[string]string
@@ -65,26 +340,16 @@ type Runner struct {
 	inFunc   bool
 	inSource bool
 
-	err  error // current fatal error
-	exit int   // current (last) exit code
+	err  error // current shell exit code or fatal error
+	exit int   // current (last) exit status code
 
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
-
-	bgShells sync.WaitGroup
-
-	// Context can be used to cancel the interpreter before it finishes
-	Context context.Context
+	bgShells errgroup.Group
 
 	opts [len(shellOptsTable) + len(bashOptsTable)]bool
 
 	dirStack []string
 
 	optState getopts
-
-	ifsJoin string
-	ifsRune func(rune) bool
 
 	// keepRedirs is used so that "exec" can make any redirections
 	// apply to the current shell, and not just the command.
@@ -102,17 +367,6 @@ type Runner struct {
 	// On Windows, the kill signal is always sent immediately,
 	// because Go doesn't currently support sending Interrupt on Windows.
 	KillTimeout time.Duration
-
-	fieldAlloc  [4]fieldPart
-	fieldsAlloc [4][]fieldPart
-	bufferAlloc bytes.Buffer
-	oneWord     [1]*syntax.Word
-}
-
-func (r *Runner) strBuilder() *bytes.Buffer {
-	b := &r.bufferAlloc
-	b.Reset()
-	return b
 }
 
 func (r *Runner) optByFlag(flag string) *bool {
@@ -172,20 +426,21 @@ const (
 	optGlobStar
 )
 
-// Reset will set the unexported fields back to zero, fill any exported
-// fields with their default values if not set, and prepare the runner
-// to interpret a program.
+// Reset empties the runner state and sets any exported fields with zero values
+// to their default values.
 //
-// This function should be called once before running any node. It can
-// be skipped before any following runs to keep internal state, such as
-// declared variables.
-func (r *Runner) Reset() error {
+// Typically, this function only needs to be called if a runner is reused to run
+// multiple programs non-incrementally. Not calling Reset between each run will
+// mean that the shell state will be kept, including variables and options.
+func (r *Runner) Reset() {
+	if !r.usedNew {
+		panic("use interp.New to construct a Runner")
+	}
 	// reset the internal state
 	*r = Runner{
 		Env:         r.Env,
 		Dir:         r.Dir,
 		Params:      r.Params,
-		Context:     r.Context,
 		Stdin:       r.Stdin,
 		Stdout:      r.Stdout,
 		Stderr:      r.Stderr,
@@ -197,9 +452,10 @@ func (r *Runner) Reset() error {
 		Vars:     r.Vars,
 		cmdVars:  r.cmdVars,
 		dirStack: r.dirStack[:0],
+		usedNew:  r.usedNew,
 	}
 	if r.Vars == nil {
-		r.Vars = make(map[string]Variable)
+		r.Vars = make(map[string]expand.Variable)
 	} else {
 		for k := range r.Vars {
 			delete(r.Vars, k)
@@ -212,87 +468,62 @@ func (r *Runner) Reset() error {
 			delete(r.cmdVars, k)
 		}
 	}
-	if r.Context == nil {
-		r.Context = context.Background()
-	}
-	if r.Env == nil {
-		r.Env, _ = EnvFromList(os.Environ())
-	}
-	if _, ok := r.Env.Get("HOME"); !ok {
+	if vr := r.Env.Get("HOME"); !vr.IsSet() {
 		u, _ := user.Current()
-		r.Vars["HOME"] = Variable{Value: StringVal(u.HomeDir)}
+		r.Vars["HOME"] = expand.Variable{Value: u.HomeDir}
 	}
-	if r.Dir == "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("could not get current dir: %v", err)
-		}
-		r.Dir = dir
-	} else {
-		abs, err := filepath.Abs(r.Dir)
-		if err != nil {
-			return fmt.Errorf("could not get absolute dir: %v", err)
-		}
-		info, err := os.Stat(abs)
-		if err != nil {
-			return fmt.Errorf("could not stat: %v", err)
-		}
-		if !info.IsDir() {
-			return fmt.Errorf("%s is not a directory", abs)
-		}
-		r.Dir = abs
-	}
-	r.Vars["PWD"] = Variable{Value: StringVal(r.Dir)}
-	r.Vars["IFS"] = Variable{Value: StringVal(" \t\n")}
-	r.ifsUpdated()
-	r.Vars["OPTIND"] = Variable{Value: StringVal("1")}
+	r.Vars["PWD"] = expand.Variable{Value: r.Dir}
+	r.Vars["IFS"] = expand.Variable{Value: " \t\n"}
+	r.Vars["OPTIND"] = expand.Variable{Value: "1"}
 
 	if runtime.GOOS == "windows" {
 		// convert $PATH to a unix path list
-		path, _ := r.Env.Get("PATH")
+		path := r.Env.Get("PATH").String()
 		path = strings.Join(filepath.SplitList(path), ":")
-		r.Vars["PATH"] = Variable{Value: StringVal(path)}
+		r.Vars["PATH"] = expand.Variable{Value: path}
 	}
 
 	r.dirStack = append(r.dirStack, r.Dir)
-	if r.Exec == nil {
-		r.Exec = DefaultExec
-	}
-	if r.Open == nil {
-		r.Open = DefaultOpen
-	}
 	if r.KillTimeout == 0 {
 		r.KillTimeout = 2 * time.Second
 	}
-	return nil
+	r.didReset = true
 }
 
-func (r *Runner) ctx() Ctxt {
-	c := Ctxt{
-		Context:     r.Context,
-		Env:         r.Env,
+func (r *Runner) modCtx(ctx context.Context) context.Context {
+	mc := ModuleCtx{
 		Dir:         r.Dir,
 		Stdin:       r.Stdin,
 		Stdout:      r.Stdout,
 		Stderr:      r.Stderr,
 		KillTimeout: r.KillTimeout,
 	}
-	c.Env = r.Env.Copy()
+	oenv := overlayEnviron{
+		parent: r.Env,
+		values: make(map[string]expand.Variable),
+	}
 	for name, vr := range r.Vars {
-		if !vr.Exported {
-			continue
-		}
-		c.Env.Set(name, r.varStr(vr, 0))
+		oenv.Set(name, vr)
 	}
-	for name, val := range r.cmdVars {
-		c.Env.Set(name, val)
+	for name, vr := range r.funcVars {
+		oenv.Set(name, vr)
 	}
-	return c
+	for name, value := range r.cmdVars {
+		oenv.Set(name, expand.Variable{Exported: true, Value: value})
+	}
+	mc.Env = oenv
+	return context.WithValue(ctx, moduleCtxKey{}, mc)
 }
 
-type ExitCode uint8
+// ShellExitStatus exits the shell with a status code.
+type ShellExitStatus uint8
 
-func (e ExitCode) Error() string { return fmt.Sprintf("exit status %d", e) }
+func (s ShellExitStatus) Error() string { return fmt.Sprintf("exit status %d", s) }
+
+// ExitStatus is a non-zero status code resulting from running a shell node.
+type ExitStatus uint8
+
+func (s ExitStatus) Error() string { return fmt.Sprintf("exit status %d", s) }
 
 func (r *Runner) setErr(err error) {
 	if r.err == nil {
@@ -300,83 +531,34 @@ func (r *Runner) setErr(err error) {
 	}
 }
 
-func (r *Runner) lastExit() {
-	if r.err == nil {
-		r.err = ExitCode(r.exit)
-	}
-}
-
-// FromArgs populates the shell options and returns the remaining
-// arguments. For example, running FromArgs("-e", "--", "foo") will set
-// the "-e" option and return []string{"foo"}.
+// Run interprets a node, which can be a *File, *Stmt, or Command. If a non-nil
+// error is returned, it will typically be of type ExitStatus or
+// ShellExitStatus.
 //
-// This is similar to what the interpreter's "set" builtin does.
-func (r *Runner) FromArgs(args ...string) ([]string, error) {
-	for len(args) > 0 {
-		arg := args[0]
-		if arg == "" || (arg[0] != '-' && arg[0] != '+') {
-			break
-		}
-		if arg == "--" {
-			args = args[1:]
-			break
-		}
-		enable := arg[0] == '-'
-		var opt *bool
-		if flag := arg[1:]; flag == "o" {
-			args = args[1:]
-			if len(args) == 0 && enable {
-				for i, opt := range &shellOptsTable {
-					r.printOptLine(opt.name, r.opts[i])
-				}
-				break
-			}
-			if len(args) == 0 && !enable {
-				for i, opt := range &shellOptsTable {
-					setFlag := "+o"
-					if r.opts[i] {
-						setFlag = "-o"
-					}
-					r.outf("set %s %s\n", setFlag, opt.name)
-				}
-				break
-			}
-			opt = r.optByName(args[0], false)
-		} else {
-			opt = r.optByFlag(flag)
-		}
-		if opt == nil {
-			return nil, fmt.Errorf("invalid option: %q", arg)
-		}
-		*opt = enable
-		args = args[1:]
+// Run can be called multiple times synchronously to interpret programs
+// incrementally. To reuse a Runner without keeping the internal shell state,
+// call Reset.
+func (r *Runner) Run(ctx context.Context, node syntax.Node) error {
+	if !r.didReset {
+		r.Reset()
 	}
-	return args, nil
-}
-
-// Run starts the interpreter and returns any error.
-func (r *Runner) Run(node syntax.Node) error {
+	r.fillExpandConfig(ctx)
+	r.err = nil
 	r.filename = ""
 	switch x := node.(type) {
 	case *syntax.File:
 		r.filename = x.Name
-		r.stmts(x.StmtList)
+		r.stmts(ctx, x.StmtList)
 	case *syntax.Stmt:
-		r.stmt(x)
+		r.stmt(ctx, x)
 	case syntax.Command:
-		r.cmd(x)
+		r.cmd(ctx, x)
 	default:
-		return fmt.Errorf("Node can only be File, Stmt, or Command: %T", x)
+		return fmt.Errorf("node can only be File, Stmt, or Command: %T", x)
 	}
-	r.lastExit()
-	if r.err == ExitCode(0) {
-		r.err = nil
+	if r.exit > 0 {
+		r.setErr(ExitStatus(r.exit))
 	}
-	return r.err
-}
-
-func (r *Runner) Stmt(stmt *syntax.Stmt) error {
-	r.stmt(stmt)
 	return r.err
 }
 
@@ -392,11 +574,11 @@ func (r *Runner) errf(format string, a ...interface{}) {
 	fmt.Fprintf(r.Stderr, format, a...)
 }
 
-func (r *Runner) stop() bool {
+func (r *Runner) stop(ctx context.Context) bool {
 	if r.err != nil {
 		return true
 	}
-	if err := r.Context.Err(); err != nil {
+	if err := ctx.Err(); err != nil {
 		r.err = err
 		return true
 	}
@@ -406,26 +588,26 @@ func (r *Runner) stop() bool {
 	return false
 }
 
-func (r *Runner) stmt(st *syntax.Stmt) {
-	if r.stop() {
+func (r *Runner) stmt(ctx context.Context, st *syntax.Stmt) {
+	if r.stop(ctx) {
 		return
 	}
 	if st.Background {
-		r.bgShells.Add(1)
 		r2 := r.sub()
-		go func() {
-			r2.stmtSync(st)
-			r.bgShells.Done()
-		}()
+		st2 := *st
+		st2.Background = false
+		r.bgShells.Go(func() error {
+			return r2.Run(ctx, &st2)
+		})
 	} else {
-		r.stmtSync(st)
+		r.stmtSync(ctx, st)
 	}
 }
 
-func (r *Runner) stmtSync(st *syntax.Stmt) {
+func (r *Runner) stmtSync(ctx context.Context, st *syntax.Stmt) {
 	oldIn, oldOut, oldErr := r.Stdin, r.Stdout, r.Stderr
 	for _, rd := range st.Redirs {
-		cls, err := r.redir(rd)
+		cls, err := r.redir(ctx, rd)
 		if err != nil {
 			r.exit = 1
 			return
@@ -437,13 +619,13 @@ func (r *Runner) stmtSync(st *syntax.Stmt) {
 	if st.Cmd == nil {
 		r.exit = 0
 	} else {
-		r.cmd(st.Cmd)
+		r.cmd(ctx, st.Cmd)
 	}
 	if st.Negated {
 		r.exit = oneIf(r.exit == 0)
 	}
 	if r.exit != 0 && r.opts[optErrExit] {
-		r.lastExit()
+		r.setErr(ShellExitStatus(r.exit))
 	}
 	if !r.keepRedirs {
 		r.Stdin, r.Stdout, r.Stderr = oldIn, oldOut, oldErr
@@ -451,40 +633,57 @@ func (r *Runner) stmtSync(st *syntax.Stmt) {
 }
 
 func (r *Runner) sub() *Runner {
-	r2 := *r
-	r2.bgShells = sync.WaitGroup{}
-	r2.bufferAlloc = bytes.Buffer{}
-	// TODO: perhaps we could do a lazy copy here, or some sort of
-	// overlay to avoid copying all the time
-	r2.Env = r.Env.Copy()
-	r2.Vars = make(map[string]Variable, len(r.Vars))
+	// Keep in sync with the Runner type. Manually copy fields, to not copy
+	// sensitive ones like errgroup.Group, and to do deep copies of slices.
+	r2 := &Runner{
+		Env:         r.Env,
+		Dir:         r.Dir,
+		Params:      r.Params,
+		Exec:        r.Exec,
+		Open:        r.Open,
+		Stdin:       r.Stdin,
+		Stdout:      r.Stdout,
+		Stderr:      r.Stderr,
+		Funcs:       r.Funcs,
+		KillTimeout: r.KillTimeout,
+		filename:    r.filename,
+		opts:        r.opts,
+	}
+	r2.Vars = make(map[string]expand.Variable, len(r.Vars))
 	for k, v := range r.Vars {
 		r2.Vars[k] = v
+	}
+	r2.funcVars = make(map[string]expand.Variable, len(r.funcVars))
+	for k, v := range r.funcVars {
+		r2.funcVars[k] = v
 	}
 	r2.cmdVars = make(map[string]string, len(r.cmdVars))
 	for k, v := range r.cmdVars {
 		r2.cmdVars[k] = v
 	}
-	return &r2
+	r2.dirStack = append([]string(nil), r.dirStack...)
+	r2.fillExpandConfig(r.ectx)
+	r2.didReset = true
+	return r2
 }
 
-func (r *Runner) cmd(cm syntax.Command) {
-	if r.stop() {
+func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
+	if r.stop(ctx) {
 		return
 	}
 	switch x := cm.(type) {
 	case *syntax.Block:
-		r.stmts(x.StmtList)
+		r.stmts(ctx, x.StmtList)
 	case *syntax.Subshell:
 		r2 := r.sub()
-		r2.stmts(x.StmtList)
+		r2.stmts(ctx, x.StmtList)
 		r.exit = r2.exit
 		r.setErr(r2.err)
 	case *syntax.CallExpr:
-		fields := r.Fields(x.Args...)
+		fields := r.fields(x.Args...)
 		if len(fields) == 0 {
 			for _, as := range x.Assigns {
-				vr, _ := r.lookupVar(as.Name.Value)
+				vr := r.lookupVar(as.Name.Value)
 				vr.Value = r.assignVal(as, "")
 				r.setVar(as.Name.Value, as.Index, vr)
 			}
@@ -493,13 +692,9 @@ func (r *Runner) cmd(cm syntax.Command) {
 		for _, as := range x.Assigns {
 			val := r.assignVal(as, "")
 			// we know that inline vars must be strings
-			r.cmdVars[as.Name.Value] = string(val.(StringVal))
-			if as.Name.Value == "IFS" {
-				r.ifsUpdated()
-				defer r.ifsUpdated()
-			}
+			r.cmdVars[as.Name.Value] = val.(string)
 		}
-		r.call(x.Args[0].Pos(), fields)
+		r.call(ctx, x.Args[0].Pos(), fields)
 		// cmdVars can be nuked here, as they are never useful
 		// again once we nest into further levels of inline
 		// vars.
@@ -509,14 +704,14 @@ func (r *Runner) cmd(cm syntax.Command) {
 	case *syntax.BinaryCmd:
 		switch x.Op {
 		case syntax.AndStmt:
-			r.stmt(x.X)
+			r.stmt(ctx, x.X)
 			if r.exit == 0 {
-				r.stmt(x.Y)
+				r.stmt(ctx, x.Y)
 			}
 		case syntax.OrStmt:
-			r.stmt(x.X)
+			r.stmt(ctx, x.X)
 			if r.exit != 0 {
-				r.stmt(x.Y)
+				r.stmt(ctx, x.Y)
 			}
 		case syntax.Pipe, syntax.PipeAll:
 			pr, pw := io.Pipe()
@@ -531,11 +726,11 @@ func (r *Runner) cmd(cm syntax.Command) {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				r2.stmt(x.X)
+				r2.stmt(ctx, x.X)
 				pw.Close()
 				wg.Done()
 			}()
-			r.stmt(x.Y)
+			r.stmt(ctx, x.Y)
 			pr.Close()
 			wg.Wait()
 			if r.opts[optPipeFail] && r2.exit > 0 && r.exit == 0 {
@@ -544,19 +739,19 @@ func (r *Runner) cmd(cm syntax.Command) {
 			r.setErr(r2.err)
 		}
 	case *syntax.IfClause:
-		r.stmts(x.Cond)
+		r.stmts(ctx, x.Cond)
 		if r.exit == 0 {
-			r.stmts(x.Then)
+			r.stmts(ctx, x.Then)
 			break
 		}
 		r.exit = 0
-		r.stmts(x.Else)
+		r.stmts(ctx, x.Else)
 	case *syntax.WhileClause:
-		for !r.stop() {
-			r.stmts(x.Cond)
+		for !r.stop(ctx) {
+			r.stmts(ctx, x.Cond)
 			stop := (r.exit == 0) == x.Until
 			r.exit = 0
-			if stop || r.loopStmtsBroken(x.Do) {
+			if stop || r.loopStmtsBroken(ctx, x.Do) {
 				break
 			}
 		}
@@ -564,16 +759,16 @@ func (r *Runner) cmd(cm syntax.Command) {
 		switch y := x.Loop.(type) {
 		case *syntax.WordIter:
 			name := y.Name.Value
-			for _, field := range r.Fields(y.Items...) {
+			for _, field := range r.fields(y.Items...) {
 				r.setVarString(name, field)
-				if r.loopStmtsBroken(x.Do) {
+				if r.loopStmtsBroken(ctx, x.Do) {
 					break
 				}
 			}
 		case *syntax.CStyleLoop:
 			r.arithm(y.Init)
 			for r.arithm(y.Cond) != 0 {
-				if r.loopStmtsBroken(x.Do) {
+				if r.loopStmtsBroken(ctx, x.Do) {
 					break
 				}
 				r.arithm(y.Post)
@@ -590,31 +785,30 @@ func (r *Runner) cmd(cm syntax.Command) {
 		}
 		r.exit = oneIf(val == 0)
 	case *syntax.CaseClause:
-		str := r.loneWord(x.Word)
+		str := r.literal(x.Word)
 		for _, ci := range x.Items {
 			for _, word := range ci.Patterns {
-				pat := r.lonePattern(word)
-				if match(pat, str) {
-					r.stmts(ci.StmtList)
+				pattern := r.pattern(word)
+				if match(pattern, str) {
+					r.stmts(ctx, ci.StmtList)
 					return
 				}
 			}
 		}
 	case *syntax.TestClause:
 		r.exit = 0
-		if r.bashTest(x.X) == "" && r.exit == 0 {
-			// to preserve exit code 2 for regex
-			// errors, etc
+		if r.bashTest(ctx, x.X, false) == "" && r.exit == 0 {
+			// to preserve exit status code 2 for regex errors, etc
 			r.exit = 1
 		}
 	case *syntax.DeclClause:
-		local := false
+		local, global := false, false
 		var modes []string
 		valType := ""
 		switch x.Variant.Value {
 		case "declare":
-			// When used in a function, "declare" acts as
-			// "local" unless the "-g" option is used.
+			// When used in a function, "declare" acts as "local"
+			// unless the "-g" option is used.
 			local = r.inFunc
 		case "local":
 			if !r.inFunc {
@@ -631,13 +825,13 @@ func (r *Runner) cmd(cm syntax.Command) {
 			modes = append(modes, "-n")
 		}
 		for _, opt := range x.Opts {
-			switch s := r.loneWord(opt); s {
+			switch s := r.literal(opt); s {
 			case "-x", "-r", "-n":
 				modes = append(modes, s)
 			case "-a", "-A":
 				valType = s
 			case "-g":
-				local = false
+				global = true
 			default:
 				r.errf("declare: invalid option %q\n", s)
 				r.exit = 2
@@ -645,11 +839,15 @@ func (r *Runner) cmd(cm syntax.Command) {
 			}
 		}
 		for _, as := range x.Assigns {
-			for _, as := range r.expandAssigns(as) {
+			for _, as := range r.flattenAssign(as) {
 				name := as.Name.Value
-				vr, _ := r.lookupVar(as.Name.Value)
+				vr := r.lookupVar(as.Name.Value)
 				vr.Value = r.assignVal(as, valType)
-				vr.Local = local
+				if global {
+					vr.Local = false
+				} else if local {
+					vr.Local = true
+				}
 				for _, mode := range modes {
 					switch mode {
 					case "-x":
@@ -666,7 +864,7 @@ func (r *Runner) cmd(cm syntax.Command) {
 	case *syntax.TimeClause:
 		start := time.Now()
 		if x.Stmt != nil {
-			r.stmt(x.Stmt)
+			r.stmt(ctx, x.Stmt)
 		}
 		format := "%s\t%s\n"
 		if x.PosixFormat {
@@ -684,6 +882,39 @@ func (r *Runner) cmd(cm syntax.Command) {
 	}
 }
 
+func (r *Runner) flattenAssign(as *syntax.Assign) []*syntax.Assign {
+	// Convert "declare $x" into "declare value".
+	// Don't use syntax.Parser here, as we only want the basic
+	// splitting by '='.
+	if as.Name != nil {
+		return []*syntax.Assign{as} // nothing to do
+	}
+	var asgns []*syntax.Assign
+	for _, field := range r.fields(as.Value) {
+		as := &syntax.Assign{}
+		parts := strings.SplitN(field, "=", 2)
+		as.Name = &syntax.Lit{Value: parts[0]}
+		if len(parts) == 1 {
+			as.Naked = true
+		} else {
+			as.Value = &syntax.Word{Parts: []syntax.WordPart{
+				&syntax.Lit{Value: parts[1]},
+			}}
+		}
+		asgns = append(asgns, as)
+	}
+	return asgns
+}
+
+func match(pattern, name string) bool {
+	expr, err := syntax.TranslatePattern(pattern, true)
+	if err != nil {
+		return false
+	}
+	rx := regexp.MustCompile("^" + expr + "$")
+	return rx.MatchString(name)
+}
+
 func elapsedString(d time.Duration, posix bool) string {
 	if posix {
 		return fmt.Sprintf("%.2f", d.Seconds())
@@ -693,16 +924,48 @@ func elapsedString(d time.Duration, posix bool) string {
 	return fmt.Sprintf("%dm%.3fs", min, sec)
 }
 
-func (r *Runner) stmts(sl syntax.StmtList) {
+func (r *Runner) stmts(ctx context.Context, sl syntax.StmtList) {
 	for _, stmt := range sl.Stmts {
-		r.stmt(stmt)
+		r.stmt(ctx, stmt)
 	}
 }
 
-func (r *Runner) redir(rd *syntax.Redirect) (io.Closer, error) {
+func (r *Runner) hdocReader(rd *syntax.Redirect) io.Reader {
+	if rd.Op != syntax.DashHdoc {
+		hdoc := r.document(rd.Hdoc)
+		return strings.NewReader(hdoc)
+	}
+	var buf bytes.Buffer
+	var cur []syntax.WordPart
+	flushLine := func() {
+		if buf.Len() > 0 {
+			buf.WriteByte('\n')
+		}
+		buf.WriteString(r.document(&syntax.Word{Parts: cur}))
+		cur = cur[:0]
+	}
+	for _, wp := range rd.Hdoc.Parts {
+		lit, ok := wp.(*syntax.Lit)
+		if !ok {
+			cur = append(cur, wp)
+			continue
+		}
+		for i, part := range strings.Split(lit.Value, "\n") {
+			if i > 0 {
+				flushLine()
+				cur = cur[:0]
+			}
+			part = strings.TrimLeft(part, "\t")
+			cur = append(cur, &syntax.Lit{Value: part})
+		}
+	}
+	flushLine()
+	return &buf
+}
+
+func (r *Runner) redir(ctx context.Context, rd *syntax.Redirect) (io.Closer, error) {
 	if rd.Hdoc != nil {
-		hdoc := r.loneWord(rd.Hdoc)
-		r.Stdin = strings.NewReader(hdoc)
+		r.Stdin = r.hdocReader(rd)
 		return nil, nil
 	}
 	orig := &r.Stdout
@@ -713,7 +976,7 @@ func (r *Runner) redir(rd *syntax.Redirect) (io.Closer, error) {
 			orig = &r.Stderr
 		}
 	}
-	arg := r.loneWord(rd.Word)
+	arg := r.literal(rd.Word)
 	switch rd.Op {
 	case syntax.WordHdoc:
 		r.Stdin = strings.NewReader(arg + "\n")
@@ -736,11 +999,11 @@ func (r *Runner) redir(rd *syntax.Redirect) (io.Closer, error) {
 	mode := os.O_RDONLY
 	switch rd.Op {
 	case syntax.AppOut, syntax.AppAll:
-		mode = os.O_RDWR | os.O_CREATE | os.O_APPEND
+		mode = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	case syntax.RdrOut, syntax.RdrAll:
-		mode = os.O_RDWR | os.O_CREATE | os.O_TRUNC
+		mode = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 	}
-	f, err := r.open(r.relPath(arg), mode, 0644, true)
+	f, err := r.open(ctx, r.relPath(arg), mode, 0644, true)
 	if err != nil {
 		return nil, err
 	}
@@ -758,12 +1021,12 @@ func (r *Runner) redir(rd *syntax.Redirect) (io.Closer, error) {
 	return f, nil
 }
 
-func (r *Runner) loopStmtsBroken(sl syntax.StmtList) bool {
+func (r *Runner) loopStmtsBroken(ctx context.Context, sl syntax.StmtList) bool {
 	oldInLoop := r.inLoop
 	r.inLoop = true
 	defer func() { r.inLoop = oldInLoop }()
 	for _, stmt := range sl.Stmts {
-		r.stmt(stmt)
+		r.stmt(ctx, stmt)
 		if r.contnEnclosing > 0 {
 			r.contnEnclosing--
 			return r.contnEnclosing > 0
@@ -776,12 +1039,12 @@ func (r *Runner) loopStmtsBroken(sl syntax.StmtList) bool {
 	return false
 }
 
-type returnCode uint8
+type returnStatus uint8
 
-func (returnCode) Error() string { return "returned" }
+func (s returnStatus) Error() string { return fmt.Sprintf("return status %d", s) }
 
-func (r *Runner) call(pos syntax.Pos, args []string) {
-	if r.stop() {
+func (r *Runner) call(ctx context.Context, pos syntax.Pos, args []string) {
+	if r.stop(ctx) {
 		return
 	}
 	name := args[0]
@@ -794,39 +1057,39 @@ func (r *Runner) call(pos syntax.Pos, args []string) {
 		r.funcVars = nil
 		r.inFunc = true
 
-		r.stmt(body)
+		r.stmt(ctx, body)
 
 		r.Params = oldParams
 		r.funcVars = oldFuncVars
 		r.inFunc = oldInFunc
-		if code, ok := r.err.(returnCode); ok {
+		if code, ok := r.err.(returnStatus); ok {
 			r.err = nil
 			r.exit = int(code)
 		}
 		return
 	}
 	if isBuiltin(name) {
-		r.exit = r.builtinCode(pos, name, args[1:])
+		r.exit = r.builtinCode(ctx, pos, name, args[1:])
 		return
 	}
-	r.exec(args)
+	r.exec(ctx, args)
 }
 
-func (r *Runner) exec(args []string) {
+func (r *Runner) exec(ctx context.Context, args []string) {
 	path := r.lookPath(args[0])
-	err := r.Exec(r.ctx(), path, args)
+	err := r.Exec(r.modCtx(ctx), path, args)
 	switch x := err.(type) {
 	case nil:
 		r.exit = 0
-	case ExitCode:
+	case ExitStatus:
 		r.exit = int(x)
 	default: // module's custom fatal error
 		r.setErr(err)
 	}
 }
 
-func (r *Runner) open(path string, flags int, mode os.FileMode, print bool) (io.ReadWriteCloser, error) {
-	f, err := r.Open(r.ctx(), path, flags, mode)
+func (r *Runner) open(ctx context.Context, path string, flags int, mode os.FileMode, print bool) (io.ReadWriteCloser, error) {
+	f, err := r.Open(r.modCtx(ctx), path, flags, mode)
 	switch err.(type) {
 	case nil:
 	case *os.PathError:
@@ -915,7 +1178,7 @@ func splitList(path string) []string {
 }
 
 func (r *Runner) lookPath(file string) string {
-	pathList := splitList(r.getVar("PATH"))
+	pathList := splitList(r.envGet("PATH"))
 	chars := `/`
 	if runtime.GOOS == "windows" {
 		chars = `:\/`
@@ -946,7 +1209,7 @@ func (r *Runner) pathExts() []string {
 	if runtime.GOOS != "windows" {
 		return nil
 	}
-	pathext := r.getVar("PATHEXT")
+	pathext := r.envGet("PATHEXT")
 	if pathext == "" {
 		return []string{".com", ".exe", ".bat", ".cmd"}
 	}

@@ -1104,7 +1104,7 @@ var fileTests = []testCase{
 				Redirs: []*Redirect{{
 					Op:   DashHdoc,
 					Word: litWord("EOF"),
-					Hdoc: litWord("bar\n"),
+					Hdoc: litWord("\t\tbar\n\t"),
 				}},
 			}),
 		},
@@ -1118,6 +1118,7 @@ var fileTests = []testCase{
 				Redirs: []*Redirect{{
 					Op:   DashHdoc,
 					Word: litWord("EOF"),
+					Hdoc: litWord("\t"),
 				}},
 			}),
 		},
@@ -1202,16 +1203,13 @@ var fileTests = []testCase{
 		},
 	},
 	{
-		Strs: []string{
-			"foo <<-EOF\n\tbar\nEOF",
-			"foo <<- EOF\nbar\nEOF",
-		},
+		Strs: []string{"foo <<-EOF\n\tbar\nEOF"},
 		common: &Stmt{
 			Cmd: litCall("foo"),
 			Redirs: []*Redirect{{
 				Op:   DashHdoc,
 				Word: litWord("EOF"),
-				Hdoc: litWord("bar\n"),
+				Hdoc: litWord("\tbar\n"),
 			}},
 		},
 	},
@@ -1242,7 +1240,7 @@ var fileTests = []testCase{
 			Redirs: []*Redirect{{
 				Op:   DashHdoc,
 				Word: litWord("EOF"),
-				Hdoc: litWord("bar\n"),
+				Hdoc: litWord("\tbar\n"),
 			}},
 		},
 	},
@@ -1253,7 +1251,7 @@ var fileTests = []testCase{
 			Redirs: []*Redirect{{
 				Op:   DashHdoc,
 				Word: word(sglQuoted("EOF")),
-				Hdoc: litWord("bar\n"),
+				Hdoc: litWord("\tbar\n"),
 			}},
 		},
 	},
@@ -1622,6 +1620,15 @@ var fileTests = []testCase{
 		))),
 	},
 	{
+		Strs: []string{
+			"$($(foo bar))",
+			"`\\`foo bar\\``",
+		},
+		common: cmdSubst(stmt(call(
+			word(cmdSubst(litStmt("foo", "bar"))),
+		))),
+	},
+	{
 		Strs: []string{"$( (a) | b)"},
 		common: cmdSubst(
 			stmt(&BinaryCmd{
@@ -1843,6 +1850,10 @@ var fileTests = []testCase{
 			word(lit("$"), lit("àb")),
 			word(lit("$"), lit(",b")),
 		),
+	},
+	{
+		Strs:   []string{"$à", "$\\\nà"},
+		common: word(lit("$"), lit("à")),
 	},
 	{
 		Strs: []string{"$foobar", "$foo\\\nbar"},
@@ -3225,6 +3236,22 @@ var fileTests = []testCase{
 		}},
 	},
 	{
+		Strs: []string{"[[ a =~ b$ || c =~ d$ ]]"},
+		bash: &TestClause{X: &BinaryTest{
+			Op: OrTest,
+			X: &BinaryTest{
+				Op: TsReMatch,
+				X:  litWord("a"),
+				Y:  word(lit("b"), lit("$")),
+			},
+			Y: &BinaryTest{
+				Op: TsReMatch,
+				X:  litWord("c"),
+				Y:  word(lit("d"), lit("$")),
+			},
+		}},
+	},
+	{
 		Strs: []string{"[[ -n $a ]]"},
 		bsmk: &TestClause{
 			X: &UnaryTest{Op: TsNempStr, X: word(litParamExp("a"))},
@@ -4149,7 +4176,7 @@ func clearPosRecurse(tb testing.TB, src string, v interface{}) {
 		offs := pos.Offset()
 		if offs > uint(len(src)) {
 			tb.Fatalf("Pos %d in %T is out of bounds in %q",
-				pos, v, string(src))
+				pos, v, src)
 			return
 		}
 		if strs == nil {
@@ -4232,7 +4259,7 @@ func clearPosRecurse(tb testing.TB, src string, v interface{}) {
 				// ended by & or |&
 			default:
 				tb.Fatalf("Unexpected Stmt.End() %d %q in %q",
-					endOff, end, string(src))
+					endOff, end, src)
 			}
 		}
 		recurse(x.Comments)
@@ -4307,7 +4334,7 @@ func clearPosRecurse(tb testing.TB, src string, v interface{}) {
 			// same as above, but with word and EOF
 		case end != want:
 			tb.Fatalf("Unexpected Lit %q End() %d (wanted %d) in %q",
-				val, end, want, string(src))
+				val, end, want, src)
 		}
 		setPos(&x.ValuePos, val)
 		setPos(&x.ValueEnd)

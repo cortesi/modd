@@ -14,10 +14,11 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
+	"mvdan.cc/sh/expand"
+	"mvdan.cc/sh/internal"
 	"mvdan.cc/sh/syntax"
 )
 
@@ -41,13 +42,11 @@ let i=(2 + 3)
 	if err != nil {
 		b.Fatal(err)
 	}
-	r := Runner{
-		Stdout: ioutil.Discard,
-		Stderr: ioutil.Discard,
-	}
+	r, _ := New()
+	ctx := context.Background()
 	for i := 0; i < b.N; i++ {
 		r.Reset()
-		if err := r.Run(file); err != nil {
+		if err := r.Run(ctx, file); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -88,7 +87,7 @@ var fileCases = []struct {
 	{"{ :; }", ""},
 	{"(:)", ""},
 
-	// exit codes
+	// exit status codes
 	{"exit 1", "exit status 1"},
 	{"exit -1", "exit status 255"},
 	{"exit 300", "exit status 44"},
@@ -121,7 +120,7 @@ var fileCases = []struct {
 	},
 
 	// we don't need to follow bash error strings
-	{"exit a", "invalid exit code: \"a\"\nexit status 2 #JUSTERR"},
+	{"exit a", "invalid exit status code: \"a\"\nexit status 2 #JUSTERR"},
 	{"exit 1 2", "exit cannot take multiple arguments\nexit status 1 #JUSTERR"},
 
 	// echo
@@ -177,6 +176,8 @@ var fileCases = []struct {
 	{`echo -n "\\"`, `\`},
 	{`set -- a b c; x="$@"; echo "$x"`, "a b c\n"},
 	{`set -- b c; echo a"$@"d`, "ab cd\n"},
+	{`echo $1 $3; set -- a b c; echo $1 $3`, "\na c\n"},
+	{`[[ $0 == "bash" || $0 == "gosh" ]]`, ""},
 
 	// dollar quotes
 	{`echo $'foo\nbar'`, "foo\nbar\n"},
@@ -194,6 +195,9 @@ var fileCases = []struct {
 	{"echo 'a\\b'", "a\\b\n"},
 	{"echo \"a\\\nb\"", "ab\n"},
 	{"echo 'a\\\nb'", "a\\\nb\n"},
+	{`echo "\""`, "\"\n"},
+	{`echo \\`, "\\\n"},
+	{`echo \\\\`, "\\\\\n"},
 
 	// vars
 	{"foo=bar; echo $foo", "bar\n"},
@@ -211,6 +215,8 @@ var fileCases = []struct {
 	{"foo=bar env | grep '^foo='", "foo=bar\n"},
 	{"foo=a foo=b env | grep '^foo='", "foo=b\n"},
 	{"env | grep '^INTERP_GLOBAL='", "INTERP_GLOBAL=value\n"},
+	{"INTERP_GLOBAL=new; env | grep '^INTERP_GLOBAL='", "INTERP_GLOBAL=new\n"},
+	{"INTERP_GLOBAL=; env | grep '^INTERP_GLOBAL='", "INTERP_GLOBAL=\n"},
 	{"a=b; a+=c x+=y; echo $a $x", "bc y\n"},
 	{`a=" x  y"; b=$a c="$a"; echo $b; echo $c`, "x y\nx y\n"},
 	{`a=" x  y"; b=$a c="$a"; echo "$b"; echo "$c"`, " x  y\n x  y\n"},
@@ -274,6 +280,10 @@ var fileCases = []struct {
 	{
 		"echo ${a:-b}; echo $a; a=; echo ${a:-b}; a=c; echo ${a:-b}",
 		"b\n\nb\nc\n",
+	},
+	{
+		"echo ${#:-never} ${?:-never} ${LINENO:-never}",
+		"0 0 1\n",
 	},
 	{
 		"echo ${a-b}; echo $a; a=; echo ${a-b}; a=c; echo ${a-b}",
@@ -839,6 +849,10 @@ var fileCases = []struct {
 		`mkdir d; [[ $(cd d && pwd) == "$(pwd)" ]]`,
 		"exit status 1",
 	},
+	{
+		"a=sub true & { a=main env | grep '^a='; }",
+		"a=main\n",
+	},
 
 	// pipes
 	{
@@ -847,6 +861,10 @@ var fileCases = []struct {
 	},
 	{
 		"echo foo | false | true",
+		"",
+	},
+	{
+		"true $(true) | true", // used to panic
 		"",
 	},
 
@@ -868,10 +886,12 @@ var fileCases = []struct {
 		"echo foo >/dev/null; echo bar",
 		"bar\n",
 	},
-	{
-		">a; wc -c <a",
-		"0\n",
-	},
+	// TODO: reenable once we've made a decision on
+	// https://github.com/mvdan/sh/issues/289
+	// {
+	// 	">a; echo foo >>b; wc -c <a >>b; cat b",
+	// 	"foo\n0\n",
+	// },
 	{
 		"echo foo >a; wc -c <a",
 		"4\n",
@@ -901,8 +921,20 @@ var fileCases = []struct {
 		"faa\n",
 	},
 	{
+		"cat <<EOF\n~/foo\nEOF",
+		"~/foo\n",
+	},
+	{
 		"sed 's/o/a/g' <<<foo$foo",
 		"faa\n",
+	},
+	{
+		"cat <<-EOF\n\tfoo\nEOF",
+		"foo\n",
+	},
+	{
+		"cat <<-EOF\n\tfoo\n\nEOF",
+		"foo\n\n",
 	},
 	{
 		"mkdir a; echo foo >a |& grep -q 'is a directory'",
@@ -1309,6 +1341,10 @@ var fileCases = []struct {
 	{"[ -o errexit ]", "exit status 1"},
 	{"set -e; [ -o errexit ]", ""},
 	{"a=x b=''; [ -v a -a -v b -a ! -v c ]", ""},
+	{"[ a = a ]", ""},
+	{"[ a != a ]", "exit status 1"},
+	{"[ abc = ab* ]", "exit status 1"},
+	{"[ abc != ab* ]", ""},
 
 	// arithm
 	{
@@ -1403,6 +1439,18 @@ var fileCases = []struct {
 		"a=$((1 + 2)); echo $a",
 		"3\n",
 	},
+	{
+		"x=3; echo $(($x)) $((x))",
+		"3 3\n",
+	},
+	{
+		"set -- 1; echo $(($@))",
+		"1\n",
+	},
+	{
+		"a=b b=a; echo $(($a))",
+		"0\n #IGNORE",
+	},
 
 	// set/shift
 	{
@@ -1486,7 +1534,7 @@ var fileCases = []struct {
 		"b\nb\n",
 	},
 	{
-		"echo $a; set -u; echo $a",
+		"echo $a; set -u; echo $a; echo extra",
 		"\na: unbound variable\nexit status 1 #JUSTERR",
 	},
 	{"set -n; echo foo", ""},
@@ -1547,6 +1595,18 @@ set +o pipefail
 	{
 		`a=b eval 'echo $a; unset a; echo $a'`,
 		"b\n\n",
+	},
+	{
+		`$(unset INTERP_GLOBAL); echo $INTERP_GLOBAL; unset INTERP_GLOBAL; echo $INTERP_GLOBAL`,
+		"value\n\n",
+	},
+	{
+		`x=orig; f() { local x=local; unset x; x=still_local; }; f; echo $x`,
+		"orig\n",
+	},
+	{
+		`x=orig; f() { local x=local; unset x; [[ -v x ]] && echo set || echo unset; }; f`,
+		"unset\n",
 	},
 
 	// shopt
@@ -1798,6 +1858,18 @@ set +o pipefail
 		"f() { a=1; declare b=2; export c=3; readonly d=4; declare -g e=5; }; f; echo $a $b $c $d $e",
 		"1 3 4 5\n",
 	},
+	{
+		`f() { local x; [[ -v x ]] && echo set || echo unset; }; f`,
+		"unset\n",
+	},
+	{
+		`f() { local x=; [[ -v x ]] && echo set || echo unset; }; f`,
+		"set\n",
+	},
+	{
+		`export x=before; f() { local x; export x=after; env | grep '^x='; }; f; echo $x`,
+		"x=after\nbefore\n",
+	},
 
 	// name references
 	{"declare -n foo=bar; bar=etc; [[ -R foo ]]", ""},
@@ -1836,6 +1908,19 @@ set +o pipefail
 		"declare -n foo=bar; bar=etc; echo $foo; echo ${!foo}",
 		"etc\nbar\n",
 	},
+	{
+		"declare -n foo=bar; bar=etc; foo=xxx; echo $foo $bar",
+		"xxx xxx\n",
+	},
+	{
+		"declare -n foo=bar; foo=xxx; echo $foo $bar",
+		"xxx xxx\n",
+	},
+	// TODO: figure this one out
+	//{
+	//        "declare -n foo=bar bar=baz; foo=xxx; echo $foo $bar; echo $baz",
+	//        "xxx xxx\nxxx\n",
+	//},
 
 	// read-only vars
 	{"declare -r foo=bar; echo $foo", "bar\n"},
@@ -1863,7 +1948,7 @@ set +o pipefail
 		"foo: readonly variable\nexit status 1 #JUSTERR",
 	},
 
-	// glob
+	// globbing
 	{"echo .", ".\n"},
 	{"echo ..", "..\n"},
 	{"echo ./.", "./.\n"},
@@ -1874,6 +1959,10 @@ set +o pipefail
 	{
 		`touch a.x; echo '*.x' "*.x"; rm a.x`,
 		"*.x *.x\n",
+	},
+	{
+		`touch a.x b.y; echo *'.'x; rm a.x`,
+		"a.x\n",
 	},
 	{
 		`touch a.x; echo *'.x' "a."* '*'.x; rm a.x`,
@@ -1915,6 +2004,14 @@ set +o pipefail
 		"shopt -s globstar; mkdir -p a/b/c; echo **/c | sed 's@\\\\@/@g'",
 		"a/b/c\n",
 	},
+	{
+		"cat <<EOF\n{foo,bar}\nEOF",
+		"{foo,bar}\n",
+	},
+	{
+		"cat <<EOF\n*.go\nEOF",
+		"*.go\n",
+	},
 
 	// brace expansion; more exhaustive tests in the syntax package
 	{"echo a}b", "a}b\n"},
@@ -1927,6 +2024,24 @@ set +o pipefail
 	{"echo a{1..2}b{4..5}c", "a1b4c a1b5c a2b4c a2b5c\n"},
 	{"echo a{c..f}", "ac ad ae af\n"},
 	{"echo a{4..1..1}", "a4 a3 a2 a1\n"},
+
+	// tilde expansion
+	{
+		"[[ '~/foo' == ~/foo ]] || [[ ~/foo == '~/foo' ]]",
+		"exit status 1",
+	},
+	{
+		"case '~/foo' in ~/foo) echo match ;; esac",
+		"",
+	},
+	{
+		"a=~/foo; [[ $a == '~/foo' ]]",
+		"exit status 1",
+	},
+	{
+		`a=$(echo "~/foo"); [[ $a == '~/foo' ]]`,
+		"",
+	},
 
 	// /dev/null
 	{"echo foo >/dev/null", ""},
@@ -2086,34 +2201,6 @@ set +o pipefail
 	},
 }
 
-// concBuffer wraps a bytes.Buffer in a mutex so that concurrent writes
-// to it don't upset the race detector.
-type concBuffer struct {
-	buf bytes.Buffer
-	sync.Mutex
-}
-
-func (c *concBuffer) Write(p []byte) (int, error) {
-	c.Lock()
-	n, err := c.buf.Write(p)
-	c.Unlock()
-	return n, err
-}
-
-func (c *concBuffer) WriteString(s string) (int, error) {
-	c.Lock()
-	n, err := c.buf.WriteString(s)
-	c.Unlock()
-	return n, err
-}
-
-func (c *concBuffer) String() string {
-	c.Lock()
-	s := c.buf.String()
-	c.Unlock()
-	return s
-}
-
 // wc: leading whitespace padding
 // touch -d @: no way to set unix timestamps
 var skipOnDarwin = regexp.MustCompile(`\bwc\b|touch -d @`)
@@ -2122,16 +2209,16 @@ var skipOnDarwin = regexp.MustCompile(`\bwc\b|touch -d @`)
 // mkfifo: very different by design
 // ln -s: requires linked path to exist, stat does not work well
 // ~root: username does not exist
-var skipOnWindows = regexp.MustCompile(`chmod|mkfifo|ln -s|~root`)
+// env: missing on Travis? TODO: investigate
+var skipOnWindows = regexp.MustCompile(`chmod|mkfifo|ln -s|~root|env`)
 
-func skipFileReason(src string) string {
-	if runtime.GOOS == "darwin" && skipOnDarwin.MatchString(src) {
-		return "skipping linux-only test on darwin"
+func skipIfUnsupported(tb testing.TB, src string) {
+	switch {
+	case runtime.GOOS == "darwin" && skipOnDarwin.MatchString(src):
+		tb.Skipf("skipping non-portable test on darwin")
+	case runtime.GOOS == "windows" && skipOnWindows.MatchString(src):
+		tb.Skipf("skipping non-portable test on windows")
 	}
-	if runtime.GOOS == "windows" && skipOnWindows.MatchString(src) {
-		return "skipping unix-only test on windows"
-	}
-	return ""
 }
 
 func TestFile(t *testing.T) {
@@ -2139,9 +2226,7 @@ func TestFile(t *testing.T) {
 	for i := range fileCases {
 		t.Run(fmt.Sprintf("%03d", i), func(t *testing.T) {
 			c := fileCases[i]
-			if reason := skipFileReason(c.in); reason != "" {
-				t.Skip(reason)
-			}
+			skipIfUnsupported(t, c.in)
 			file, err := p.Parse(strings.NewReader(c.in), "")
 			if err != nil {
 				t.Fatalf("could not parse: %v", err)
@@ -2152,15 +2237,14 @@ func TestFile(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer os.RemoveAll(dir)
-			var cb concBuffer
-			r := Runner{
-				Dir:    dir,
-				Stdout: &cb,
-				Stderr: &cb,
+			var cb internal.ConcBuffer
+			r, err := New(Dir(dir), StdIO(nil, &cb, &cb),
+				Module(OpenDevImpls(DefaultOpen)))
+			if err != nil {
+				t.Fatal(err)
 			}
-			r.Open = OpenDevImpls(DefaultOpen)
-			r.Reset()
-			if err := r.Run(file); err != nil {
+			ctx := context.Background()
+			if err := r.Run(ctx, file); err != nil && err != ShellExitStatus(0) {
 				cb.WriteString(err.Error())
 			}
 			want := c.want
@@ -2188,9 +2272,7 @@ func TestFileConfirm(t *testing.T) {
 			if strings.Contains(c.want, " #IGNORE") {
 				return
 			}
-			if reason := skipFileReason(c.in); reason != "" {
-				t.Skip(reason)
-			}
+			skipIfUnsupported(t, c.in)
 			t.Parallel()
 			dir, err := ioutil.TempDir("", "interp-test")
 			if err != nil {
@@ -2202,7 +2284,7 @@ func TestFileConfirm(t *testing.T) {
 			cmd.Stdin = strings.NewReader(c.in)
 			out, err := cmd.CombinedOutput()
 			if strings.Contains(c.want, " #JUSTERR") {
-				// bash sometimes exits with code 0 and
+				// bash sometimes exits with status code 0 and
 				// stderr "bash: ..." for an error
 				fauxErr := bytes.HasPrefix(out, []byte("bash:"))
 				if err == nil && !fauxErr {
@@ -2224,53 +2306,54 @@ func TestFileConfirm(t *testing.T) {
 
 func TestRunnerOpts(t *testing.T) {
 	t.Parallel()
-	withPath := func(strs ...string) Environ {
-		list := []string{"PATH=" + os.Getenv("PATH")}
-		list = append(list, strs...)
-		env, _ := EnvFromList(list)
-		return env
+	withPath := func(strs ...string) func(*Runner) error {
+		prefix := []string{"PATH=" + os.Getenv("PATH")}
+		return Env(expand.ListEnviron(append(prefix, strs...)...))
+	}
+	opts := func(list ...func(*Runner) error) []func(*Runner) error {
+		return list
 	}
 	cases := []struct {
-		runner   Runner
+		opts     []func(*Runner) error
 		in, want string
 	}{
 		{
-			Runner{},
+			nil,
 			"env | grep '^INTERP_GLOBAL='",
 			"INTERP_GLOBAL=value\n",
 		},
 		{
-			Runner{Env: withPath()},
+			opts(withPath()),
 			"env | grep '^INTERP_GLOBAL='",
 			"exit status 1",
 		},
 		{
-			Runner{Env: withPath("INTERP_GLOBAL=bar")},
+			opts(withPath("INTERP_GLOBAL=bar")),
 			"env | grep '^INTERP_GLOBAL='",
 			"INTERP_GLOBAL=bar\n",
 		},
 		{
-			Runner{Env: withPath("a=b")},
+			opts(withPath("a=b")),
 			"echo $a",
 			"b\n",
 		},
 		{
-			Runner{Env: withPath("A=b")},
+			opts(withPath("A=b")),
 			"env | grep '^A='; echo $A",
 			"A=b\nb\n",
 		},
 		{
-			Runner{Env: withPath("A=b", "A=c")},
+			opts(withPath("A=b", "A=c")),
 			"env | grep '^A='; echo $A",
 			"A=c\nc\n",
 		},
 		{
-			Runner{Env: withPath("HOME=")},
+			opts(withPath("HOME=")),
 			"echo $HOME",
 			"\n",
 		},
 		{
-			Runner{Env: withPath("PWD=foo")},
+			opts(withPath("PWD=foo")),
 			"[[ $PWD == foo ]]",
 			"exit status 1",
 		},
@@ -2278,18 +2361,18 @@ func TestRunnerOpts(t *testing.T) {
 	p := syntax.NewParser()
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("%03d", i), func(t *testing.T) {
+			skipIfUnsupported(t, c.in)
 			file, err := p.Parse(strings.NewReader(c.in), "")
 			if err != nil {
 				t.Fatalf("could not parse: %v", err)
 			}
-			var cb concBuffer
-			r := c.runner
-			r.Stdout = &cb
-			r.Stderr = &cb
-			if err := r.Reset(); err != nil {
-				cb.WriteString(err.Error())
+			var cb internal.ConcBuffer
+			r, err := New(append(c.opts, StdIO(nil, &cb, &cb))...)
+			if err != nil {
+				t.Fatal(err)
 			}
-			if err := r.Run(file); err != nil {
+			ctx := context.Background()
+			if err := r.Run(ctx, file); err != nil && err != ShellExitStatus(0) {
 				cb.WriteString(err.Error())
 			}
 			if got := cb.String(); got != c.want {
@@ -2322,10 +2405,10 @@ func TestRunnerContext(t *testing.T) {
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			r := Runner{Context: ctx}
+			r, _ := New()
 			errChan := make(chan error)
 			go func() {
-				errChan <- r.Run(file)
+				errChan <- r.Run(ctx, file)
 			}()
 
 			select {
@@ -2354,13 +2437,10 @@ func TestRunnerAltNodes(t *testing.T) {
 		file.Stmts[0].Cmd,
 	}
 	for _, node := range nodes {
-		var cb concBuffer
-		r := Runner{
-			Stdout: &cb,
-			Stderr: &cb,
-		}
-		r.Reset()
-		if err := r.Run(node); err != nil {
+		var cb internal.ConcBuffer
+		r, _ := New(StdIO(nil, &cb, &cb))
+		ctx := context.Background()
+		if err := r.Run(ctx, node); err != nil && err != ShellExitStatus(0) {
 			cb.WriteString(err.Error())
 		}
 		if got := cb.String(); got != want {
@@ -2414,41 +2494,116 @@ func TestRunnerDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rel, err := filepath.Rel(wd, dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	t.Run("Missing", func(t *testing.T) {
-		r := Runner{Dir: "missing"}
-		if err := r.Reset(); err == nil {
-			t.Fatal("expected Runner to error when Dir is missing")
+		_, err := New(Dir("missing"))
+		if err == nil {
+			t.Fatal("expected New to error when Dir is missing")
 		}
 	})
 	t.Run("NoDir", func(t *testing.T) {
-		r := Runner{Dir: "interp_test.go"}
-		if err := r.Reset(); err == nil {
-			t.Fatal("expected Runner to error when Dir is not a dir")
+		_, err := New(Dir("interp_test.go"))
+		if err == nil {
+			t.Fatal("expected New to error when Dir is not a dir")
 		}
 	})
 	t.Run("NoDirAbs", func(t *testing.T) {
-		r := Runner{Dir: filepath.Join(wd, "interp_test.go")}
-		if err := r.Reset(); err == nil {
-			t.Fatal("expected Runner to error when Dir is not a dir")
+		_, err := New(Dir(filepath.Join(wd, "interp_test.go")))
+		if err == nil {
+			t.Fatal("expected New to error when Dir is not a dir")
 		}
 	})
 	t.Run("Relative", func(t *testing.T) {
-		var b bytes.Buffer
-		r := Runner{
-			Dir:    rel,
-			Stdout: &b,
-			Stderr: &b,
+		rel, err := filepath.Rel(wd, dir)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if err := r.Reset(); err != nil {
-			t.Error(err)
+		r, err := New(Dir(rel))
+		if err != nil {
+			t.Fatal(err)
 		}
 		if !filepath.IsAbs(r.Dir) {
 			t.Errorf("Runner.Dir is not absolute")
 		}
 	})
+}
+
+func TestRunnerIncremental(t *testing.T) {
+	t.Parallel()
+	in := "echo foo; false; echo bar; exit 0; echo baz"
+	want := "foo\nbar\n"
+	file, err := syntax.NewParser().Parse(strings.NewReader(in), "")
+	if err != nil {
+		t.Fatalf("could not parse: %v", err)
+	}
+	var b bytes.Buffer
+	r, _ := New(StdIO(nil, &b, &b))
+	ctx := context.Background()
+StmtLoop:
+	for _, stmt := range file.Stmts {
+		err := r.Run(ctx, stmt)
+		switch err.(type) {
+		case nil:
+		case ExitStatus:
+		case ShellExitStatus:
+			break StmtLoop
+		default:
+			b.WriteString(err.Error())
+		}
+	}
+	if got := b.String(); got != want {
+		t.Fatalf("\nwant: %q\ngot:  %q", want, got)
+	}
+}
+
+func TestRunnerManyResets(t *testing.T) {
+	t.Parallel()
+	r, _ := New()
+	for i := 0; i < 5; i++ {
+		r.Reset()
+	}
+}
+
+func TestRunnerFilename(t *testing.T) {
+	t.Parallel()
+	in := "echo $0"
+	want := "f.sh\n"
+	file, err := syntax.NewParser().Parse(strings.NewReader(in), "f.sh")
+	if err != nil {
+		t.Fatalf("could not parse: %v", err)
+	}
+	var b bytes.Buffer
+	r, _ := New(StdIO(nil, &b, &b))
+	ctx := context.Background()
+	if err := r.Run(ctx, file); err != nil {
+		t.Fatal(err)
+	}
+	if got := b.String(); got != want {
+		t.Fatalf("\nwant: %q\ngot:  %q", want, got)
+	}
+}
+
+func TestRunnerEnvNoModify(t *testing.T) {
+	t.Parallel()
+	env := expand.ListEnviron("one=1", "two=2")
+	in := `echo -n "$one $two; "; one=x; unset two`
+	file, err := syntax.NewParser().Parse(strings.NewReader(in), "")
+	if err != nil {
+		t.Fatalf("could not parse: %v", err)
+	}
+
+	var b bytes.Buffer
+	r, _ := New(Env(env), StdIO(nil, &b, &b))
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		r.Reset()
+		err := r.Run(ctx, file)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	want := "1 2; 1 2; 1 2; "
+	if got := b.String(); got != want {
+		t.Fatalf("\nwant: %q\ngot:  %q", want, got)
+	}
 }
