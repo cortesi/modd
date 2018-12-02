@@ -26,21 +26,14 @@ type daemon struct {
 	conf  conf.Daemon
 	indir string
 
-	running bool
-	ex      *shell.Executor
-	log     termlog.Stream
-	shell   string
-	stop    bool
+	ex    *shell.Executor
+	log   termlog.Stream
+	shell string
+	stop  bool
 	sync.Mutex
 }
 
 func (d *daemon) Run() {
-	ex, err := shell.NewExecutor(d.shell, d.conf.Command, d.indir)
-	if err != nil {
-		d.log.Shout("Could not create executor: %s", err)
-	}
-	d.ex = ex
-
 	var lastStart time.Time
 	delay := MinRestart
 	for d.stop != true {
@@ -52,7 +45,7 @@ func (d *daemon) Run() {
 		}
 		d.log.Notice(">> starting...")
 		lastStart = time.Now()
-		err, pstate := ex.Run(d.log, false)
+		err, pstate := d.ex.Run(d.log, false)
 
 		if err != nil {
 			d.log.Shout("execution error: %s", err)
@@ -83,8 +76,12 @@ func (d *daemon) Run() {
 func (d *daemon) Restart() {
 	d.Lock()
 	defer d.Unlock()
-	if !d.running {
-		d.running = true
+	if d.ex == nil {
+		ex, err := shell.NewExecutor(d.shell, d.conf.Command, d.indir)
+		if err != nil {
+			d.log.Shout("Could not create executor: %s", err)
+		}
+		d.ex = ex
 		go d.Run()
 	} else {
 		d.log.Notice(">> sending signal %s", d.conf.RestartSignal)
