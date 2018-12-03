@@ -1,4 +1,5 @@
 version: "{build}"
+image: Previous Visual Studio 2017
 
 clone_folder: c:\gopath\src\github.com\cortesi\modd
 
@@ -6,12 +7,13 @@ environment:
   GOPATH: c:\gopath
 
 install:
-  - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
+  - set PATH=%GOPATH%\bin;c:\go\bin;C:\msys64\mingw64\bin;%PATH%
   - go version
   - go env
   - go get -d ./...
 
 build_script:
+  - set PATH=%GOPATH%\bin;c:\go\bin;C:\msys64\mingw64\bin;%PATH%
   - go install ./cmd/modd
   - go test -timeout 30s -race -v ./...
 
