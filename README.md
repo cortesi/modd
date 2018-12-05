@@ -1,5 +1,4 @@
 [![Travis Build Status](https://travis-ci.org/cortesi/modd.svg?branch=master)](https://travis-ci.org/cortesi/modd)
-[![Appveyor Build status](https://ci.appveyor.com/api/projects/status/1k7fk4j48oepvubo?svg=true)](https://ci.appveyor.com/project/cortesi/modd)
 
 
 Modd is a developer tool that triggers commands and manages daemons in response
