@@ -123,7 +123,8 @@
   version = "v2.2.6"
 
 [[projects]]
-  digest = "1:6ea4de3b88696e66d211a28065410c2b549be523436cc8b1b2cdbb7fa3f7b20c"
+  branch = "master"
+  digest = "1:cc0a7406255b979d308070af5b610fc24df7518fb69c389176fa5506fdfa5cb0"
   name = "mvdan.cc/sh"
   packages = [
     "expand",
@@ -131,8 +132,7 @@
     "syntax",
   ]
   pruneopts = ""
-  revision = "ca9904be79646f1f53440fcd323536d0ae6fca9b"
-  version = "v2.6.0"
+  revision = "bbb66890e6cf6c6fe235f062a83f47d3402fcf44"
 
 [solve-meta]
   analyzer-name = "dep"

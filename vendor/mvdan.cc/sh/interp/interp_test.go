@@ -14,11 +14,11 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"mvdan.cc/sh/expand"
-	"mvdan.cc/sh/internal"
 	"mvdan.cc/sh/syntax"
 )
 
@@ -60,6 +60,15 @@ func TestMain(m *testing.M) {
 	os.Unsetenv("CDPATH")
 	hasBash44 = checkBash()
 	os.Setenv("INTERP_GLOBAL", "value")
+	os.Setenv("MULTILINE_INTERP_GLOBAL", "\nwith\nnewlines\n\n")
+
+	// Double check that env vars on Windows are case insensitive.
+	if runtime.GOOS == "windows" {
+		os.Setenv("mixedCase_INTERP_GLOBAL", "value")
+	} else {
+		os.Setenv("MIXEDCASE_INTERP_GLOBAL", "value")
+	}
+
 	for _, s := range []string{"a", "b", "c", "d", "foo", "bar"} {
 		os.Unsetenv(s)
 	}
@@ -73,6 +82,40 @@ func checkBash() bool {
 		return false
 	}
 	return strings.HasPrefix(string(out), "4.4")
+}
+
+// concBuffer wraps a bytes.Buffer in a mutex so that concurrent writes
+// to it don't upset the race detector.
+type concBuffer struct {
+	buf bytes.Buffer
+	sync.Mutex
+}
+
+func (c *concBuffer) Write(p []byte) (int, error) {
+	c.Lock()
+	n, err := c.buf.Write(p)
+	c.Unlock()
+	return n, err
+}
+
+func (c *concBuffer) WriteString(s string) (int, error) {
+	c.Lock()
+	n, err := c.buf.WriteString(s)
+	c.Unlock()
+	return n, err
+}
+
+func (c *concBuffer) String() string {
+	c.Lock()
+	s := c.buf.String()
+	c.Unlock()
+	return s
+}
+
+func (c *concBuffer) Reset() {
+	c.Lock()
+	c.buf.Reset()
+	c.Unlock()
 }
 
 var fileCases = []struct {
@@ -209,6 +252,7 @@ var fileCases = []struct {
 	{"echo $INTERP_GLOBAL", "value\n"},
 	{"INTERP_GLOBAL=; echo $INTERP_GLOBAL", "\n"},
 	{"unset INTERP_GLOBAL; echo $INTERP_GLOBAL", "\n"},
+	{"echo $MIXEDCASE_INTERP_GLOBAL", "value\n"},
 	{"foo=bar; foo=x true; echo $foo", "bar\n"},
 	{"foo=bar; foo=x true; echo $foo", "bar\n"},
 	{"foo=bar; env | grep '^foo='", "exit status 1"},
@@ -220,6 +264,7 @@ var fileCases = []struct {
 	{"a=b; a+=c x+=y; echo $a $x", "bc y\n"},
 	{`a=" x  y"; b=$a c="$a"; echo $b; echo $c`, "x y\nx y\n"},
 	{`a=" x  y"; b=$a c="$a"; echo "$b"; echo "$c"`, " x  y\n x  y\n"},
+	{"env | sed -n '1 s/^$/empty/p'", ""}, // never begin with an empty element
 
 	// special vars
 	{"echo $?; false; echo $?", "0\n1\n"},
@@ -853,6 +898,14 @@ var fileCases = []struct {
 		"a=sub true & { a=main env | grep '^a='; }",
 		"a=main\n",
 	},
+	{
+		"echo foo >f; echo $(cat f); echo $(<f)",
+		"foo\nfoo\n",
+	},
+	{
+		"echo foo >f; echo $(<f; echo bar)",
+		"bar\n",
+	},
 
 	// pipes
 	{
@@ -892,6 +945,10 @@ var fileCases = []struct {
 	// 	">a; echo foo >>b; wc -c <a >>b; cat b",
 	// 	"foo\n0\n",
 	// },
+	{
+		"echo foo >a; <a",
+		"",
+	},
 	{
 		"echo foo >a; wc -c <a",
 		"4\n",
@@ -2237,7 +2294,7 @@ func TestFile(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer os.RemoveAll(dir)
-			var cb internal.ConcBuffer
+			var cb concBuffer
 			r, err := New(Dir(dir), StdIO(nil, &cb, &cb),
 				Module(OpenDevImpls(DefaultOpen)))
 			if err != nil {
@@ -2261,10 +2318,15 @@ func TestFile(t *testing.T) {
 
 func TestFileConfirm(t *testing.T) {
 	if testing.Short() {
-		t.Skip("calling bash is slow.")
+		t.Skip("calling bash is slow")
 	}
 	if !hasBash44 {
 		t.Skip("bash 4.4 required to run")
+	}
+	if runtime.GOOS == "windows" {
+		// For example, it seems to treat environment variables as
+		// case-sensitive, which isn't how Windows works.
+		t.Skip("bash on Windows emulates Unix-y behavior")
 	}
 	for i := range fileCases {
 		t.Run(fmt.Sprintf("%03d", i), func(t *testing.T) {
@@ -2366,7 +2428,7 @@ func TestRunnerOpts(t *testing.T) {
 			if err != nil {
 				t.Fatalf("could not parse: %v", err)
 			}
-			var cb internal.ConcBuffer
+			var cb concBuffer
 			r, err := New(append(c.opts, StdIO(nil, &cb, &cb))...)
 			if err != nil {
 				t.Fatal(err)
@@ -2437,7 +2499,7 @@ func TestRunnerAltNodes(t *testing.T) {
 		file.Stmts[0].Cmd,
 	}
 	for _, node := range nodes {
-		var cb internal.ConcBuffer
+		var cb concBuffer
 		r, _ := New(StdIO(nil, &cb, &cb))
 		ctx := context.Background()
 		if err := r.Run(ctx, node); err != nil && err != ShellExitStatus(0) {

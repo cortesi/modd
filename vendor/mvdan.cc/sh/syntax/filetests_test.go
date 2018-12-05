@@ -3151,7 +3151,10 @@ var fileTests = []testCase{
 		}},
 	},
 	{
-		Strs: []string{"[[ -R a ]]"},
+		Strs: []string{
+			"[[ -R a ]]",
+			"[[\n-R a\n]]",
+		},
 		bash: &TestClause{X: &UnaryTest{
 			Op: TsRefVar,
 			X:  litWord("a"),
@@ -3272,6 +3275,7 @@ var fileTests = []testCase{
 		Strs: []string{
 			"[[ ! -e $a ]]",
 			"[[ ! -a $a ]]",
+			"[[\n!\n-a $a\n]]",
 		},
 		bsmk: &TestClause{X: &UnaryTest{
 			Op: TsNot,
@@ -3883,6 +3887,23 @@ var fileTests = []testCase{
 					Post: true,
 					X:    litWord("i"),
 				}))),
+			}},
+		},
+	},
+	{
+		Strs: []string{"case a in b) [[ x =~ y ]] ;; esac"},
+		bash: &CaseClause{
+			Word: word(lit("a")),
+			Items: []*CaseItem{{
+				Op:       Break,
+				Patterns: litWords("b"),
+				StmtList: stmtList(stmt(
+					&TestClause{X: &BinaryTest{
+						Op: TsReMatch,
+						X:  litWord("x"),
+						Y:  litWord("y"),
+					}},
+				)),
 			}},
 		},
 	},
