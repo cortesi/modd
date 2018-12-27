@@ -1862,6 +1862,8 @@ set +o pipefail
 	{"a=x=y; declare $a; echo $a $x", "x=y y\n"},
 	{"a='x=(y)'; declare $a; echo $a $x", "x=(y) (y)\n"},
 	{"a='x=b y=c'; declare $a; echo $x $y", "b c\n"},
+	{"declare =bar", "declare: invalid name \"=bar\"\nexit status 1 #JUSTERR"},
+	{"declare $unset=$unset", "declare: invalid name \"\"\nexit status 1 #JUSTERR"},
 
 	// export
 	{"declare foo=bar; env | grep '^foo='", "exit status 1"},
@@ -2068,6 +2070,26 @@ set +o pipefail
 	{
 		"cat <<EOF\n*.go\nEOF",
 		"*.go\n",
+	},
+	{
+		"mkdir -p a/b a/c; echo ./a/* | sed 's@\\\\@/@g'",
+		"./a/b ./a/c\n",
+	},
+	{
+		"mkdir -p a/b a/c d; cd d; echo ../a/* | sed 's@\\\\@/@g'",
+		"../a/b ../a/c\n",
+	},
+	{
+		"mkdir x-d1 x-d2; touch x-f; echo x-*/ | sed -e 's@\\\\@/@g'",
+		"x-d1/ x-d2/\n",
+	},
+	{
+		"mkdir x-d1 x-d2; touch x-f; echo ././x-*/// | sed -e 's@\\\\@/@g'",
+		"././x-d1/ ././x-d2/\n",
+	},
+	{
+		"mkdir x-d; touch x-f; test -d $PWD/x-*/",
+		"",
 	},
 
 	// brace expansion; more exhaustive tests in the syntax package
