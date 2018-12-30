@@ -431,6 +431,28 @@ libnotify. You'll need to use your system package manager to install
 **libnotify**.
 
 
+# Colour output in process logs
+
+Some programs that have colourised output when run on the command-line don't
+emit colour when run under modd. Users might assume that modd is stripping the
+colour from the command output, but that is not the case. Well-behaved terminal
+programs check whether they are connected to a terminal, and if not, disable
+colour codes in their own output. It is possible to trick a program into
+believing that a terminal is present through pseudo-terminal emulation, but this
+is complex and platform dependent and is not a good fit for a simple, reliable
+tool like modd.
+
+This leaves users with two options:
+
+- Many tools that produce colour output also have a flag to force colour when no
+  terminal is detected, and many logging libraries with human-friendly output do
+  the same. The simplest solution is to work out how to force output and
+  explicitly specify this in your modd configuration.
+- There are platform-specific tools you can interpose between modd and the
+  subprocess to emulate a terminal. One example is
+  [unbuffer](https://linux.die.net/man/1/unbuffer) on Linux.
+
+
 # Development
 
 The scripts used to build this package for distribution can be found
