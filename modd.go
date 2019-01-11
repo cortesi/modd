@@ -43,6 +43,7 @@ var CommonExcludes = []string{
 	"**.swp",
 	"**.___jb_old___",
 	"**.___jb_bak___",
+	"**mage_output_file.go",
 
 	// Python
 	"**.py[cod]",
