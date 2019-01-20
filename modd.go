@@ -16,7 +16,7 @@ import (
 )
 
 // Version is the modd release version
-const Version = "0.7"
+const Version = "0.8"
 
 const lullTime = time.Millisecond * 100
 
