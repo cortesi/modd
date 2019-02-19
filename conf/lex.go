@@ -14,7 +14,7 @@ import (
 
 const spaces = " \t"
 const whitespace = spaces + "\n"
-const wordRunes = "abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVXYZ_"
+const wordRunes = "abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 const quotes = `'"`
 
 // Characters we don't allow in bare strings

@@ -256,6 +256,13 @@ var lexTests = []struct {
 			{itemRightParen, "}"},
 		},
 	},
+	{
+		"@W = b", []itm{
+			{itemVarName, "@W"},
+			{itemEquals, "="},
+			{itemBareString, "b"},
+		},
+	},
 }
 
 func TestLex(t *testing.T) {
