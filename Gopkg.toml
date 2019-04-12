@@ -79,4 +79,4 @@
 
 [[constraint]]
   name = "mvdan.cc/sh"
-  version = "2.3.0"
+  branch="master"

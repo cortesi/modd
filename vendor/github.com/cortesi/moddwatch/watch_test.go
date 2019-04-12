@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -404,8 +405,8 @@ func testList(t *testing.T) {
 		"x.test1",
 	}
 	for _, p := range paths {
-		dst := filepath.Join(".", p)
-		err := os.MkdirAll(filepath.Dir(dst), 0777)
+		dst := path.Join(".", p)
+		err := os.MkdirAll(path.Dir(dst), 0777)
 		if err != nil {
 			t.Fatalf("Error creating test dir: %v", err)
 		}
@@ -423,7 +424,7 @@ func testList(t *testing.T) {
 		return
 	}
 
-	sabs, err := filepath.Abs("./b")
+	sabs, err := filepath.Abs(filepath.FromSlash("./b"))
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -589,6 +590,7 @@ func _testWatch(
 		if more {
 			ret = ret.Join(*evt)
 			if cmp.Equal(ret, expected, cmpOptions) {
+				watcher.Stop()
 				return
 			}
 		} else {

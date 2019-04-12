@@ -1,11 +1,12 @@
 language: go
 
 go:
-    - 1.9
+    - 1.11.x
 
 os:
     - linux
     - osx
+    - windows
 
 install:
     - go get -t -v ./...

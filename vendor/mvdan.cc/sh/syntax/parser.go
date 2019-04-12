@@ -315,7 +315,11 @@ type Parser struct {
 }
 
 func (p *Parser) Incomplete() bool {
-	return p.quote != noState || p.openStmts > 0
+	// If we're in a quote state other than noState, we're parsing a node
+	// such as a double-quoted string.
+	// If there are any open statements, we need to finish them.
+	// If we're constructing a literal, we need to finish it.
+	return p.quote != noState || p.openStmts > 0 || p.litBs != nil
 }
 
 const bufSize = 1 << 10
@@ -1469,6 +1473,9 @@ func (p *Parser) backquoteEnd() bool {
 
 // ValidName returns whether val is a valid name as per the POSIX spec.
 func ValidName(val string) bool {
+	if val == "" {
+		return false
+	}
 	for i, r := range val {
 		switch {
 		case 'a' <= r && r <= 'z':
@@ -2120,6 +2127,7 @@ func (p *Parser) testClause(s *Stmt) {
 }
 
 func (p *Parser) testExpr(ftok token, fpos Pos, pastAndOr bool) TestExpr {
+	p.got(_Newl)
 	var left TestExpr
 	if pastAndOr {
 		left = p.testExprBase(ftok, fpos)
@@ -2129,6 +2137,7 @@ func (p *Parser) testExpr(ftok token, fpos Pos, pastAndOr bool) TestExpr {
 	if left == nil {
 		return left
 	}
+	p.got(_Newl)
 	switch p.tok {
 	case andAnd, orOr:
 	case _LitWord:
@@ -2153,10 +2162,12 @@ func (p *Parser) testExpr(ftok token, fpos Pos, pastAndOr bool) TestExpr {
 		Op:    BinTestOperator(p.tok),
 		X:     left,
 	}
+	// Save the previous quoteState, since we change it in TsReMatch.
+	oldQuote := p.quote
+
 	switch b.Op {
 	case AndTest, OrTest:
 		p.next()
-		p.got(_Newl)
 		if b.Y = p.testExpr(token(b.Op), b.OpPos, false); b.Y == nil {
 			p.followErrExp(b.OpPos, b.Op.String())
 		}
@@ -2179,6 +2190,7 @@ func (p *Parser) testExpr(ftok token, fpos Pos, pastAndOr bool) TestExpr {
 		p.next()
 		b.Y = p.followWordTok(token(b.Op), b.OpPos)
 	}
+	p.quote = oldQuote
 	return b
 }
 
@@ -2217,14 +2229,12 @@ func (p *Parser) testExprBase(ftok token, fpos Pos) TestExpr {
 	case leftParen:
 		pe := &ParenTest{Lparen: p.pos}
 		p.next()
-		p.got(_Newl)
 		if pe.X = p.testExpr(leftParen, pe.Lparen, false); pe.X == nil {
 			p.followErrExp(pe.Lparen, "(")
 		}
 		pe.Rparen = p.matched(pe.Lparen, leftParen, rightParen)
 		return pe
 	default:
-		p.got(_Newl)
 		return p.followWordTok(ftok, fpos)
 	}
 }

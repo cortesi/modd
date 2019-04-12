@@ -6,6 +6,10 @@
 A shell parser, formatter and interpreter. Supports [POSIX Shell], [Bash] and
 [mksh]. Requires Go 1.10 or later.
 
+**Note**: `v2` is in a feature freeze, and will only receive bugfixes.
+Development continues on the `mvdan.cc/sh/v3` Go module on the
+[`master.v3`](https://github.com/mvdan/sh/tree/master.v3) branch.
+
 ### Quick start
 
 To parse shell scripts, inspect them, and print them out, see the [syntax
@@ -38,7 +42,8 @@ Use `-i N` to indent with a number of spaces instead of tabs. There are other
 formatting options - see `shfmt -h`. For example, to get the formatting
 appropriate for [Google's Style][google-style] guide, use `shfmt -i 2 -ci`.
 
-Packages are available for [Arch], [CRUX], [Homebrew], [NixOS] and [Void].
+Packages are available on [Arch], [CRUX], [Docker], [FreeBSD], [Homebrew],
+[NixOS] and [Void].
 
 #### Replacing `bash -n`
 
@@ -100,21 +105,29 @@ $ echo '$((foo); (bar))' | shfmt
 A subset of the Go packages are available as an npm package called [mvdan-sh].
 See the [_js](_js) directory for more information.
 
+### Docker
+
+To build a Docker image, checkout a specific version of the repository and run:
+
+	docker build -t my:tag -f cmd/shfmt/Dockerfile .
+
 ### Related projects
 
-* Docker images - by [jamesmstone][dockerized-jamesmstone], [PeterDaveHello][dockerized-peterdavehello]
+* Alternative docker images - by [jamesmstone][dockerized-jamesmstone], [PeterDaveHello][dockerized-peterdavehello]
 * [format-shell] - Atom plugin for `shfmt`
 * [micro] - Editor with a built-in plugin for `shfmt`
 * [shell-format] - VS Code plugin for `shfmt`
 * [vim-shfmt] - Vim plugin for `shfmt`
 
-[arch]: https://aur.archlinux.org/packages/shfmt/
+[arch]: https://www.archlinux.org/packages/community/x86_64/shfmt/
 [bash]: https://www.gnu.org/software/bash/
-[crux]: https://github.com/6c37/crux-ports-git/tree/3.3/shfmt
+[crux]: https://github.com/6c37/crux-ports-git/tree/HEAD/shfmt
+[docker]: https://hub.docker.com/r/mvdan/shfmt/
 [dockerized-jamesmstone]: https://hub.docker.com/r/jamesmstone/shfmt/
-[dockerized-peterdavehello]: https://github.com/PeterDaveHello/dockerized-shfmt
+[dockerized-peterdavehello]: https://github.com/PeterDaveHello/dockerized-shfmt/
 [examples]: https://godoc.org/mvdan.cc/sh/syntax#pkg-examples
 [format-shell]: https://atom.io/packages/format-shell
+[freebsd]: https://github.com/freebsd/freebsd-ports/tree/HEAD/devel/shfmt
 [go-fuzz]: https://github.com/dvyukov/go-fuzz
 [google-style]: https://google.github.io/styleguide/shell.xml
 [homebrew]: https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/shfmt.rb
