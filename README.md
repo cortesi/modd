@@ -430,6 +430,11 @@ systems. Modd uses the **notify-send** command to send notifications using
 libnotify. You'll need to use your system package manager to install
 **libnotify**.
 
+## ModdNotify
+
+Modd supports an external executable (or shell script) called **modd-notify**,
+which can be enabled with the `-n -t modd-notify` option. This allows an external
+script to be called for a custom notifier (ie: noti or others).
 
 # Colour output in process logs
 
