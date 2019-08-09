@@ -1,7 +1,0 @@
-/suppressions/
-/crashers/
-/sh-fuzz.zip
-
-/_js/index.js*
-/_js/_js.js*
-/_js/*.log
