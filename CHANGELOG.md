@@ -1,4 +1,11 @@
-# v0.7 - July 2018
+# v0.8 - 21 January 2019
+
+* Improvements to display for restart backoff
+* Fix a race condition affecting daemon restart (Richard Musiol)
+* Dependency updates and build improvements
+
+
+# v0.7 - 26 July 2018
 
 * Modd now has a built-in shell interpreter, which is used to execute commands
   by default. This means modd.conf files should now be fully portable.
