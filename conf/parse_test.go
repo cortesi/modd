@@ -1,7 +1,6 @@
 package conf
 
 import (
-	"path/filepath"
 	"syscall"
 	"testing"
 
@@ -275,7 +274,7 @@ var parseTests = []struct {
 		"",
 		&Config{
 			variables: map[string]string{
-				"@confdir": filepath.Join("path", "to"),
+				"@confdir": "path/to",
 			},
 		},
 	},
@@ -287,7 +286,7 @@ var parseTests = []struct {
 				{InDir: "path/to/foo"},
 			},
 			variables: map[string]string{
-				"@confdir": filepath.Join("path", "to"),
+				"@confdir": "path/to",
 			},
 		},
 	},

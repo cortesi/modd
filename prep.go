@@ -58,6 +58,7 @@ func RunPreps(
 	if mod != nil {
 		modified = mod.All()
 	}
+
 	vcmd := varcmd.VarCmd{Block: &b, Modified: modified, Vars: vars}
 	for _, p := range b.Preps {
 		cmd, err := vcmd.Render(p.Command)

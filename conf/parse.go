@@ -8,7 +8,7 @@ package conf
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"runtime"
 	"strings"
 )
@@ -24,7 +24,7 @@ type parser struct {
 	peekItem *item
 }
 
-// Dreadfully naive at the momet, but then so is the lexer.
+// Dreadfully naive at the moment, but then so is the lexer.
 func unquote(s string) string {
 	quote := s[0:1]
 	s = s[1 : len(s)-1]
@@ -165,7 +165,7 @@ func (p *parser) parse() (err error) {
 
 	// Store path to conf in variable if not empty
 	if p.name != "" {
-		p.config.addVariable(confVarName, filepath.Dir(p.name))
+		p.config.addVariable(confVarName, path.Dir(p.name))
 	}
 
 	for {
@@ -244,7 +244,9 @@ Loop:
 				p.errorf("indir can only be used once per block")
 			}
 			// Replace @confdir here instead of at command runtime
-			dir = strings.Replace(dir, confVarName, p.config.variables[confVarName], -1)
+			dir = strings.Replace(
+				dir, confVarName, p.config.variables[confVarName], -1,
+			)
 			block.InDir = dir
 		case itemDaemon:
 			options := p.collectValues(itemBareString)
