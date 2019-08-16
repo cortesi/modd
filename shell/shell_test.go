@@ -2,6 +2,7 @@ package shell
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -161,4 +162,37 @@ func TestShells(t *testing.T) {
 			)
 		}
 	}
+}
+
+func TestCaseInsensitivePath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("skipping - only windows has case insensitive PATH")
+	}
+
+	oldpath := os.Getenv("PATH")
+	fixpath := func() {
+		os.Unsetenv("Path")
+		os.Setenv("PATH", oldpath)
+	}
+	defer fixpath()
+	os.Unsetenv("PATH")
+	os.Setenv("Path", fmt.Sprintf("%s%ctrigger-text", oldpath, os.PathListSeparator))
+
+	shellTesting = true
+
+	pathTest := cmdTest{
+		name:   "path-test",
+		cmd:    "echo $PATH",
+		logHas: "trigger-text",
+	}
+	sh := "modd"
+	t.Run(
+		"modd/path-capitalization",
+		func(t *testing.T) {
+			if _, err := CheckShell(sh); err != nil {
+				t.Skipf("skipping - %s", err)
+			}
+			testCmd(t, sh, pathTest)
+		},
+	)
 }
