@@ -9,6 +9,7 @@ package conf
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -247,6 +248,10 @@ Loop:
 			dir = strings.Replace(
 				dir, confVarName, p.config.variables[confVarName], -1,
 			)
+			dir, err := filepath.Abs(dir)
+			if err != nil {
+				p.errorf("%s", err)
+			}
 			block.InDir = dir
 		case itemDaemon:
 			options := p.collectValues(itemBareString)

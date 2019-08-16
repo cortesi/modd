@@ -1,11 +1,20 @@
 package conf
 
 import (
+	"path/filepath"
 	"syscall"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 )
+
+func mustAbs(s string) string {
+	f, err := filepath.Abs(s)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
 
 var parseTests = []struct {
 	path     string
@@ -265,7 +274,7 @@ var parseTests = []struct {
 		"{ indir: foo\n }",
 		&Config{
 			Blocks: []Block{
-				{InDir: "foo"},
+				{InDir: mustAbs("foo")},
 			},
 		},
 	},
@@ -283,13 +292,17 @@ var parseTests = []struct {
 		"{ indir: @confdir/foo\n }",
 		&Config{
 			Blocks: []Block{
-				{InDir: "path/to/foo"},
+				{InDir: mustAbs("path/to/foo")},
 			},
 			variables: map[string]string{
 				"@confdir": "path/to",
 			},
 		},
 	},
+}
+
+var parseCmpOptions = []cmp.Option{
+	cmp.AllowUnexported(Config{}),
 }
 
 func TestParse(t *testing.T) {
@@ -299,7 +312,7 @@ func TestParse(t *testing.T) {
 			t.Fatalf("%q - %s", tt.input, err)
 		}
 
-		if diff := cmp.Diff(ret, tt.expected, cmp.AllowUnexported(Config{})); diff != "" {
+		if diff := cmp.Diff(ret, tt.expected, parseCmpOptions...); diff != "" {
 			t.Errorf("%d %s", i, diff)
 		}
 	}
