@@ -277,6 +277,7 @@ The following variables are automatically generated for prep commands
 Variable      | Meaning
 ------------- | -------
 @mods         | On first run, all files matching the block patterns. On subsequent change, a list of all modified files.
+@confdir      | The absolute path of the directory that contains the current modd config file.
 @dirmods      | On first run, all directories containing files matching the block patterns. On subsequent change, a list of all directories containing modified files.
 
 All file names in variables are relative to the current directory, and
@@ -324,6 +325,12 @@ The following signals are supported: **sighup**, **sigterm**, **sigint**,
 
 Support for signals on Windows is limited. The signal type is ignored, and all
 daemons are stopped and restarted when a signal would normally be sent.
+
+The following variables are automatically generated for prep commands
+
+Variable      | Meaning
+------------- | -------
+@confdir      | The absolute path of the directory that contains the current modd config file.
 
 
 ## Controlling log headers
@@ -456,5 +463,4 @@ This leaves users with two options:
 # Development
 
 The scripts used to build this package for distribution can be found
-[here](https://github.com/cortesi/godist). External packages are vendored using
-[dep](https://github.com/golang/dep).
+[here](https://github.com/cortesi/godist).
