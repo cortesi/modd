@@ -9,6 +9,7 @@ require (
 	github.com/cortesi/moddwatch v0.0.0-20190809041828-239a95c12d84
 	github.com/cortesi/termlog v0.0.0-20190809035425-7871d363854c
 	github.com/fatih/color v1.7.0
+	github.com/google/go-cmp v0.3.1
 	github.com/mattn/go-colorable v0.1.2
 	github.com/mattn/go-isatty v0.0.8
 	github.com/rjeczalik/notify v0.0.0-20181126183243-629144ba06a1

@@ -1,8 +1,11 @@
 package conf
 
 import (
+	"path/filepath"
 	"syscall"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 var parseTests = []struct {
@@ -272,7 +275,7 @@ var parseTests = []struct {
 		"",
 		&Config{
 			variables: map[string]string{
-				"@confdir": "path/to",
+				"@confdir": filepath.Join("path", "to"),
 			},
 		},
 	},
@@ -284,7 +287,7 @@ var parseTests = []struct {
 				{InDir: "path/to/foo"},
 			},
 			variables: map[string]string{
-				"@confdir": "path/to",
+				"@confdir": filepath.Join("path", "to"),
 			},
 		},
 	},
@@ -296,8 +299,9 @@ func TestParse(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%q - %s", tt.input, err)
 		}
-		if !ret.Equals(tt.expected) {
-			t.Errorf("%d %q\nexpected:\n\t%#v\ngot\n\t%#v", i, tt.input, tt.expected, ret)
+
+		if diff := cmp.Diff(ret, tt.expected, cmp.AllowUnexported(Config{})); diff != "" {
+			t.Errorf("%d %s", i, diff)
 		}
 	}
 }

@@ -272,7 +272,7 @@ escaped recursively.
 All prep commands in a block are run in order before any daemons are restarted.
 If any prep command exits with an error, execution stops.
 
-There following variables are automatically generated for prep commands
+The following variables are automatically generated for prep commands
 
 Variable      | Meaning
 ------------- | -------

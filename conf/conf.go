@@ -3,7 +3,6 @@ package conf
 import (
 	"fmt"
 	"os"
-	"reflect"
 	"sort"
 )
 
@@ -55,21 +54,6 @@ func (b *Block) addPrep(command string, options []string) error {
 type Config struct {
 	Blocks    []Block
 	variables map[string]string
-}
-
-// Equals checks if this Config equals another
-func (c *Config) Equals(other *Config) bool {
-	if (c.Blocks != nil || len(c.Blocks) != 0) || (other.Blocks != nil || len(other.Blocks) != 0) {
-		if !reflect.DeepEqual(c.Blocks, other.Blocks) {
-			return false
-		}
-	}
-	if (c.variables != nil || len(c.variables) != 0) || (other.variables != nil || len(other.variables) != 0) {
-		if !reflect.DeepEqual(c.variables, other.variables) {
-			return false
-		}
-	}
-	return true
 }
 
 // IncludePatterns retrieves all include patterns from all blocks.
