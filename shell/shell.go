@@ -7,7 +7,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"sync"
+	"time"
 
 	"github.com/cortesi/termlog"
 )
@@ -157,6 +159,22 @@ func (e *Executor) Signal(sig os.Signal) error {
 }
 
 func (e *Executor) Stop() error {
+	// Windows does not support Interrupt
+	if runtime.GOOS == "windows" {
+		return e.Signal(os.Kill)
+	}
+
+	err := e.Signal(os.Interrupt)
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(2 * time.Second)
+
+	if !e.Running() {
+		return nil
+	}
+
 	return e.Signal(os.Kill)
 }
 
