@@ -29,7 +29,7 @@ your OS, and copy the binary to somewhere on your PATH.
 
 If you have a working Go installation, you can also say
 
-    $ go get github.com/cortesi/modd/cmd/modd
+    $ env GO111MODULE=on go get github.com/cortesi/modd/cmd/modd
 
 On OSX, you can install modd with homebrew:
 
