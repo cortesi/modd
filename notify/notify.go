@@ -40,6 +40,18 @@ func (GrowlNotifier) Push(title string, text string, iconPath string) {
 	go cmd.Run()
 }
 
+// TerminalNotifier is a notifier for terminal-notifier
+type TerminalNotifier struct {
+}
+
+// Push implements Notifier
+func (TerminalNotifier) Push(title string, text string, iconPath string) {
+	cmd := exec.Command(
+		"terminal-notifier", "-title", prog, "-subtitle", title, "-message", text,
+	)
+	go cmd.Run()
+}
+
 // LibnotifyNotifier is a notifier for lib-notify
 type LibnotifyNotifier struct {
 }
@@ -54,7 +66,9 @@ func (LibnotifyNotifier) Push(title string, text string, iconPath string) {
 
 // PlatformNotifier finds a notifier for this platform
 func PlatformNotifier() Notifier {
-	if hasExecutable("growlnotify") {
+	if hasExecutable("terminal-notifier") {
+		return &TerminalNotifier{}
+	} else if hasExecutable("growlnotify") {
 		return &GrowlNotifier{}
 	} else if hasExecutable("notify-send") {
 		return &LibnotifyNotifier{}
