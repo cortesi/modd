@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cortesi/modd"
 	"github.com/cortesi/modd/notify"
@@ -44,6 +45,10 @@ var doNotify = kingpin.Flag("notify", "Send stderr to system notification if com
 var prep = kingpin.Flag("prep", "Run prep commands and exit").
 	Short('p').
 	Bool()
+
+var maxRestartDelay = kingpin.Flag("maxrestart", "Max deamon restart delay").
+	Default("8").
+	Int()
 
 var debug = kingpin.Flag("debug", "Debugging for modd development").
 	Default("false").
@@ -110,7 +115,11 @@ func main() {
 		notifiers = append(notifiers, &notify.BeepNotifier{})
 	}
 
-	mr, err := modd.NewModRunner(*file, log, notifiers, !(*noconf))
+	mr, err := modd.NewModRunner(log, notifiers, modd.ModRunnerArgs{
+		ConfPath:        *file,
+		ConfReload:      !(*noconf),
+		MaxRestartDelay: time.Duration(*maxRestartDelay) * time.Second,
+	})
 	if err != nil {
 		log.Shout("%s", err)
 		return

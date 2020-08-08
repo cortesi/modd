@@ -52,22 +52,31 @@ var CommonExcludes = []string{
 	"**/node_modules/**",
 }
 
+// ModRunnerArgs arguments for modd command
+type ModRunnerArgs struct {
+	ConfPath        string
+	ConfReload      bool
+	MaxRestartDelay time.Duration
+}
+
 // ModRunner coordinates running the modd command
 type ModRunner struct {
-	Log        termlog.TermLog
-	Config     *conf.Config
-	ConfPath   string
-	ConfReload bool
-	Notifiers  []notify.Notifier
+	Log             termlog.TermLog
+	Config          *conf.Config
+	ConfPath        string
+	ConfReload      bool
+	MaxRestartDelay time.Duration
+	Notifiers       []notify.Notifier
 }
 
 // NewModRunner constructs a new ModRunner
-func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notifier, confreload bool) (*ModRunner, error) {
+func NewModRunner(log termlog.TermLog, notifiers []notify.Notifier, ma ModRunnerArgs) (*ModRunner, error) {
 	mr := &ModRunner{
-		Log:        log,
-		ConfPath:   confPath,
-		ConfReload: confreload,
-		Notifiers:  notifiers,
+		Log:             log,
+		ConfPath:        ma.ConfPath,
+		ConfReload:      ma.ConfReload,
+		MaxRestartDelay: ma.MaxRestartDelay,
+		Notifiers:       notifiers,
 	}
 	err := mr.ReadConfig()
 	if err != nil {
@@ -166,7 +175,7 @@ func (mr *ModRunner) trigger(root string, mod *moddwatch.Mod, dworld *DaemonWorl
 
 // Gives control of chan to caller
 func (mr *ModRunner) runOnChan(modchan chan *moddwatch.Mod, readyCallback func()) error {
-	dworld, err := NewDaemonWorld(mr.Config, mr.Log)
+	dworld, err := NewDaemonWorld(mr.Config, mr.Log, mr.MaxRestartDelay)
 	if err != nil {
 		return err
 	}
