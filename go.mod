@@ -5,9 +5,8 @@ go 1.14
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20210208195552-ff826a37aa15 // indirect
-	github.com/bmatcuk/doublestar v1.3.4 // indirect
-	github.com/cortesi/moddwatch v0.0.0-20200427000745-d26468c93cf0
-	github.com/cortesi/termlog v0.0.0-20210222032753-2a4f27f41ccb
+	github.com/cortesi/moddwatch v0.0.0-20210222043437-a6aaad86a36e
+	github.com/cortesi/termlog v0.0.0-20210222042314-a1eec763abec
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.5.4
 	github.com/kr/text v0.2.0 // indirect
