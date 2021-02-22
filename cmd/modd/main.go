@@ -10,8 +10,8 @@ import (
 	"github.com/cortesi/modd/notify"
 	"github.com/cortesi/termlog"
 	"gopkg.in/alecthomas/kingpin.v2"
-	"mvdan.cc/sh/interp"
-	"mvdan.cc/sh/syntax"
+	"mvdan.cc/sh/v3/interp"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 const modfile = "./modd.conf"
@@ -67,7 +67,6 @@ func main() {
 		runner, err := interp.New(
 			interp.StdIO(os.Stdin, os.Stdout, os.Stderr),
 			func(r *interp.Runner) error {
-				r.KillTimeout = -1
 				return nil
 			},
 		)
