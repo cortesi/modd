@@ -41,6 +41,10 @@ var doNotify = kingpin.Flag("notify", "Send stderr to system notification if com
 	Short('n').
 	Bool()
 
+var notifyType = kingpin.Flag("notifier", "Select the notifier").
+	Short('t').
+	String()
+
 var prep = kingpin.Flag("prep", "Run prep commands and exit").
 	Short('p').
 	Bool()
@@ -98,7 +102,7 @@ func main() {
 
 	notifiers := []notify.Notifier{}
 	if *doNotify {
-		n := notify.PlatformNotifier()
+		n := notify.PlatformNotifier(*notifyType)
 		if n == nil {
 			log.Shout("Could not find a desktop notifier")
 		} else {

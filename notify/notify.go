@@ -52,12 +52,32 @@ func (LibnotifyNotifier) Push(title string, text string, iconPath string) {
 	go cmd.Run()
 }
 
+// ModdNotifier is a notifier for running shell commands
+type ModdNotifier struct {
+}
+
+// Push implements Notifier
+func (n ModdNotifier) Push(title string, text string, iconPath string) {
+	cmd := exec.Command(
+		"modd-notify", "-t", title, "-m", text,
+	)
+	go cmd.Run()
+}
+
+var notifiers = map[string]Notifier{
+	"growlnotify": &GrowlNotifier{},
+	"notify-send": &LibnotifyNotifier{},
+	"modd-notify": &ModdNotifier{},
+}
+
 // PlatformNotifier finds a notifier for this platform
-func PlatformNotifier() Notifier {
-	if hasExecutable("growlnotify") {
-		return &GrowlNotifier{}
-	} else if hasExecutable("notify-send") {
-		return &LibnotifyNotifier{}
+func PlatformNotifier(name string) Notifier {
+	n, ok := notifiers[name]
+	if !ok {
+		return nil
+	}
+	if hasExecutable(name) {
+		return n
 	}
 	return nil
 }
