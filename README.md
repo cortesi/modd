@@ -418,9 +418,13 @@ prep command that exits abnormally to a desktop notifier. Since modd commands
 are shell scripts, you can redirect or manipulate output to entirely customise
 what gets sent to notifiers as needed.
 
-At the moment, we support [Growl](http://growl.info/) on OSX, and
+At the moment, we support [terminal-notifier](https://github.com/julienXX/terminal-notifier) and [Growl](http://growl.info/) on OSX, and
 [libnotify](https://launchpad.net/ubuntu/+source/libnotify) on Linux and other
 Unix systems.
+
+## terminal-notifier
+
+terminal-notifier is a command-line tool to send macOS User Notifications, which are available on macOS 10.10 and higher. Follow the instructions in the [terminal-notifier GitHub repository](https://github.com/julienXX/terminal-notifier) to install.
 
 ## Growl
 
