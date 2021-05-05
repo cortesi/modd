@@ -225,3 +225,104 @@ func TestWatch(t *testing.T) {
 		},
 	)
 }
+
+func TestSilence(t *testing.T) {
+	t.Run(
+		"immediate",
+		func(t *testing.T) {
+			_testSilence(
+				t,
+				func() {
+					touch("immediate")
+					time.Sleep(2 * time.Millisecond)
+					touch("immediate")
+					time.Sleep(11 * time.Millisecond)
+					touch("immediate")
+				},
+				[]string{
+					":immediate: ./immediate",
+					":immediate: ./immediate",
+					":immediate: ./immediate",
+				},
+			)
+		},
+	)
+	t.Run(
+		"debounced",
+		func(t *testing.T) {
+			_testSilence(
+				t,
+				func() {
+					touch("debounced")
+					time.Sleep(2 * time.Millisecond)
+					touch("debounced")
+					time.Sleep(10 * time.Millisecond)
+					touch("debounced")
+					time.Sleep(11 * time.Millisecond)
+				},
+				[]string{
+					":debounced: ./debounced",
+					":debounced: ./debounced",
+				},
+			)
+		},
+	)
+}
+
+func _testSilence(t *testing.T, modfunc func(), expected []string) {
+	defer utils.WithTempDir(t)()
+
+	// There's some race condition in rjeczalik/notify. If we don't wait a bit
+	// here, we sometimes receive notifications for the change above even
+	// though we haven't started the watcher.
+	time.Sleep(200 * time.Millisecond)
+
+	confTxt := `
+		@shell = bash
+
+		immediate {
+            prep: echo ":immediate:" @mods
+        }
+		debounced {
+			silence: 10ms
+            prep: echo ":debounced:" @mods
+        }
+    `
+	cnf, err := conf.Parse("test", confTxt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lt := termlog.NewLogTest()
+	modchan := make(chan *moddwatch.Mod, 1024)
+	cback := func() {
+		start := time.Now()
+		modfunc()
+		for {
+			ret := events(lt.String())
+			if reflect.DeepEqual(ret, expected) {
+				break
+			}
+			if time.Since(start) > timeout {
+				t.Errorf("Expected\n%#v\nGot\n%#v", expected, ret)
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		modchan <- nil
+	}
+
+	mr := ModRunner{
+		Log:    lt.Log,
+		Config: cnf,
+	}
+
+	err = mr.runOnChan(modchan, cback)
+	if err != nil {
+		t.Fatalf("runOnChan: %s", err)
+	}
+	ret := events(lt.String())
+	if !reflect.DeepEqual(ret, expected) {
+		t.Errorf("Expected\n%#v\nGot\n%#v", expected, ret)
+	}
+}
