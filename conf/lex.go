@@ -436,7 +436,7 @@ func lexInside(l *lexer) stateFn {
 				l.emit(itemPrep)
 				return lexOptions
 			case "silence":
-				l.emit(itemPrep)
+				l.emit(itemSilence)
 				return lexOptions
 			default:
 				l.errorf("unknown directive: %s", l.current())
