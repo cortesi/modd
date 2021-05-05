@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"time"
 )
 
 // A Daemon is a persistent process that is kept running
@@ -27,6 +28,7 @@ type Block struct {
 
 	Daemons []Daemon
 	Preps   []Prep
+	Silence *Silence
 }
 
 func (b *Block) addPrep(command string, options []string) error {
@@ -47,6 +49,38 @@ func (b *Block) addPrep(command string, options []string) error {
 	prep := Prep{command, onchange}
 
 	b.Preps = append(b.Preps, prep)
+	return nil
+}
+
+func (b *Block) addSilence(value string, options []string) error {
+	if b.Silence != nil {
+		return fmt.Errorf("silence can only be used once per block")
+	}
+
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return fmt.Errorf("can't parse duration `%s`: %s", value, err)
+	}
+
+	// We already have the onchange prop in prep. Though, the semantics of 'onchange' for silence is not clear for me.
+	// TODO: may be rename this to onstart.
+	var onchange = false
+	for _, v := range options {
+		switch v {
+		case "+onchange":
+			onchange = true
+		default:
+			return fmt.Errorf("unknown option: %s", v)
+		}
+	}
+
+	last := time.Now()
+	if !onchange {
+		// pretend we've been triggered some time earlier
+		last = last.Add(-duration)
+	}
+
+	b.Silence = &Silence{last, duration}
 	return nil
 }
 

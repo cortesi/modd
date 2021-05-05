@@ -148,6 +148,10 @@ func (mr *ModRunner) runBlock(b conf.Block, mod *moddwatch.Mod, dpen *DaemonPen)
 
 func (mr *ModRunner) trigger(root string, mod *moddwatch.Mod, dworld *DaemonWorld) {
 	for i, b := range mr.Config.Blocks {
+		if !b.Silence.Ready() {
+			mr.Log.Notice("silence period effective: %s", b.Silence)
+			continue
+		}
 		lmod := mod
 		if lmod != nil {
 			var err error
