@@ -108,7 +108,7 @@ func _testWatch(t *testing.T, modfunc func(), expected []string) {
 			if reflect.DeepEqual(ret, expected) {
 				break
 			}
-			if time.Now().Sub(start) > timeout {
+			if time.Since(start) > timeout {
 				t.Errorf("Expected\n%#v\nGot\n%#v", expected, ret)
 				break
 			}
