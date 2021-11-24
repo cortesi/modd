@@ -27,13 +27,17 @@ Windows, Linux, FreeBSD, NetBSD and OpenBSD. Go to the [releases
 page](https://github.com/cortesi/modd/releases/latest), download the package for
 your OS, and copy the binary to somewhere on your PATH.
 
-If you have a working Go installation, you can also say
+If you have a working Go installation, you can also run
 
-    $ env GO111MODULE=on go get github.com/cortesi/modd/cmd/modd
+    env GO111MODULE=on go get github.com/cortesi/modd/cmd/modd
+
+Go 1.17+
+
+    go install github.com/cortesi/modd/cmd/modd@latest
 
 On OSX, you can install modd with homebrew:
 
-    $ brew install modd
+    brew install modd
 
 
 # Quick start
@@ -49,7 +53,7 @@ Put this in a file called *modd.conf*:
 Now run modd like so:
 
 ```
-$ modd
+modd
 ```
 
 The first time modd is run, it will run the tests of all Go modules. Whenever
