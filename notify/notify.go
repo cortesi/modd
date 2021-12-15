@@ -33,7 +33,7 @@ type GrowlNotifier struct {
 }
 
 // Push implements Notifier
-func (GrowlNotifier) Push(title string, text string, iconPath string) {
+func (GrowlNotifier) Push(_ string, text string, _ string) {
 	cmd := exec.Command(
 		"growlnotify", "-n", prog, "-d", prog, "-m", text, prog,
 	)
@@ -45,7 +45,7 @@ type LibnotifyNotifier struct {
 }
 
 // Push implements Notifier
-func (LibnotifyNotifier) Push(title string, text string, iconPath string) {
+func (LibnotifyNotifier) Push(_ string, text string, _ string) {
 	cmd := exec.Command(
 		"notify-send", prog, text,
 	)
