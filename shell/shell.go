@@ -157,7 +157,7 @@ func (e *Executor) Signal(sig os.Signal) error {
 }
 
 func (e *Executor) Stop() error {
-	return e.Signal(os.Kill)
+	return e.Signal(os.Interrupt)
 }
 
 func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interface{})) {
