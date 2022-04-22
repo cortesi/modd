@@ -2,9 +2,11 @@ package shell
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -195,4 +197,81 @@ func TestCaseInsensitivePath(t *testing.T) {
 			testCmd(t, sh, pathTest)
 		},
 	)
+}
+
+func generateLongLines() *string {
+	var sb strings.Builder
+
+	// Each line should be at least twice as large as the buffer used in `logOutput` (4k)
+	for i := 0; i < 10000; i++ {
+		sb.WriteRune(rune('A' + (i % 26)))
+	}
+
+	var longLine = sb.String()
+	var lines = strings.Join([]string{longLine, longLine, longLine, longLine}, "\n")
+
+	return &lines
+}
+
+func writeTempFile(s *string, f *os.File) error {
+	defer f.Close()
+	_, err := f.WriteString(*s)
+	if err != nil {
+		return err
+	}
+	err = f.Sync()
+	return err
+}
+
+func TestVeryLongLine(t *testing.T) {
+	f, err := ioutil.TempFile("", "testVeryLongLines")
+	if err != nil {
+		panic(err)
+	}
+	defer syscall.Unlink(f.Name())
+
+	shellTesting = true
+	var longLines = generateLongLines()
+
+	err = writeTempFile(longLines, f)
+	if err != nil {
+		panic(err)
+	}
+
+	var shells []string
+	var command string
+	if runtime.GOOS == "windows" {
+		shells = []string{
+			"modd",
+			"powershell",
+		}
+		command = fmt.Sprintf("type %s", f.Name())
+	} else {
+		shells = []string{
+			"sh",
+			"bash",
+			"modd",
+			"powershell",
+		}
+		command = fmt.Sprintf("cat %s", f.Name())
+	}
+	for _, sh := range shells {
+
+		longLineTest := cmdTest{
+			name:   "long-line-test",
+			cmd:    command,
+			logHas: *longLines,
+		}
+
+		t.Run(
+			fmt.Sprintf("%s/%s", sh, longLineTest.name),
+			func(t *testing.T) {
+				if _, err := CheckShell(sh); err != nil {
+					t.Skipf("skipping - %s", err)
+					return
+				}
+				testCmd(t, sh, longLineTest)
+			},
+		)
+	}
 }
