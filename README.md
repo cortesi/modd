@@ -27,10 +27,9 @@ Windows, Linux, FreeBSD, NetBSD and OpenBSD. Go to the [releases
 page](https://github.com/cortesi/modd/releases/latest), download the package for
 your OS, and copy the binary to somewhere on your PATH.
 
-If you have a working Go installation, you can also say
+Alternatively, with Go 1.17+ installed, you can install `modd` directly using `go install`. Please note that CGO is required, so if you happen to have it disabled you will need to prepend the `CGO_ENABLED=1` environment variable.
 
     $ go install github.com/cortesi/modd/cmd/modd@latest
-
 
 # Quick start
 
