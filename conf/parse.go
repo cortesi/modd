@@ -8,6 +8,7 @@ package conf
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -248,6 +249,8 @@ Loop:
 			dir = strings.Replace(
 				dir, confVarName, p.config.variables[confVarName], -1,
 			)
+			// Expand any OS environment variables that might be in the path
+			dir = os.ExpandEnv(dir)
 			dir, err := filepath.Abs(dir)
 			if err != nil {
 				p.errorf("%s", err)
