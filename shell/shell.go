@@ -27,6 +27,7 @@ type Executor struct {
 	Shell   string
 	Command string
 	Dir     string
+	Env     []string
 
 	cmd  *exec.Cmd
 	stdo io.ReadCloser
@@ -50,7 +51,7 @@ func GetShellName(v string) (string, error) {
 	return v, nil
 }
 
-func NewExecutor(shell string, command string, dir string) (*Executor, error) {
+func NewExecutor(shell string, command string, dir string, env []string) (*Executor, error) {
 	_, err := makeCommand(shell, command, dir)
 	if err != nil {
 		return nil, err
@@ -59,6 +60,7 @@ func NewExecutor(shell string, command string, dir string) (*Executor, error) {
 		Shell:   shell,
 		Command: command,
 		Dir:     dir,
+		Env:     env,
 	}, nil
 }
 
@@ -71,6 +73,9 @@ func (e *Executor) start(
 	cmd, err := makeCommand(e.Shell, e.Command, e.Dir)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	if e.Env != nil {
+		cmd.Env = e.Env
 	}
 	e.cmd = cmd
 

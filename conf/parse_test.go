@@ -159,7 +159,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo"},
-					Preps:   []Prep{Prep{Command: "command"}},
+					Preps:   []Prep{{Command: "command"}},
 				},
 			},
 		},
@@ -171,7 +171,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo"},
-					Preps:   []Prep{Prep{Command: "command", Onchange: true}},
+					Preps:   []Prep{{Command: "command", Onchange: true}},
 				},
 			},
 		},
@@ -183,7 +183,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo"},
-					Preps:   []Prep{Prep{Command: "command\n-one\n-two"}},
+					Preps:   []Prep{{Command: "command\n-one\n-two"}},
 				},
 			},
 		},
@@ -195,7 +195,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo", "bar"},
-					Preps:   []Prep{Prep{Command: "command"}},
+					Preps:   []Prep{{Command: "command"}},
 				},
 			},
 		},
@@ -299,6 +299,51 @@ var parseTests = []struct {
 			},
 		},
 	},
+	{
+		"",
+		"foo {\nenvfile:testdata/good.env\nprep: command\n}",
+		&Config{
+			Blocks: []Block{
+				{
+					Include: []string{"foo"},
+					Env: []string{
+						"FOO=BAR",
+						`BAR="FOO"`,
+						"BAZ",
+						"WUG",
+					},
+					Preps: []Prep{
+						{
+							Command: "command",
+						},
+					},
+				},
+			},
+		},
+	},
+	{
+		"",
+		"foo {\nenvfile:testdata/good.env\nenvfile:testdata/good2.env\nprep: command\n}",
+		&Config{
+			Blocks: []Block{
+				{
+					Include: []string{"foo"},
+					Env: []string{
+						"FOO=BAR",
+						`BAR="FOO"`,
+						"BAZ",
+						"WUG",
+						"ALSO=GOOD",
+					},
+					Preps: []Prep{
+						{
+							Command: "command",
+						},
+					},
+				},
+			},
+		},
+	},
 }
 
 var parseCmpOptions = []cmp.Option{
@@ -335,6 +380,8 @@ var parseErrorTests = []struct {
 	{"@foo=bar\n@foo=bar {}", "test:2: variable @foo shadows previous declaration"},
 	{"{indir +foo: bar\n}", "test:1: indir takes no options"},
 	{"{indir: bar\nindir: voing\n}", "test:2: indir can only be used once per block"},
+	{"{envfile: bar\n}", "test:1: envfile bar: not found"},
+	{"{envfile: testdata/bad_var.env\n}", "test:1: envfile testdata/bad_var.env:1: invalid environment variable \"!NOPE\""},
 }
 
 func TestErrorsParse(t *testing.T) {

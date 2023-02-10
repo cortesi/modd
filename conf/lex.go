@@ -12,10 +12,12 @@ import (
 	"unicode/utf8"
 )
 
-const spaces = " \t"
-const whitespace = spaces + "\n"
-const wordRunes = "abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
-const quotes = `'"`
+const (
+	spaces     = " \t"
+	whitespace = spaces + "\n"
+	wordRunes  = "abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+	quotes     = `'"`
+)
 
 // Characters we don't allow in bare strings
 const bareStringDisallowed = "{}#\n" + whitespace + quotes
@@ -38,6 +40,8 @@ const (
 	itemSpace
 	itemVarName
 	itemEquals
+	itemEnvVar
+	itemEnvFile
 )
 
 func (i itemType) String() string {
@@ -70,6 +74,10 @@ func (i itemType) String() string {
 		return "space"
 	case itemVarName:
 		return "var"
+	case itemEnvVar:
+		return "env"
+	case itemEnvFile:
+		return "envfile"
 	default:
 		panic("unreachable")
 	}
@@ -432,6 +440,12 @@ func lexInside(l *lexer) stateFn {
 			case "prep":
 				l.emit(itemPrep)
 				return lexOptions
+			case "envfile":
+				l.emit(itemEnvFile)
+				return lexOptions
+			// case "env":
+			// 	l.emit(itemEnvVar)
+			// 	return lexOptions
 			default:
 				l.errorf("unknown directive: %s", l.current())
 				return nil

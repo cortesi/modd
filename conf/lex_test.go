@@ -263,6 +263,16 @@ var lexTests = []struct {
 			{itemBareString, "b"},
 		},
 	},
+	{
+		"one {\nenvfile: foo\n}", []itm{
+			{itemBareString, "one"},
+			{itemLeftParen, "{"},
+			{itemEnvFile, "envfile"},
+			{itemColon, ":"},
+			{itemBareString, "foo\n"},
+			{itemRightParen, "}"},
+		},
+	},
 }
 
 func TestLex(t *testing.T) {

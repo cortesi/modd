@@ -24,6 +24,9 @@ type Block struct {
 	Exclude        []string
 	NoCommonFilter bool
 	InDir          string
+	// todo: cumulative env with envEndIdx
+	// envEndIdx int
+	Env []string
 
 	Daemons []Daemon
 	Preps   []Prep
@@ -34,7 +37,7 @@ func (b *Block) addPrep(command string, options []string) error {
 		b.Preps = []Prep{}
 	}
 
-	var onchange = false
+	onchange := false
 	for _, v := range options {
 		switch v {
 		case "+onchange":
