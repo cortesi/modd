@@ -47,7 +47,7 @@ func (b *Block) addPrep(command string, options []string) error {
 		}
 	}
 
-	prep := Prep{command, onchange}
+	prep := Prep{os.ExpandEnv(command), onchange}
 
 	b.Preps = append(b.Preps, prep)
 	return nil
