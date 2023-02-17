@@ -1,9 +1,11 @@
-// +build  !windows
+//go:build !windows
+// +build !windows
 
 package conf
 
 import (
 	"fmt"
+	"os"
 	"syscall"
 )
 
@@ -12,7 +14,7 @@ func (b *Block) addDaemon(command string, options []string) error {
 		b.Daemons = []Daemon{}
 	}
 	d := Daemon{
-		Command:       command,
+		Command:       os.ExpandEnv(command),
 		RestartSignal: syscall.SIGHUP,
 	}
 	for _, v := range options {

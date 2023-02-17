@@ -8,6 +8,7 @@ package conf
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -248,11 +249,28 @@ Loop:
 			dir = strings.Replace(
 				dir, confVarName, p.config.variables[confVarName], -1,
 			)
+			// Expand any OS environment variables that might be in the path
+			dir = os.ExpandEnv(dir)
 			dir, err := filepath.Abs(dir)
 			if err != nil {
 				p.errorf("%s", err)
 			}
 			block.InDir = dir
+		case itemEnvFile:
+			options := p.collectValues(itemBareString)
+			if len(options) > 0 {
+				p.errorf("envfile takes no options")
+			}
+			p.mustNext(itemColon)
+			envFile := prepValue(p.mustNext(itemBareString, itemQuotedString))
+			cleanEnv := filepath.Clean(envFile)
+			envVars, err := processEnvFile(cleanEnv)
+			if err != nil {
+				p.errorf("envfile %s:%s", envFile, err)
+			}
+			block.Env = append(block.Env, envVars...)
+		// case itemEnvVar:
+		// 	options := p.collectValues(itemBareString, itemQuotedString, itemEquals)
 		case itemDaemon:
 			options := p.collectValues(itemBareString)
 			p.mustNext(itemColon)

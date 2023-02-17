@@ -22,9 +22,9 @@ func (p ProcError) Error() string {
 }
 
 // RunProc runs a process to completion, sending output to log
-func RunProc(cmd string, shellMethod string, dir string, log termlog.Stream) error {
+func RunProc(cmd string, shellMethod string, dir string, env []string, log termlog.Stream) error {
 	log.Header()
-	ex, err := shell.NewExecutor(shellMethod, cmd, dir)
+	ex, err := shell.NewExecutor(shellMethod, cmd, dir, env)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func RunPreps(
 		if err != nil {
 			return err
 		}
-		err = RunProc(cmd, sh, b.InDir, log.Stream(niceHeader("prep: ", cmd)))
+		err = RunProc(cmd, sh, b.InDir, b.Env, log.Stream(niceHeader("prep: ", cmd)))
 		if err != nil {
 			if pe, ok := err.(ProcError); ok {
 				for _, n := range notifiers {

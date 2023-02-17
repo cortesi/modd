@@ -42,7 +42,7 @@ func testCmd(t *testing.T, shell string, ct cmdTest) {
 	}
 
 	lt := termlog.NewLogTest()
-	exec, err := NewExecutor(shell, ct.cmd, "")
+	exec, err := NewExecutor(shell, ct.cmd, "", nil)
 	if err != nil {
 		t.Error(err)
 		return

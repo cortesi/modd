@@ -25,7 +25,7 @@ const (
 type daemon struct {
 	conf  conf.Daemon
 	indir string
-
+	env   []string
 	ex    *shell.Executor
 	log   termlog.Stream
 	shell string
@@ -77,7 +77,7 @@ func (d *daemon) Restart() {
 	d.Lock()
 	defer d.Unlock()
 	if d.ex == nil {
-		ex, err := shell.NewExecutor(d.shell, d.conf.Command, d.indir)
+		ex, err := shell.NewExecutor(d.shell, d.conf.Command, d.indir, d.env)
 		if err != nil {
 			d.log.Shout("Could not create executor: %s", err)
 		}
@@ -138,6 +138,7 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 			log:   log.Stream(niceHeader("daemon: ", dmn.Command)),
 			shell: sh,
 			indir: indir,
+			env:   block.Env,
 		}
 	}
 	return &DaemonPen{daemons: d}, nil
