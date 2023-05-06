@@ -163,12 +163,27 @@ func (e *Executor) Stop() error {
 func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interface{})) {
 	defer wg.Done()
 	r := bufio.NewReader(fp)
+
+	var partial = false
+	var fullLine = ""
 	for {
-		line, _, err := r.ReadLine()
+		line, isPrefix, err := r.ReadLine()
 		if err != nil {
 			return
 		}
-		out("%s", string(line))
+
+		if !isPrefix && !partial {
+			out("%s", string(line))
+		} else if !isPrefix && partial {
+			out("%s", fullLine+string(line))
+			fullLine = ""
+			partial = false
+		} else if isPrefix && !partial {
+			fullLine = string(line)
+			partial = true
+		} else if isPrefix && partial {
+			fullLine += string(line)
+		}
 	}
 }
 
