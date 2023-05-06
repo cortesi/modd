@@ -159,7 +159,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo"},
-					Preps:   []Prep{Prep{Command: "command"}},
+					Preps:   []Prep{{Command: "command"}},
 				},
 			},
 		},
@@ -171,7 +171,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo"},
-					Preps:   []Prep{Prep{Command: "command", Onchange: true}},
+					Preps:   []Prep{{Command: "command", Onchange: true}},
 				},
 			},
 		},
@@ -183,7 +183,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo"},
-					Preps:   []Prep{Prep{Command: "command\n-one\n-two"}},
+					Preps:   []Prep{{Command: "command\n-one\n-two"}},
 				},
 			},
 		},
@@ -195,7 +195,7 @@ var parseTests = []struct {
 			Blocks: []Block{
 				{
 					Include: []string{"foo", "bar"},
-					Preps:   []Prep{Prep{Command: "command"}},
+					Preps:   []Prep{{Command: "command"}},
 				},
 			},
 		},

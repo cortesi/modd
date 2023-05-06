@@ -1,10 +1,7 @@
 package modd
 
 import (
-	"bufio"
-	"io"
 	"strings"
-	"sync"
 
 	"github.com/cortesi/termlog"
 )
@@ -32,16 +29,4 @@ func niceHeader(preamble string, command string) string {
 	pre := termlog.DefaultPalette.Timestamp.SprintFunc()(preamble)
 	command = termlog.DefaultPalette.Header.SprintFunc()(shortCommand(command))
 	return pre + command
-}
-
-func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interface{})) {
-	defer wg.Done()
-	r := bufio.NewReader(fp)
-	for {
-		line, _, err := r.ReadLine()
-		if err != nil {
-			return
-		}
-		out("%s", string(line))
-	}
 }

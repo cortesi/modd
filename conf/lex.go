@@ -399,7 +399,7 @@ func lexVariables(l *lexer) stateFn {
 	}
 }
 
-func lexTop(l *lexer) stateFn {
+func lexTop(*lexer) stateFn {
 	return lexVariables
 }
 
