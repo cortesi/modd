@@ -27,6 +27,8 @@ type Block struct {
 
 	Daemons []Daemon
 	Preps   []Prep
+
+	Status int
 }
 
 func (b *Block) addPrep(command string, options []string) error {
