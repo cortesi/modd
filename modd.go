@@ -10,6 +10,7 @@ import (
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
 	"github.com/cortesi/modd/shell"
+	"github.com/cortesi/modd/utils"
 	"github.com/cortesi/moddwatch"
 	"github.com/cortesi/termlog"
 )
@@ -108,7 +109,7 @@ func (mr *ModRunner) PrepOnly(initial bool) error {
 
 func (mr *ModRunner) runBlock(b conf.Block, mod *moddwatch.Mod, dpen *DaemonPen) {
 	if b.InDir != "" {
-		currentDir, err := os.Getwd()
+		currentDir, err := utils.GetRealWd()
 		if err != nil {
 			mr.Log.Shout("Error getting current working directory: %s", err)
 			return
@@ -184,14 +185,14 @@ func (mr *ModRunner) runOnChan(modchan chan *moddwatch.Mod, readyCallback func()
 		ipatts = append(ipatts, filepath.Dir(mr.ConfPath))
 	}
 
-	currentDir, err := os.Getwd()
+	currentDir, err := utils.GetRealWd()
 	if err != nil {
 		return err
 	}
+
 	// FIXME: This takes a long time. We could start it in parallel with the
 	// first process run in a goroutine
 	watcher, err := moddwatch.Watch(currentDir, ipatts, []string{}, lullTime, modchan)
-
 	if err != nil {
 		return fmt.Errorf("Error watching: %s", err)
 	}

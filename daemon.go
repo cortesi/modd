@@ -8,6 +8,7 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/shell"
+	"github.com/cortesi/modd/utils"
 	"github.com/cortesi/modd/varcmd"
 	"github.com/cortesi/termlog"
 )
@@ -123,7 +124,7 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 		if block.InDir != "" {
 			indir = block.InDir
 		} else {
-			indir, err = os.Getwd()
+			indir, err = utils.GetRealWd()
 			if err != nil {
 				return nil, err
 			}
