@@ -17,14 +17,13 @@ const (
 	MinRestart = 500 * time.Millisecond
 	// MulRestart is the exponential backoff multiplier applied when the daemon exits uncleanly
 	MulRestart = 2
-	// MaxRestart is the maximum amount of time between daemon restarts
-	MaxRestart = 8 * time.Second
 )
 
 // A single daemon
 type daemon struct {
-	conf  conf.Daemon
-	indir string
+	conf            conf.Daemon
+	indir           string
+	maxRestartDelay time.Duration
 
 	ex    *shell.Executor
 	log   termlog.Stream
@@ -61,12 +60,12 @@ func (d *daemon) Run() {
 
 		// If we exited cleanly, or the process ran for > MaxRestart, we reset
 		// the delay timer
-		if time.Now().Sub(lastStart) > MaxRestart {
+		if time.Now().Sub(lastStart) > d.maxRestartDelay {
 			delay = MinRestart
 		} else {
 			delay *= MulRestart
-			if delay > MaxRestart {
-				delay = MaxRestart
+			if delay > d.maxRestartDelay {
+				delay = d.maxRestartDelay
 			}
 		}
 	}
@@ -110,7 +109,7 @@ type DaemonPen struct {
 }
 
 // NewDaemonPen creates a new DaemonPen
-func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog) (*DaemonPen, error) {
+func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog, maxRestartDelay time.Duration) (*DaemonPen, error) {
 	d := make([]*daemon, len(block.Daemons))
 	for i, dmn := range block.Daemons {
 		vcmd := varcmd.VarCmd{Block: nil, Modified: nil, Vars: vars}
@@ -134,10 +133,11 @@ func NewDaemonPen(block conf.Block, vars map[string]string, log termlog.TermLog)
 		}
 
 		d[i] = &daemon{
-			conf:  dmn,
-			log:   log.Stream(niceHeader("daemon: ", dmn.Command)),
-			shell: sh,
-			indir: indir,
+			conf:            dmn,
+			log:             log.Stream(niceHeader("daemon: ", dmn.Command)),
+			shell:           sh,
+			indir:           indir,
+			maxRestartDelay: maxRestartDelay,
 		}
 	}
 	return &DaemonPen{daemons: d}, nil
@@ -171,10 +171,10 @@ type DaemonWorld struct {
 }
 
 // NewDaemonWorld creates a DaemonWorld
-func NewDaemonWorld(cnf *conf.Config, log termlog.TermLog) (*DaemonWorld, error) {
+func NewDaemonWorld(cnf *conf.Config, log termlog.TermLog, maxRestartDelay time.Duration) (*DaemonWorld, error) {
 	daemonPens := make([]*DaemonPen, len(cnf.Blocks))
 	for i, b := range cnf.Blocks {
-		d, err := NewDaemonPen(b, cnf.GetVariables(), log)
+		d, err := NewDaemonPen(b, cnf.GetVariables(), log, maxRestartDelay)
 		if err != nil {
 			return nil, err
 		}
