@@ -35,6 +35,7 @@ const (
 	itemQuotedString
 	itemPrep
 	itemRightParen
+	itemSilence
 	itemSpace
 	itemVarName
 	itemEquals
@@ -66,6 +67,8 @@ func (i itemType) String() string {
 		return "quotedstring"
 	case itemRightParen:
 		return "rparen"
+	case itemSilence:
+		return "silence"
 	case itemSpace:
 		return "space"
 	case itemVarName:
@@ -431,6 +434,9 @@ func lexInside(l *lexer) stateFn {
 				return lexOptions
 			case "prep":
 				l.emit(itemPrep)
+				return lexOptions
+			case "silence":
+				l.emit(itemSilence)
 				return lexOptions
 			default:
 				l.errorf("unknown directive: %s", l.current())

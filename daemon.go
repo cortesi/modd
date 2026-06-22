@@ -61,7 +61,7 @@ func (d *daemon) Run() {
 
 		// If we exited cleanly, or the process ran for > MaxRestart, we reset
 		// the delay timer
-		if time.Now().Sub(lastStart) > MaxRestart {
+		if time.Since(lastStart) > MaxRestart {
 			delay = MinRestart
 		} else {
 			delay *= MulRestart

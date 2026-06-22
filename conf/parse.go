@@ -273,6 +273,16 @@ Loop:
 			if err != nil {
 				p.errorf("%s", err)
 			}
+		case itemSilence:
+			options := p.collectValues(itemBareString)
+			p.mustNext(itemColon)
+			err := block.addSilence(
+				prepValue(p.mustNext(itemBareString)),
+				options,
+			)
+			if err != nil {
+				p.errorf("%s", err)
+			}
 		case itemRightParen:
 			break Loop
 		default:

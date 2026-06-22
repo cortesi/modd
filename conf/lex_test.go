@@ -263,6 +263,15 @@ var lexTests = []struct {
 			{itemBareString, "b"},
 		},
 	},
+	{
+		"{\nsilence: 1us\n}\n", []itm{
+			{itemLeftParen, "{"},
+			{itemSilence, "silence"},
+			{itemColon, ":"},
+			{itemBareString, "1us\n"},
+			{itemRightParen, "}"},
+		},
+	},
 }
 
 func TestLex(t *testing.T) {
