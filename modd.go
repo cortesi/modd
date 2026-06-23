@@ -9,6 +9,7 @@ import (
 
 	"github.com/cortesi/modd/conf"
 	"github.com/cortesi/modd/notify"
+	"github.com/cortesi/modd/report"
 	"github.com/cortesi/modd/shell"
 	"github.com/cortesi/moddwatch"
 	"github.com/cortesi/termlog"
@@ -58,15 +59,17 @@ type ModRunner struct {
 	ConfPath   string
 	ConfReload bool
 	Notifiers  []notify.Notifier
+	Reporters  []report.Reporter
 }
 
 // NewModRunner constructs a new ModRunner
-func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notifier, confreload bool) (*ModRunner, error) {
+func NewModRunner(confPath string, log termlog.TermLog, notifiers []notify.Notifier, reporters []report.Reporter, confreload bool) (*ModRunner, error) {
 	mr := &ModRunner{
 		Log:        log,
 		ConfPath:   confPath,
 		ConfReload: confreload,
 		Notifiers:  notifiers,
+		Reporters:  reporters,
 	}
 	err := mr.ReadConfig()
 	if err != nil {
@@ -106,12 +109,12 @@ func (mr *ModRunner) PrepOnly(initial bool) error {
 	return nil
 }
 
-func (mr *ModRunner) runBlock(b conf.Block, mod *moddwatch.Mod, dpen *DaemonPen) {
+func (mr *ModRunner) runBlock(b conf.Block, mod *moddwatch.Mod, dpen *DaemonPen) error {
 	if b.InDir != "" {
 		currentDir, err := os.Getwd()
 		if err != nil {
 			mr.Log.Shout("Error getting current working directory: %s", err)
-			return
+			return err
 		}
 		err = os.Chdir(b.InDir)
 		if err != nil {
@@ -120,7 +123,7 @@ func (mr *ModRunner) runBlock(b conf.Block, mod *moddwatch.Mod, dpen *DaemonPen)
 				b.InDir,
 				err,
 			)
-			return
+			return err
 		}
 		defer func() {
 			err := os.Chdir(currentDir)
@@ -140,9 +143,10 @@ func (mr *ModRunner) runBlock(b conf.Block, mod *moddwatch.Mod, dpen *DaemonPen)
 		if _, ok := err.(ProcError); !ok {
 			mr.Log.Shout("Error running prep: %s", err)
 		}
-		return
+		return err
 	}
 	dpen.Restart()
+	return nil
 }
 
 func (mr *ModRunner) trigger(root string, mod *moddwatch.Mod, dworld *DaemonWorld) {
@@ -159,7 +163,28 @@ func (mr *ModRunner) trigger(root string, mod *moddwatch.Mod, dworld *DaemonWorl
 				continue
 			}
 		}
-		mr.runBlock(b, lmod, dworld.DaemonPens[i])
+
+		err := mr.runBlock(b, lmod, dworld.DaemonPens[i])
+
+		if err != nil {
+			mr.Config.Blocks[i].Status = 1
+		} else {
+			mr.Config.Blocks[i].Status = 0
+		}
+	}
+
+	// Compute overall status: != 0 if any block has Status != 0, otherwise 0.
+	status := 0
+
+	for _, b := range mr.Config.Blocks {
+		if status == 0 {
+			status = b.Status
+		}
+	}
+
+	// Report the overall status to all reporters.
+	for _, r := range mr.Reporters {
+		r.Report(time.Now(), status)
 	}
 }
 

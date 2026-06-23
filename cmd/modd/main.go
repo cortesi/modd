@@ -8,6 +8,7 @@ import (
 
 	"github.com/cortesi/modd"
 	"github.com/cortesi/modd/notify"
+	"github.com/cortesi/modd/report"
 	"github.com/cortesi/termlog"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"mvdan.cc/sh/v3/interp"
@@ -15,6 +16,7 @@ import (
 )
 
 const modfile = "./modd.conf"
+const reportFile = ".modd_report"
 
 var file = kingpin.Flag(
 	"file",
@@ -39,6 +41,10 @@ var ignores = kingpin.Flag("ignores", "List default ignore patterns and exit").
 
 var doNotify = kingpin.Flag("notify", "Send stderr to system notification if commands error").
 	Short('n').
+	Bool()
+
+var doReport = kingpin.Flag("report", "Report last prep status to file").
+	Short('r').
 	Bool()
 
 var prep = kingpin.Flag("prep", "Run prep commands and exit").
@@ -109,7 +115,15 @@ func main() {
 		notifiers = append(notifiers, &notify.BeepNotifier{})
 	}
 
-	mr, err := modd.NewModRunner(*file, log, notifiers, !(*noconf))
+	reporters := []report.Reporter{}
+	if *doReport {
+		r := report.FileReporter{
+			Filename: reportFile,
+		}
+		reporters = append(reporters, r)
+	}
+
+	mr, err := modd.NewModRunner(*file, log, notifiers, reporters, !(*noconf))
 	if err != nil {
 		log.Shout("%s", err)
 		return
