@@ -153,7 +153,7 @@ func (e *Executor) Signal(sig os.Signal) error {
 	if !e.running() {
 		return fmt.Errorf("executor not running")
 	}
-	return e.sendSignal(sig)
+	return e.sendSignal()
 }
 
 func (e *Executor) Stop() error {

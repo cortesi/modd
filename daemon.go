@@ -94,7 +94,7 @@ func (d *daemon) Restart() {
 	}
 }
 
-func (d *daemon) Shutdown(sig os.Signal) error {
+func (d *daemon) Shutdown() error {
 	d.log.Notice(">> stopping")
 	d.stop = true
 	if d.ex != nil {
@@ -160,7 +160,7 @@ func (dp *DaemonPen) Shutdown(sig os.Signal) {
 	defer dp.Unlock()
 	if dp.daemons != nil {
 		for _, d := range dp.daemons {
-			d.Shutdown(sig)
+			d.Shutdown()
 		}
 	}
 }
