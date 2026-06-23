@@ -90,6 +90,16 @@ func testCmd(t *testing.T, shell string, ct cmdTest) {
 	}
 }
 
+var longLine = func() string {
+	// 6K is longer than the default buffer size, but still well under the
+	// powershell command line length limit of 8191
+	var runes [6 * 1024]rune
+	for i := range runes {
+		runes[i] = rune('0' + i%10)
+	}
+	return string(runes[:])
+}()
+
 var shellTests = []cmdTest{
 	{
 		name:   "echosuccess",
@@ -128,6 +138,11 @@ var shellTests = []cmdTest{
 		logHas:  "moddtest",
 		kill:    true,
 		procerr: true,
+	},
+	{
+		name:   "longline",
+		cmd:    "echo " + longLine + "; true",
+		logHas: longLine,
 	},
 }
 

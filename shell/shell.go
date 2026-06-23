@@ -23,6 +23,8 @@ var shellTesting bool
 
 var Default = "modd"
 
+const maxLineLen = 64 * 1024
+
 type Executor struct {
 	Shell   string
 	Command string
@@ -162,7 +164,7 @@ func (e *Executor) Stop() error {
 
 func logOutput(wg *sync.WaitGroup, fp io.ReadCloser, out func(string, ...interface{})) {
 	defer wg.Done()
-	r := bufio.NewReader(fp)
+	r := bufio.NewReaderSize(fp, maxLineLen)
 	for {
 		line, _, err := r.ReadLine()
 		if err != nil {
